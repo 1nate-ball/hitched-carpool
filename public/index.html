@@ -1,0 +1,859 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Hitch Carpool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: phone-width app column centered on a quiet stage; sticky top bars, sticky bottom nav. Navy "highway sign" ink + red-rock accent. */
+:root{
+  --stage:#E3E8EF; --bg:#F4F6F9; --surface:#FFFFFF; --surface-2:#EDF1F6;
+  --ink:#13203A; --muted:#5A6479; --line:#D9DFE8;
+  --accent:#C8502A; --accent-soft:#FBE7DE;
+  --btn:#13203A; --btn-ink:#FFFFFF;
+  --ok:#1D7148; --ok-bg:#DFF2E7; --warn:#8A5A06; --warn-bg:#FBEFD3; --bad:#A8271F; --bad-bg:#FBE3E0;
+  --shadow:0 1px 2px rgba(19,32,58,.06),0 6px 20px rgba(19,32,58,.07);
+  --scrim:rgba(10,16,30,.5);
+  --f-display:'Bricolage Grotesque','Avenir Next','Segoe UI',system-ui,sans-serif;
+  --f-body:'Figtree','Segoe UI',system-ui,-apple-system,sans-serif;
+  --r:14px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --stage:#080C14; --bg:#0E1420; --surface:#161F31; --surface-2:#1C2740;
+  --ink:#E7ECF4; --muted:#9AA5B9; --line:#27324A;
+  --accent:#F08A5D; --accent-soft:#3A2219;
+  --btn:#E7ECF4; --btn-ink:#0E1420;
+  --ok:#6FD39C; --ok-bg:#163326; --warn:#F2C164; --warn-bg:#3A2D10; --bad:#F59088; --bad-bg:#3D1A18;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.25); --scrim:rgba(0,0,0,.6);
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --stage:#080C14; --bg:#0E1420; --surface:#161F31; --surface-2:#1C2740;
+  --ink:#E7ECF4; --muted:#9AA5B9; --line:#27324A;
+  --accent:#F08A5D; --accent-soft:#3A2219;
+  --btn:#E7ECF4; --btn-ink:#0E1420;
+  --ok:#6FD39C; --ok-bg:#163326; --warn:#F2C164; --warn-bg:#3A2D10; --bad:#F59088; --bad-bg:#3D1A18;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.25); --scrim:rgba(0,0,0,.6);
+  color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--stage);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;letter-spacing:-.01em}
+h1{font-size:1.75rem;line-height:1.15}
+h2{font-size:1.2rem}
+h3{font-size:1.02rem}
+p{margin:0}
+.stage{min-height:100%;display:flex;justify-content:center}
+.app{width:100%;max-width:460px;min-height:100vh;background:var(--bg);display:flex;flex-direction:column;position:relative}
+@media (min-width:500px){.app{border-inline:1px solid var(--line);box-shadow:var(--shadow)}}
+.screen{flex:1;padding:16px 16px 28px;display:flex;flex-direction:column;gap:18px;min-width:0}
+.muted{color:var(--muted)}
+.small{font-size:.85rem}
+.tnum{font-variant-numeric:tabular-nums}
+.eyebrow{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--muted)}
+
+/* top bar */
+.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.topbar .title{flex:1;min-width:0}
+.topbar .title h2{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iconbtn{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center;cursor:pointer;flex:none}
+.iconbtn svg{width:20px;height:20px}
+.brandrow{display:flex;align-items:center;gap:10px}
+.logo{width:34px;height:34px;border-radius:9px;background:var(--btn);color:var(--btn-ink);display:grid;place-items:center;flex:none}
+.logo svg{width:20px;height:20px}
+.brand-name{font-family:var(--f-display);font-weight:700;font-size:1.25rem;line-height:1}
+.brand-sub{font-size:.78rem;color:var(--muted)}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 18px;border-radius:12px;border:1px solid var(--line);background:var(--surface);font-weight:600;cursor:pointer;text-decoration:none}
+.btn.primary{background:var(--btn);color:var(--btn-ink);border-color:var(--btn)}
+.btn.accent{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.danger{color:var(--bad)}
+.btn.block{width:100%}
+.btn.sm{min-height:36px;padding:0 12px;font-size:.88rem;border-radius:10px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.link{background:none;border:0;padding:0;color:var(--ink);font-weight:600;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.row > .btn{flex:1}
+
+/* forms */
+form{display:flex;flex-direction:column;gap:14px}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field label,.label{font-weight:600;font-size:.9rem}
+.field .hint{font-size:.8rem;color:var(--muted)}
+.input,input[type=text],input[type=password],input[type=email],input[type=tel],input[type=date],input[type=time],input[type=number],select,textarea{width:100%;min-height:46px;padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:var(--surface)}
+textarea{min-height:90px;resize:vertical}
+input[readonly]{background:var(--surface-2);color:var(--muted)}
+.field.invalid input,.field.invalid select,.field.invalid textarea,.field.invalid .filebox{border-color:var(--bad)}
+.err{font-size:.8rem;color:var(--bad);font-weight:500}
+.err:empty{display:none}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fieldset{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:14px}
+.fieldset > .eyebrow{margin-bottom:-4px}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:.92rem;cursor:pointer}
+.check input{width:20px;height:20px;margin:1px 0 0;flex:none;accent-color:var(--accent)}
+.filebox{border:1px dashed var(--line);border-radius:11px;padding:12px;display:flex;align-items:center;gap:12px;background:var(--surface-2)}
+.filebox input{font-size:.85rem;min-width:0;flex:1}
+.filebox .thumb{width:44px;height:44px;border-radius:50%;object-fit:cover;flex:none}
+.reqs{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px 12px;font-size:.8rem;color:var(--muted)}
+.reqs li::before{content:"○ "}
+.reqs li.ok{color:var(--ok)}
+.reqs li.ok::before{content:"✓ "}
+.choice{display:grid;gap:10px}
+.choice label{display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid var(--line);border-radius:12px;cursor:pointer;background:var(--surface)}
+.choice input{margin-top:3px;accent-color:var(--accent)}
+.choice label:has(input:checked){border-color:var(--ink);background:var(--surface-2)}
+
+/* alerts, pills */
+.alert{border-radius:12px;padding:12px 14px;font-size:.9rem;display:flex;flex-direction:column;gap:6px}
+.alert.bad{background:var(--bad-bg);color:var(--bad)}
+.alert.warn{background:var(--warn-bg);color:var(--warn)}
+.alert.ok{background:var(--ok-bg);color:var(--ok)}
+.alert.info{background:var(--surface-2);color:var(--ink)}
+.alert b{font-weight:700}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:.76rem;font-weight:700;white-space:nowrap}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}
+.pill.warn{background:var(--warn-bg);color:var(--warn)}
+.pill.bad{background:var(--bad-bg);color:var(--bad)}
+.pill.neutral{background:var(--surface-2);color:var(--muted)}
+.pill.accent{background:var(--accent-soft);color:var(--accent)}
+.verified{display:inline-flex;align-items:center;gap:3px;color:var(--ok);font-size:.78rem;font-weight:700}
+.verified svg{width:14px;height:14px}
+
+/* auth */
+.auth{padding:28px 20px 32px;display:flex;flex-direction:column;gap:22px;flex:1}
+.auth-links{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;font-size:.92rem;color:var(--muted)}
+.demo-note{font-size:.82rem;color:var(--muted);text-align:center;border-top:1px solid var(--line);padding-top:14px}
+.auth-hero{border-radius:18px;overflow:hidden;aspect-ratio:16/7;max-width:100%}
+.auth-hero svg{width:100%;height:100%;display:block}
+
+/* home */
+.searchcard{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow)}
+.sfield{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:12px;padding:0 12px;background:var(--bg)}
+.sfield svg{width:18px;height:18px;flex:none;color:var(--muted)}
+.sfield input{border:0;background:transparent;min-height:44px;padding:0;flex:1;min-width:0}
+.sfield input:focus{outline:none}
+.sfield:focus-within{outline:3px solid var(--accent);outline-offset:1px}
+.sfield .tag{font-size:.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;width:34px;flex:none}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 14px;font-weight:600;font-size:.88rem;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--btn);color:var(--btn-ink);border-color:var(--btn)}
+.section{display:flex;flex-direction:column;gap:12px}
+.section-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.dgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.dcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;cursor:pointer;text-align:left;padding:0;display:flex;flex-direction:column;min-width:0}
+.dcard:hover{border-color:var(--muted)}
+.dart{aspect-ratio:16/11;max-width:100%;background:var(--surface-2);position:relative}
+.dart svg{position:absolute;inset:0;width:100%;height:100%}
+.dart .count{position:absolute;left:8px;top:8px}
+.dbody{padding:10px 11px 12px;display:flex;flex-direction:column;gap:3px;min-width:0}
+.dbody h3{font-size:.98rem;line-height:1.2}
+.dmeta{font-size:.8rem;color:var(--muted)}
+.dprice{font-size:.85rem;font-weight:700}
+.dprice span{font-weight:500;color:var(--muted)}
+.skel{background:linear-gradient(90deg,var(--surface-2),var(--line),var(--surface-2));background-size:200% 100%;animation:sh 1.2s linear infinite;border-radius:8px}
+@keyframes sh{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.skel{animation:none}}
+.banner{display:flex;gap:12px;align-items:flex-start;background:var(--warn-bg);color:var(--warn);border-radius:14px;padding:12px 14px;font-size:.88rem}
+.banner svg{width:20px;height:20px;flex:none;margin-top:1px}
+.banner .link{color:inherit;font-size:.82rem}
+
+/* trips */
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.filters select{width:auto;min-height:38px;padding:6px 10px;border-radius:999px;font-weight:600;font-size:.88rem}
+.toggle{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:6px 12px;background:var(--surface);font-weight:600;font-size:.88rem;cursor:pointer}
+.toggle input{accent-color:var(--accent);width:16px;height:16px;margin:0}
+.tcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:12px;cursor:pointer;text-align:left;width:100%}
+.tcard:hover{border-color:var(--muted)}
+.ttop{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.twhen{font-family:var(--f-display);font-weight:700;font-size:1.05rem}
+.tprice{text-align:right;flex:none}
+.tprice b{font-family:var(--f-display);font-size:1.15rem}
+.tprice div{font-size:.75rem;color:var(--muted)}
+.driver{display:flex;align-items:center;gap:10px;min-width:0}
+.driver .nm{font-weight:600}
+.route{display:grid;grid-template-columns:14px 1fr;gap:2px 10px;font-size:.88rem}
+.route .dot{width:10px;height:10px;border-radius:50%;border:2px solid var(--ink);margin-top:5px}
+.route .dot.end{background:var(--accent);border-color:var(--accent)}
+.route .line{width:2px;background:var(--line);margin:0 auto;height:12px}
+.tfoot{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding-top:10px;font-size:.85rem}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);padding:24px 18px;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center}
+.empty svg{width:40px;height:40px;color:var(--muted)}
+
+.av{border-radius:50%;display:inline-grid;place-items:center;color:#fff;font-weight:700;flex:none;overflow:hidden;font-family:var(--f-body)}
+.av img{width:100%;height:100%;object-fit:cover}
+.avstack{display:flex}
+.avstack .av{border:2px solid var(--surface);margin-left:-8px}
+.avstack .av:first-child{margin-left:0}
+
+/* detail */
+.hero{position:relative;aspect-ratio:16/8;max-width:100%;overflow:hidden;border-radius:var(--r)}
+.hero svg{position:absolute;inset:0;width:100%;height:100%}
+.hero .cap{position:absolute;left:0;right:0;bottom:0;padding:14px 16px;background:linear-gradient(transparent,rgba(10,16,30,.7));color:#fff}
+.hero .cap h1{font-size:1.6rem}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px}
+.kv{display:grid;grid-template-columns:96px 1fr;gap:10px;font-size:.92rem}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;font-weight:500;min-width:0}
+.actionbar{position:sticky;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));display:flex;gap:12px;align-items:center;z-index:4}
+.actionbar .p{flex:none}
+.actionbar .p b{font-family:var(--f-display);font-size:1.25rem}
+.actionbar .p div{font-size:.75rem;color:var(--muted)}
+.actionbar .btn{flex:1}
+
+/* my trips */
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--surface-2);border-radius:12px;padding:4px;gap:4px}
+.seg button{border:0;background:transparent;min-height:38px;border-radius:9px;font-weight:600;cursor:pointer;color:var(--muted)}
+.seg button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.mcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:10px}
+.mtop{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.demo{font-size:.78rem;color:var(--muted);border-top:1px dashed var(--line);padding-top:8px}
+.demo .link{font-size:.78rem;color:var(--muted)}
+
+/* manage */
+.rq{display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+.rq .note{font-size:.88rem;background:var(--surface-2);border-radius:10px;padding:8px 10px}
+.plist{display:flex;flex-direction:column;gap:10px}
+.plist .driver{padding:10px 0;border-top:1px solid var(--line)}
+.plist .driver:first-child{border-top:0;padding-top:0}
+
+/* chat */
+.chatwrap{display:flex;flex-direction:column;flex:1;min-height:0}
+.pin{margin:12px 16px 0;padding:10px 12px;border-radius:12px;background:var(--accent-soft);color:var(--ink);font-size:.86rem;display:flex;gap:10px;align-items:center}
+.pin svg{width:18px;height:18px;color:var(--accent);flex:none}
+.msgs{flex:1;padding:16px;display:flex;flex-direction:column;gap:12px;overflow-y:auto}
+.msg{display:flex;gap:8px;align-items:flex-end;max-width:88%}
+.msg .bub{background:var(--surface);border:1px solid var(--line);border-radius:14px 14px 14px 4px;padding:8px 11px;min-width:0;overflow-wrap:anywhere}
+.msg .who{font-size:.74rem;color:var(--muted);margin-bottom:2px}
+.msg.me{align-self:flex-end;flex-direction:row-reverse}
+.msg.me .bub{background:var(--btn);color:var(--btn-ink);border-color:var(--btn);border-radius:14px 14px 4px 14px}
+.msg.me .who{color:inherit;opacity:.7;text-align:right}
+.composer{position:sticky;bottom:0;display:flex;gap:8px;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));background:var(--surface);border-top:1px solid var(--line)}
+.composer form{flex-direction:row;flex:1;gap:8px}
+.composer input{flex:1;min-width:0;border-radius:999px}
+.composer .btn{border-radius:999px}
+
+/* profile */
+.phead{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding-top:6px}
+.avpick{display:flex;gap:10px;flex-wrap:wrap}
+.avpick button{border:2px solid transparent;border-radius:50%;padding:2px;background:none;cursor:pointer}
+.avpick button[aria-pressed="true"]{border-color:var(--accent)}
+.privacy{display:flex;gap:10px;font-size:.85rem;color:var(--muted);align-items:flex-start}
+.privacy svg{width:18px;height:18px;flex:none;margin-top:1px}
+
+/* nav */
+.nav{position:sticky;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(4,1fr);padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px))}
+.nav button{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:.72rem;font-weight:600;color:var(--muted);padding:6px 0;cursor:pointer;border-radius:10px}
+.nav button svg{width:22px;height:22px}
+.nav button[aria-current="page"]{color:var(--ink)}
+.nav button[aria-current="page"] svg{color:var(--accent)}
+
+/* modal + toast */
+.scrim{position:fixed;inset:0;background:var(--scrim);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sheet{width:100%;max-width:460px;background:var(--surface);border-radius:20px 20px 0 0;padding:20px 16px calc(20px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px}
+@media (min-width:500px){.scrim{align-items:center}.sheet{border-radius:20px;max-width:420px}}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--btn);color:var(--btn-ink);padding:10px 16px;border-radius:12px;font-weight:600;font-size:.9rem;box-shadow:var(--shadow);max-width:calc(100% - 32px)}
+.spinner{width:16px;height:16px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="stage"><div class="app" id="app"></div></div>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+// ---------- helpers ----------
+const app = document.getElementById('app');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const NOW = new Date(2026, 9, 3, 10, 0); // prototype "today"
+const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function parse(dt){ const [d,t='00:00'] = dt.split('T'); const [y,m,da] = d.split('-').map(Number); const [h,mi] = t.split(':').map(Number); return new Date(y,m-1,da,h,mi); }
+const fDate = dt => { const d = parse(dt); return `${DAYS[d.getDay()]}, ${MON[d.getMonth()]} ${d.getDate()}`; };
+const fTimeD = d => { let h = d.getHours(), m = d.getMinutes(); const ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12; return `${h}:${String(m).padStart(2,'0')} ${ap}`; };
+const fTime = dt => fTimeD(parse(dt));
+const fDT = dt => `${fDate(dt)} · ${fTime(dt)}`;
+const money = n => '$' + n;
+
+const I = {
+  car:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16V11l2-5h10l2 5v5"/><path d="M3 16h18v3H3z"/><circle cx="7.5" cy="16" r="1.5"/><circle cx="16.5" cy="16" r="1.5"/><path d="M5 11h14"/></svg>',
+  back:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
+  user:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>',
+  search:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>',
+  pin:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>',
+  cal:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+  compass:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg>',
+  ticket:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 8a2 2 0 002-2h14a2 2 0 002 2v2a2 2 0 000 4v2a2 2 0 00-2 2H5a2 2 0 00-2-2v-2a2 2 0 000-4z"/><path d="M14 6v12" stroke-dasharray="2 2"/></svg>',
+  plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 1.8 3 .1.9 2.9 2.4 1.8-.9 2.9.9 2.9-2.4 1.8-.9 2.9-3 .1L12 22l-2.4-1.8-3-.1-.9-2.9L3.3 15.4l.9-2.9-.9-2.9L5.7 7.8l.9-2.9 3-.1z" fill="currentColor" stroke="none"/><path d="M8.5 12l2.3 2.3 4.7-4.6" stroke="#fff"/></svg>',
+  clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  lock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>',
+  chat:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></svg>',
+  road:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3L4 21M16 3l4 18M12 5v2M12 11v2M12 17v2"/></svg>',
+};
+
+// ---------- destination art (stand-in "photos") ----------
+function art(kind){
+  const P = {
+    city:  ['#8FB7DE','#F3D2A6','#7F95B3','#5C6F8E','#2E3D5A'],
+    snow:  ['#9CC1E8','#EAF2FB','#6C82A0','#4D6280','#2F4A3A'],
+    redrock:['#F0A56E','#FCE2C0','#C25A33','#8E3520','#D98250'],
+    desert:['#F6C27F','#FDEBD2','#D07A45','#A64F2B','#E3A36D'],
+    lake:  ['#93CCE6','#E8F5F9','#7FA88A','#56806A','#3B93BA'],
+  }[kind];
+  const [s1,s2,m1,m2,g] = P;
+  let fg = '';
+  if (kind === 'city') fg = `<polygon points="0,140 60,95 120,125 190,80 260,120 330,90 400,125 400,200 0,200" fill="${m1}"/>
+    <g fill="${g}"><rect x="40" y="130" width="26" height="70"/><rect x="72" y="110" width="22" height="90"/><rect x="100" y="140" width="30" height="60"/><rect x="138" y="96" width="20" height="104"/><rect x="164" y="122" width="34" height="78"/><rect x="206" y="104" width="24" height="96"/><rect x="236" y="135" width="40" height="65"/><rect x="284" y="118" width="22" height="82"/><rect x="312" y="140" width="48" height="60"/></g>
+    <rect x="0" y="186" width="400" height="14" fill="${m2}"/>`;
+  if (kind === 'snow') fg = `<polygon points="0,150 80,60 150,130 220,45 300,120 360,70 400,105 400,200 0,200" fill="${m1}"/>
+    <polygon points="80,60 100,82 90,80 80,90 70,82 62,80" fill="#fff"/><polygon points="220,45 244,72 232,70 220,80 208,72 196,74" fill="#fff"/><polygon points="360,70 378,90 368,88 358,96 348,88" fill="#fff"/>
+    <polygon points="0,170 120,125 240,160 400,130 400,200 0,200" fill="${m2}"/>
+    <g fill="${g}"><polygon points="30,200 42,160 54,200"/><polygon points="58,200 68,170 78,200"/><polygon points="320,200 334,155 348,200"/><polygon points="350,200 360,172 370,200"/></g>`;
+  if (kind === 'redrock') fg = `<rect x="0" y="150" width="400" height="50" fill="${g}"/>
+    <path d="M30 150 V105 h18 l6 -8 h40 l6 8 h14 V150 Z" fill="${m1}"/><path d="M230 150 V85 h20 l4 -6 h50 l4 6 h22 V150 Z" fill="${m1}"/>
+    <rect x="160" y="96" width="14" height="54" fill="${m2}"/><rect x="157" y="90" width="20" height="8" rx="2" fill="${m2}"/>
+    <polygon points="0,200 0,175 140,165 260,180 400,168 400,200" fill="${m2}"/>`;
+  if (kind === 'desert') fg = `<polygon points="0,150 90,110 170,140 260,100 340,135 400,115 400,200 0,200" fill="${m1}"/>
+    <polygon points="0,200 0,170 120,150 220,172 320,155 400,170 400,200" fill="${m2}"/>
+    <rect x="0" y="188" width="400" height="12" fill="${g}"/>`;
+  if (kind === 'lake') fg = `<polygon points="0,130 70,95 150,120 230,85 310,115 400,95 400,200 0,200" fill="${m1}"/>
+    <polygon points="0,145 100,125 200,140 300,122 400,140 400,200 0,200" fill="${m2}"/>
+    <rect x="0" y="150" width="400" height="50" fill="${g}"/><path d="M40 168h60M150 178h80M270 166h70" stroke="#fff" stroke-opacity=".5" stroke-width="3" stroke-linecap="round"/>`;
+  const id = 'g' + Math.random().toString(36).slice(2,8);
+  return `<svg viewBox="0 0 400 200" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${s1}"/><stop offset="1" stop-color="${s2}"/></linearGradient></defs><rect width="400" height="200" fill="url(#${id})"/><circle cx="320" cy="55" r="22" fill="#FFF6E0" opacity=".9"/>${fg}</svg>`;
+}
+
+// ---------- mock data ----------
+const DESTS = [
+  {id:'slc', name:'Salt Lake City', alias:['slc','salt lake'], drive:'45 min', est:8, cat:'Weekend getaways', art:'city', near:true},
+  {id:'sundance', name:'Sundance', alias:[], drive:'35 min', est:7, cat:'Ski trips', art:'snow', near:true},
+  {id:'parkcity', name:'Park City', alias:['pc'], drive:'1 hr', est:12, cat:'Ski trips', art:'snow', near:true},
+  {id:'bearlake', name:'Bear Lake', alias:[], drive:'2 hr 45 min', est:28, cat:'Weekend getaways', art:'lake'},
+  {id:'moab', name:'Moab', alias:['arches','canyonlands'], drive:'3 hr 40 min', est:35, cat:'National parks', art:'redrock'},
+  {id:'stgeorge', name:'St. George', alias:['st george','saint george'], drive:'3 hr 30 min', est:32, cat:'Weekend getaways', art:'desert'},
+  {id:'zion', name:'Zion National Park', alias:['zion'], drive:'4 hr', est:38, cat:'National parks', art:'redrock'},
+  {id:'jackson', name:'Jackson Hole', alias:['jackson'], drive:'4 hr 50 min', est:45, cat:'Ski trips', art:'snow'},
+];
+const D = id => DESTS.find(d => d.id === id);
+
+const USERS = {
+  u1:{first:'Kaylee', last:'Brooks', hometown:'Boise, ID', bio:'Junior in nursing. I head south most weekends and like company on the road.', color:'#3B6EA8', verified:'verified'},
+  u2:{first:'Marcus', last:'Tanaka', hometown:'Mesa, AZ', bio:'Outdoor rec major. Usually headed to Moab or Zion to climb. Snacks provided.', color:'#B0562F', verified:'verified'},
+  u3:{first:'Hannah', last:'Ortiz', hometown:'St. George, UT', bio:'Going home to St. George a lot. Quiet drives, good podcasts.', color:'#7B4FA0', verified:'verified'},
+  u4:{first:'Ben', last:'Whitaker', hometown:'Park City, UT', bio:'On the club ski team. I leave early on Saturdays.', color:'#2E7D6B', verified:'verified'},
+  u5:{first:'Priya', last:'Shah', hometown:'Salt Lake City, UT', bio:'Accounting major. I visit family in SLC almost every weekend.', color:'#A8456B', verified:'verified'},
+  u6:{first:'Tyler', last:'Nguyen', hometown:'Las Vegas, NV', bio:'Freshman in CS. Looking for rides to concerts in SLC.', color:'#4F6B2E', verified:'verified'},
+  u7:{first:'Emma', last:'Larsen', hometown:'Logan, UT', bio:'Exercise science. Happy to split gas and share the aux.', color:'#9A6A12', verified:'verified'},
+  u8:{first:'Josh', last:'Rivera', hometown:'Provo, UT', bio:'Senior in finance. Downtown SLC for internship stuff.', color:'#3A5A8C', verified:'verified'},
+  u9:{first:'Sadie', last:'Cole', hometown:'Idaho Falls, ID', bio:'Snowboarder. Sundance whenever there is fresh snow.', color:'#8C3A3A', verified:'verified'},
+};
+
+let TRIPS = [
+  {id:'t1', dest:'slc', driver:'u5', depart:'2026-10-10T09:00', ret:null, seats:3, price:8, pickup:'Wilkinson Student Center lot', dropoff:'City Creek Center', vehicle:'2019 Honda Civic, gray', passengers:['u7'], requests:[]},
+  {id:'t2', dest:'slc', driver:'me', depart:'2026-10-10T14:00', ret:'2026-10-10T21:00', seats:4, price:12, pickup:'Helaman Halls parking', dropoff:'The Gateway', vehicle:'2017 Subaru Outback, blue', passengers:['u9'], requests:[{uid:'u6', status:'pending', note:'Going to a concert at the Delta Center. Fine with leaving at 9.'},{uid:'u8', status:'pending', note:'Need to get downtown for an interview. I can be at Helaman early.'}]},
+  {id:'t3', dest:'slc', driver:'u8', depart:'2026-10-17T10:30', ret:null, seats:2, price:7, pickup:'LaVell Edwards Stadium lot', dropoff:'University of Utah campus', vehicle:'2015 Toyota Corolla, white', passengers:[], requests:[]},
+  {id:'t4', dest:'parkcity', driver:'u4', depart:'2026-10-17T06:30', ret:'2026-10-17T18:00', seats:3, price:18, pickup:'Heritage Halls', dropoff:'Park City Mountain base', vehicle:'2020 Toyota 4Runner, black (ski rack)', passengers:['u2'], requests:[{uid:'me', status:'pending', note:''}]},
+  {id:'t5', dest:'parkcity', driver:'u7', depart:'2026-10-24T07:00', ret:null, seats:4, price:11, pickup:'Wyview Park', dropoff:'Main Street, Park City', vehicle:'2018 Mazda CX-5, red', passengers:[], requests:[]},
+  {id:'t6', dest:'sundance', driver:'u9', depart:'2026-10-11T08:00', ret:'2026-10-11T16:00', seats:3, price:10, pickup:'Wilkinson Student Center lot', dropoff:'Sundance Mountain Resort', vehicle:'2016 Jeep Cherokee, green', passengers:[], requests:[]},
+  {id:'t7', dest:'moab', driver:'u2', depart:'2026-10-16T13:00', ret:'2026-10-18T16:00', seats:4, price:45, pickup:'Helaman Halls parking', dropoff:'Moab Main Street', vehicle:'2018 Toyota Tacoma, silver', passengers:['me','u3'], requests:[]},
+  {id:'t8', dest:'moab', driver:'u6', depart:'2026-10-23T15:00', ret:'2026-10-25T14:00', seats:3, price:40, pickup:'Wyview Park', dropoff:'Arches National Park visitor center', vehicle:'2021 Honda CR-V, white', passengers:['u1'], requests:[]},
+  {id:'t9', dest:'moab', driver:'u1', depart:'2026-10-09T16:00', ret:null, seats:2, price:30, pickup:'Heritage Halls', dropoff:'Moab Main Street', vehicle:'2014 Ford Focus, black', passengers:['u4','u5'], requests:[]},
+  {id:'t10', dest:'stgeorge', driver:'u3', depart:'2026-10-09T15:30', ret:'2026-10-11T15:00', seats:3, price:50, pickup:'Wilkinson Student Center lot', dropoff:'Dixie Regional area', vehicle:'2019 Hyundai Elantra, gray', passengers:[], requests:[{uid:'me', status:'declined', note:''}]},
+  {id:'t11', dest:'stgeorge', driver:'u1', depart:'2026-10-22T17:00', ret:null, seats:4, price:30, pickup:'Heritage Halls', dropoff:'St. George Temple area', vehicle:'2014 Ford Focus, black', passengers:['u9'], requests:[]},
+  {id:'t12', dest:'zion', driver:'u2', depart:'2026-10-23T06:00', ret:'2026-10-24T19:00', seats:3, price:55, pickup:'Helaman Halls parking', dropoff:'Springdale shuttle stop', vehicle:'2018 Toyota Tacoma, silver', passengers:[], requests:[]},
+  {id:'t13', dest:'bearlake', driver:'u5', depart:'2026-10-17T08:00', ret:'2026-10-18T17:00', seats:4, price:35, pickup:'Wilkinson Student Center lot', dropoff:'Garden City', vehicle:'2020 Kia Telluride, white', passengers:['u7','u8'], requests:[]},
+];
+const CHATS = {
+  t7:[
+    {uid:'u2', at:'Oct 12 · 7:42 PM', text:'Hey all! Leaving Helaman at 1:00 sharp on Friday. Bring a jacket, it gets cold at night.'},
+    {uid:'u3', at:'Oct 12 · 8:05 PM', text:'Sounds good. Should I bring a cooler?'},
+    {uid:'me', at:'Oct 12 · 8:11 PM', text:'I can grab snacks for the drive.'},
+    {uid:'u2', at:'Oct 12 · 8:20 PM', text:'Cooler would be great. Venmo me after the trip, $45 each covers gas both ways.'},
+  ],
+  t2:[
+    {uid:'me', at:'Oct 4 · 6:15 PM', text:'Welcome! Meet at the Helaman Halls lot by the volleyball courts at 2.'},
+    {uid:'u9', at:'Oct 4 · 6:30 PM', text:'Perfect, see you there.'},
+  ],
+};
+
+// ---------- state ----------
+const S = {
+  me:null, screen:'login', params:{}, hist:[],
+  accounts:{}, taken:['jhale','kbrooks','mtanaka','hortiz','admin'],
+  search:{dest:'', from:'', date:''}, cat:'All', miss:null,
+  filters:{max:'', round:false}, tripsTab:'rider', homeLoaded:false, loginNotice:'', loginUser:'',
+};
+const U = id => id === 'me' ? S.me : USERS[id];
+const fullName = u => `${u.first} ${u.last}`;
+const seatsLeft = t => t.seats - t.passengers.length;
+function myStatus(t){
+  if (t.driver === 'me') return 'driver';
+  if (t.passengers.includes('me')) return 'confirmed';
+  const r = t.requests.find(r => r.uid === 'me');
+  return r ? r.status : null;
+}
+const isVerified = () => S.me && S.me.verified === 'verified';
+const upcoming = t => parse(t.depart) > NOW;
+const openTrips = destId => TRIPS.filter(t => t.dest === destId && seatsLeft(t) > 0 && upcoming(t));
+
+function av(u, size=36){
+  const style = `width:${size}px;height:${size}px;font-size:${Math.round(size*.38)}px;background:${u.color}`;
+  const inner = u.photo ? `<img src="${u.photo}" alt="">` : esc(u.first[0] + u.last[0]);
+  return `<span class="av" style="${style}" aria-hidden="true">${inner}</span>`;
+}
+const vBadge = u => u.verified === 'verified' ? `<span class="verified">${I.check}Verified</span>` : `<span class="pill warn">Verification pending</span>`;
+
+// ---------- navigation ----------
+function go(screen, params={}, push=true){
+  if (push && S.screen !== 'login') S.hist.push({screen:S.screen, params:S.params});
+  S.screen = screen; S.params = params; render(); window.scrollTo(0,0);
+}
+function back(){ const h = S.hist.pop(); if (h){ S.screen = h.screen; S.params = h.params; render(); window.scrollTo(0,0);} else go('home',{},false); }
+function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, 2600); }
+
+const NAVMAP = {home:'home', results:'home', detail:'home', mytrips:'mytrips', manage:'mytrips', post:'post', profile:'profile', edit:'profile'};
+function nav(){
+  const cur = NAVMAP[S.screen];
+  const b = (id, icon, label) => `<button data-act="nav" data-to="${id}" ${cur===id?'aria-current="page"':''}>${icon}${label}</button>`;
+  return `<nav class="nav" aria-label="Main">${b('home',I.compass,'Explore')}${b('mytrips',I.ticket,'My Trips')}${b('post',I.plus,'Post a trip')}${b('profile',I.user,'Profile')}</nav>`;
+}
+function topbar(title, sub=''){
+  return `<header class="topbar"><button class="iconbtn" data-act="back" aria-label="Back">${I.back}</button><div class="title"><h2>${esc(title)}</h2>${sub?`<div class="small muted">${sub}</div>`:''}</div></header>`;
+}
+function pendingBanner(){
+  if (!S.me || S.me.verified !== 'pending') return '';
+  return `<div class="banner" role="status">${I.clock}<div><b>ID verification pending.</b> We're reviewing your student ID or license, usually within one business day. You can browse trips now. Requesting seats and posting trips unlock once you're verified.<div style="margin-top:6px"><button class="link" data-act="approve">Prototype: mark me verified</button></div></div></div>`;
+}
+
+// ---------- screens ----------
+const SCREENS = {}, BIND = {};
+
+function destCard(d){
+  const n = openTrips(d.id).length;
+  return `<button class="dcard" data-act="dest" data-id="${d.id}" aria-label="${esc(d.name)}: ${n} trips available">
+    <div class="dart">${art(d.art)}<span class="count pill ${n?'neutral':'warn'}" style="background:var(--surface)">${n ? `${n} trip${n>1?'s':''}` : 'No trips yet'}</span></div>
+    <div class="dbody"><h3>${esc(d.name)}</h3><div class="dmeta">${d.drive} drive</div><div class="dprice tnum">est. ${money(d.est)} <span>/ rider</span></div></div>
+  </button>`;
+}
+const skelCards = n => Array.from({length:n}, () => `<div class="dcard" aria-hidden="true"><div class="dart skel" style="border-radius:0"></div><div class="dbody"><div class="skel" style="height:14px;width:70%"></div><div class="skel" style="height:11px;width:50%"></div><div class="skel" style="height:11px;width:40%"></div></div></div>`).join('');
+SCREENS.home = () => {
+  const loc = S.me.location === 'allowed';
+  const cats = ['All','Weekend getaways','Ski trips','National parks'];
+  const list = S.cat === 'All' ? DESTS : DESTS.filter(d => d.cat === S.cat);
+  let sections = '';
+  if (!S.homeLoaded){
+    sections = `<div class="section"><div class="skel" style="height:18px;width:40%"></div><div class="dgrid">${skelCards(4)}</div></div>`;
+  } else if (S.cat !== 'All'){
+    sections = `<div class="section"><div class="section-head"><h2>${esc(S.cat)}</h2></div><div class="dgrid">${list.map(destCard).join('')}</div></div>`;
+  } else if (loc){
+    sections = `<div class="section"><div class="section-head"><h2>Nearby</h2><span class="small muted">Close to Provo</span></div><div class="dgrid">${DESTS.filter(d=>d.near).map(destCard).join('')}</div></div>
+    <div class="section"><div class="section-head"><h2>Popular carpool trips</h2></div><div class="dgrid">${DESTS.filter(d=>!d.near).map(destCard).join('')}</div></div>`;
+  } else {
+    sections = `<div class="section"><div class="section-head"><h2>Popular destinations</h2></div><div class="dgrid">${DESTS.map(destCard).join('')}</div></div>`;
+  }
+  const miss = S.miss ? `<div class="alert info" role="status"><b>No destinations match "${esc(S.miss)}".</b><span>Try a nearby or popular spot below, like Salt Lake City, Park City, or Moab.</span></div>` : '';
+  return `
+<header class="topbar"><div class="brandrow" style="flex:1"><span class="logo">${I.car}</span><div class="brand-name">Hitch</div></div>
+  <button class="iconbtn" aria-label="Account (not available in prototype)" title="Account">${S.me ? av(S.me, 38) : I.user}</button></header>
+<div class="screen">
+  ${pendingBanner()}
+  <div><h1>Where are you headed?</h1></div>
+  <form class="searchcard" id="searchForm" novalidate role="search">
+    <label class="sfield"><span class="tag">To</span><input id="s-dest" type="text" list="destlist" placeholder="Search a destination" value="${esc(S.search.dest)}" aria-label="Destination">${I.search}</label>
+    <datalist id="destlist">${DESTS.map(d=>`<option value="${esc(d.name)}">`).join('')}</datalist>
+    <label class="sfield"><span class="tag">From</span><input id="s-from" type="text" placeholder="${loc ? 'Current location' : 'Type your starting point'}" value="${esc(S.search.from)}" aria-label="Starting location (optional)">${I.pin}</label>
+    <label class="sfield"><span class="tag">Date</span><input id="s-date" type="date" value="${esc(S.search.date)}" aria-label="Travel date (optional)"></label>
+    <div class="err" id="s-err"></div>
+    <button class="btn accent block" type="submit">${I.search.replace('<svg','<svg width="18" height="18"')}Search rides</button>
+  </form>
+  ${!loc ? `<p class="small muted">Location is off, so we're showing popular destinations instead of nearby ones. Type a starting point above.</p>` : ''}
+  ${miss}
+  <div class="chips" role="group" aria-label="Categories">${cats.map(c => `<button class="chip" data-act="cat" data-c="${c}" aria-pressed="${S.cat===c}">${c}</button>`).join('')}</div>
+  ${sections}
+  <p class="small muted">Prices are estimates. The actual cost depends on the driver and how many riders join.</p>
+</div>${nav()}`;
+};
+BIND.home = () => {
+  if (!S.homeLoaded) setTimeout(() => { S.homeLoaded = true; if (S.screen === 'home') render(); }, 700);
+  document.getElementById('searchForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const q = document.getElementById('s-dest').value.trim();
+    S.search = {dest:q, from:document.getElementById('s-from').value.trim(), date:document.getElementById('s-date').value};
+    if (!q){ document.getElementById('s-err').textContent = 'Enter a destination to search.'; return; }
+    const ql = q.toLowerCase();
+    const d = DESTS.find(d => d.name.toLowerCase().includes(ql) || ql.includes(d.name.toLowerCase()) || d.alias.some(a => ql.includes(a)));
+    if (!d){ S.miss = q; S.cat = 'All'; render(); return; }
+    S.miss = null; S.filters = {max:'', round:false};
+    go('results', {dest:d.id});
+  });
+};
+
+/* Screen 4: Available trips / search results */
+function tripCard(t){
+  const u = U(t.driver), st = myStatus(t);
+  const tag = st === 'driver' ? '<span class="pill accent">Your trip</span>' : st === 'confirmed' ? '<span class="pill ok">Seat confirmed</span>' : st === 'pending' ? '<span class="pill warn">Awaiting driver</span>' : '';
+  return `<button class="tcard" data-act="trip" data-id="${t.id}">
+    <div class="ttop"><div><div class="twhen tnum">${fDate(t.depart)}</div><div class="small muted tnum">Leaves ${fTime(t.depart)}</div></div>
+      <div class="tprice tnum"><b>${money(t.price)}</b><div>per rider · ${t.ret ? 'round trip' : 'one way'}</div></div></div>
+    <div class="driver">${av(u,34)}<div style="min-width:0"><div class="nm">${esc(fullName(u))}${t.driver==='me'?' (you)':''}</div>${vBadge(u)}</div></div>
+    <div class="route"><span class="dot"></span><span>${esc(t.pickup)}</span><span class="line"></span><span></span><span class="dot end"></span><span>${esc(t.dropoff)}</span></div>
+    <div class="tfoot"><span class="tnum"><b>${seatsLeft(t)}</b> of ${t.seats} seats left</span>${t.ret ? `<span class="small tnum">Returns ${fDT(t.ret)}</span>` : '<span class="pill neutral">One-way</span>'}${tag}</div>
+  </button>`;
+}
+function resultsList(){
+  const d = D(S.params.dest), {max, round} = S.filters;
+  let list = openTrips(d.id);
+  if (S.search.date) list = list.filter(t => t.depart.slice(0,10) === S.search.date);
+  if (max) list = list.filter(t => t.price <= +max);
+  if (round) list = list.filter(t => !!t.ret);
+  list.sort((a,b) => parse(a.depart) - parse(b.depart));
+  if (!list.length) return `<div class="empty">${I.road}<h2>No rides found</h2><p class="muted small">No trips to ${esc(d.name)}${S.search.date ? ` on ${fDate(S.search.date)}` : ''} match your search${max||round?' and filters':''}. Try a different date or destination${max||round?', or clear your filters':''}.</p><div class="row" style="width:100%">${max||round?'<button class="btn" data-act="clearf">Clear filters</button>':''}<button class="btn primary" data-act="change">Change search</button></div></div>`;
+  return `<p class="small muted">${list.length} trip${list.length>1?'s':''} · earliest departure first</p>` + list.map(tripCard).join('');
+}
+SCREENS.results = () => {
+  const d = D(S.params.dest);
+  const from = S.search.from || (S.me.location === 'allowed' ? 'Current location' : 'Provo');
+  return `${topbar(d.name, `${esc(from)} → ${esc(d.name)} · ${S.search.date ? fDate(S.search.date) : 'Any date'}`)}
+<div class="screen">
+  <div class="row" style="justify-content:space-between"><div class="filters">
+    <select id="f-max" aria-label="Maximum price per rider"><option value="">Any price</option>${[10,20,30,40,50].map(v=>`<option value="${v}" ${S.filters.max==v?'selected':''}>Up to $${v}</option>`).join('')}</select>
+    <label class="toggle"><input type="checkbox" id="f-round" ${S.filters.round?'checked':''}>Round trips only</label>
+  </div><button class="btn sm" data-act="change">Change search</button></div>
+  <p class="small muted">Prices are per rider. Round-trip prices cover there and back; one-way prices cover the drive there only.</p>
+  <div id="rlist" style="display:flex;flex-direction:column;gap:12px">${resultsList()}</div>
+</div>${nav()}`;
+};
+BIND.results = () => {
+  const r = () => document.getElementById('rlist').innerHTML = resultsList();
+  document.getElementById('f-max').addEventListener('change', e => { S.filters.max = e.target.value; r(); });
+  document.getElementById('f-round').addEventListener('change', e => { S.filters.round = e.target.checked; r(); });
+};
+
+/* Screen 5: Trip details / request a seat */
+SCREENS.detail = () => {
+  const t = TRIPS.find(x => x.id === S.params.id), d = D(t.dest), u = U(t.driver), st = myStatus(t), left = seatsLeft(t);
+  const passengers = t.passengers.map(U);
+  const covers = t.ret ? `Covers your seat there and back. The driver set this price to split gas for the round trip.` : `Covers your seat for the drive there only. This is a one-way trip, so you'll need to arrange your own ride back.`;
+  let action;
+  if (st === 'driver') action = `<button class="btn primary" data-act="manage" data-id="${t.id}">Manage requests</button>`;
+  else if (st === 'confirmed') action = `<button class="btn primary" data-act="chat" data-id="${t.id}">${I.chat.replace('<svg','<svg width="18" height="18"')}Seat confirmed · Group chat</button>`;
+  else if (st === 'pending') action = `<button class="btn" data-act="go" data-to="mytrips">Request sent · Awaiting driver</button>`;
+  else if (st === 'declined') action = `<button class="btn" data-act="go" data-to="mytrips">Request declined · View status</button>`;
+  else if (!left) action = `<button class="btn" disabled>Trip is full</button>`;
+  else if (!isVerified()) action = `<button class="btn" disabled>Verify your ID to request</button>`;
+  else action = `<button class="btn accent" data-act="request">Request a seat</button>`;
+  return `${topbar('Trip details')}
+<div class="screen">
+  <div class="hero">${art(d.art)}<div class="cap"><div class="small" style="opacity:.85">Provo → </div><h1>${esc(d.name)}</h1></div></div>
+  ${!isVerified() && !st ? `<div class="alert warn">${I.lock.replace('<svg','<svg width="18" height="18"')}<span>You need a verified ID before you can request a seat. Verification is pending.</span></div>` : ''}
+  <div class="card"><h3>Trip</h3>
+    <dl class="kv tnum" style="margin:0">
+      <dt>Leaves</dt><dd>${fDT(t.depart)}</dd>
+      <dt>Pickup</dt><dd>${esc(t.pickup)}</dd>
+      <dt>Drop-off</dt><dd>${esc(t.dropoff)}</dd>
+      <dt>Return</dt><dd>${t.ret ? fDT(t.ret) : '<span class="pill neutral">One-way</span><div class="small muted" style="margin-top:4px">Riders arrange their own ride back.</div>'}</dd>
+    </dl></div>
+  <div class="card"><h3>Driver</h3>
+    <div class="driver">${av(u,48)}<div style="min-width:0"><div class="nm">${esc(fullName(u))}${t.driver==='me'?' (you)':''}</div>${vBadge(u)}</div></div>
+    <p>${esc(u.bio || 'No bio yet.')}</p>
+    <div class="small muted">${I.car.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px"')} ${esc(t.vehicle)}</div></div>
+  <div class="card"><div class="section-head"><h3>Who's going</h3><span class="small tnum"><b>${left}</b> of ${t.seats} seats left</span></div>
+    ${passengers.length ? `<div class="plist">${passengers.map(p => `<div class="driver">${av(p,34)}<div><div class="nm">${esc(fullName(p))}${p===S.me?' (you)':''}</div>${vBadge(p)}</div></div>`).join('')}</div>` : '<p class="muted small">No confirmed riders yet. Be the first.</p>'}</div>
+  <div class="card"><div class="section-head"><h3>Price</h3><span class="tnum"><b>${money(t.price)}</b> per seat</span></div><p class="small muted">${covers} No payment is collected in the app.</p></div>
+</div>
+<div class="actionbar"><div class="p tnum"><b>${money(t.price)}</b><div>${t.ret ? 'round trip' : 'one way'}</div></div>${action}</div>`;
+};
+
+function openRequestDialog(){
+  const t = TRIPS.find(x => x.id === S.params.id), d = D(t.dest), u = U(t.driver);
+  const wrap = document.createElement('div');
+  wrap.className = 'scrim';
+  wrap.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="rq-h">
+    <h2 id="rq-h">Would you like to request a seat for this trip?</h2>
+    <dl class="kv tnum" style="margin:0"><dt>To</dt><dd>${esc(d.name)}</dd><dt>Leaves</dt><dd>${fDT(t.depart)}</dd><dt>Pickup</dt><dd>${esc(t.pickup)}</dd><dt>Return</dt><dd>${t.ret ? fDT(t.ret) : 'One-way. You arrange your own ride back.'}</dd><dt>Price</dt><dd><b>${money(t.price)}</b> per seat, ${t.ret?'round trip':'one way'}</dd></dl>
+    <div class="alert info small">Your seat isn't reserved until ${esc(u.first)} accepts. We'll let you know as soon as they decide.</div>
+    <div class="row"><button class="btn" data-x="no">Keep browsing</button><button class="btn accent" data-x="yes">Confirm request</button></div>
+    <p class="small muted" id="rq-timer" style="text-align:center"></p>
+  </div>`;
+  document.body.appendChild(wrap);
+  let secs = 60; const timerEl = wrap.querySelector('#rq-timer');
+  const tick = () => { timerEl.textContent = `This prompt closes in 0:${String(secs).padStart(2,'0')}`; };
+  tick();
+  const iv = setInterval(() => { secs--; if (secs <= 0){ close(); toast('Request timed out. No request was sent.'); } else tick(); }, 1000);
+  function close(){ clearInterval(iv); wrap.remove(); }
+  wrap.addEventListener('click', e => {
+    const x = e.target.closest('[data-x]')?.dataset.x;
+    if (e.target === wrap || x === 'no'){ close(); }
+    if (x === 'yes'){ close(); t.requests = t.requests.filter(r => r.uid !== 'me'); t.requests.push({uid:'me', status:'pending', note:''}); S.tripsTab = 'rider'; go('mytrips'); toast(`Request sent to ${u.first}`); }
+  });
+  wrap.querySelector('[data-x="yes"]').focus();
+}
+
+/* Screen 6: My trips / request status */
+SCREENS.mytrips = () => {
+  const tab = S.tripsTab;
+  let body;
+  if (tab === 'rider'){
+    const mine = TRIPS.filter(t => ['pending','confirmed','declined'].includes(myStatus(t))).sort((a,b) => parse(a.depart) - parse(b.depart));
+    body = mine.length ? mine.map(t => {
+      const st = myStatus(t), d = D(t.dest), u = U(t.driver);
+      const pill = st === 'confirmed' ? '<span class="pill ok">Seat confirmed</span>' : st === 'pending' ? '<span class="pill warn">Awaiting driver</span>' : '<span class="pill bad">Request declined</span>';
+      const acts = st === 'pending' ? `<div class="row"><button class="btn sm" data-act="trip" data-id="${t.id}">View trip</button><button class="btn sm danger" data-act="withdraw" data-id="${t.id}">Withdraw request</button></div>
+          <p class="small muted">Group chat opens once ${esc(u.first)} accepts. Your seat isn't confirmed yet.</p>
+          <div class="demo">Prototype: <button class="link" data-act="manage" data-id="${t.id}" data-demo="1">respond as the driver</button> to see your status change.</div>`
+        : st === 'confirmed' ? `<div class="row"><button class="btn sm" data-act="trip" data-id="${t.id}">Trip details</button><button class="btn sm primary" data-act="chat" data-id="${t.id}">Group chat</button></div>`
+        : `<p class="small muted">${esc(u.first)} couldn't take you on this trip.</p><div class="row"><button class="btn sm primary" data-act="dest" data-id="${t.dest}">Find another ride</button></div>`;
+      return `<div class="mcard"><div class="mtop"><div><h3>${esc(d.name)}</h3><div class="small muted tnum">${fDT(t.depart)}</div></div>${pill}</div>
+        <div class="row" style="justify-content:space-between"><div class="driver">${av(u,28)}<span class="small">${esc(fullName(u))}</span></div><span class="tnum small"><b>${money(t.price)}</b> · ${t.ret?'round trip':'one way'}</span></div>${acts}</div>`;
+    }).join('') : `<div class="empty">${I.ticket}<h2>No trips yet</h2><p class="muted small">Seat requests and confirmed rides will show up here.</p><button class="btn primary" data-act="nav" data-to="home">Find a ride</button></div>`;
+  } else {
+    const mine = TRIPS.filter(t => t.driver === 'me').sort((a,b) => parse(a.depart) - parse(b.depart));
+    body = mine.length ? mine.map(t => {
+      const d = D(t.dest), pend = t.requests.filter(r => r.status === 'pending').length;
+      return `<div class="mcard"><div class="mtop"><div><h3>${esc(d.name)}</h3><div class="small muted tnum">${fDT(t.depart)}</div></div>${pend ? `<span class="pill warn">${pend} pending</span>` : '<span class="pill neutral">No pending</span>'}</div>
+        <div class="small tnum"><b>${seatsLeft(t)}</b> of ${t.seats} seats left · ${money(t.price)} per seat</div>
+        <div class="row"><button class="btn sm primary" data-act="manage" data-id="${t.id}">Manage requests</button><button class="btn sm" data-act="chat" data-id="${t.id}">Group chat</button></div></div>`;
+    }).join('') : `<div class="empty">${I.car}<h2>You haven't posted a trip</h2><p class="muted small">Offer seats in your car and riders can request to join.</p><button class="btn primary" data-act="nav" data-to="post">Post a trip</button></div>`;
+  }
+  return `<header class="topbar"><div class="title"><h2>My Trips</h2></div></header>
+<div class="screen">
+  <div class="seg" role="tablist"><button role="tab" aria-selected="${tab==='rider'}" data-act="tab" data-t="rider">As a rider</button><button role="tab" aria-selected="${tab==='driver'}" data-act="tab" data-t="driver">As a driver</button></div>
+  ${body}
+</div>${nav()}`;
+};
+
+/* Screen 7: Post a trip */
+SCREENS.post = () => {
+  if (!isVerified()) return `<header class="topbar"><div class="title"><h2>Post a trip</h2></div></header>
+<div class="screen">${pendingBanner()}<div class="empty">${I.lock}<h2>Verify your ID to post trips</h2><p class="muted small">Only verified students can offer rides. We'll unlock posting as soon as your ID is approved.</p><button class="btn" data-act="nav" data-to="home">Browse trips instead</button></div></div>${nav()}`;
+  return `<header class="topbar"><div class="title"><h2>Post a trip</h2><div class="small muted">Offer seats in your car</div></div></header>
+<div class="screen">
+<form id="ptForm" novalidate>
+  <div class="fieldset"><div class="eyebrow">Where & when</div>
+    <div class="field"><label for="pt-dest">Destination</label><select id="pt-dest"><option value="">Choose a destination</option>${DESTS.map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select><div class="err" id="pe-dest"></div></div>
+    <div class="two"><div class="field"><label for="pt-date">Departure date</label><input id="pt-date" type="date"><div class="err" id="pe-date"></div></div>
+    <div class="field"><label for="pt-time">Time</label><input id="pt-time" type="time"><div class="err" id="pe-time"></div></div></div>
+    <div class="field"><label for="pt-pickup">Pickup location</label><input id="pt-pickup" type="text" placeholder="e.g. Helaman Halls parking"><div class="err" id="pe-pickup"></div></div>
+    <div class="field"><label for="pt-dropoff">Drop-off location</label><input id="pt-dropoff" type="text" placeholder="e.g. Moab Main Street"><div class="err" id="pe-dropoff"></div></div>
+  </div>
+  <div class="fieldset"><div class="eyebrow">Seats & price</div>
+    <div class="two"><div class="field"><label for="pt-seats">Available seats</label><input id="pt-seats" type="number" min="1" max="7" inputmode="numeric" placeholder="1–7"><div class="err" id="pe-seats"></div></div>
+    <div class="field"><label for="pt-price">Price per seat ($)</label><input id="pt-price" type="number" min="1" max="150" inputmode="numeric" placeholder="1–150"><div class="err" id="pe-price"></div></div></div>
+  </div>
+  <div class="fieldset"><div class="eyebrow">Return trip</div>
+    <label class="check"><input type="checkbox" id="pt-ret"><span><b>Include a return trip</b><br><span class="small muted">Riders come back with you.</span></span></label>
+    <div id="pt-retfields" class="two" hidden><div class="field"><label for="pt-rdate">Return date</label><input id="pt-rdate" type="date"><div class="err" id="pe-rdate"></div></div>
+    <div class="field"><label for="pt-rtime">Time</label><input id="pt-rtime" type="time"><div class="err" id="pe-rtime"></div></div></div>
+    <div class="alert info small" id="pt-covers"></div>
+  </div>
+  <div class="alert bad" id="pt-sum" role="alert" hidden>Please fill in the required fields. Fix the highlighted items to publish.</div>
+  <button class="btn accent block" type="submit">Publish trip</button>
+</form>
+</div>${nav()}`;
+};
+BIND.post = () => {
+  const f = document.getElementById('ptForm'); if (!f) return;
+  const $ = id => document.getElementById(id);
+  const covers = () => { $('pt-covers').textContent = $('pt-ret').checked ? 'Your price per seat covers both directions: there and back.' : 'Your price per seat covers one direction only. Riders will see that this is a one-way trip and arrange their own ride back.'; };
+  $('pt-ret').addEventListener('change', () => { $('pt-retfields').hidden = !$('pt-ret').checked; covers(); });
+  covers();
+  f.addEventListener('submit', e => {
+    e.preventDefault();
+    const v = id => $(id).value.trim(), err = {}, ret = $('pt-ret').checked;
+    if (!v('pt-dest')) err.dest = 'Choose a destination.';
+    if (!v('pt-date')) err.date = 'Pick a departure date.';
+    if (!v('pt-time')) err.time = 'Pick a departure time.';
+    const dep = v('pt-date') && v('pt-time') ? `${v('pt-date')}T${v('pt-time')}` : null;
+    if (dep && parse(dep) <= NOW) err.date = 'Departure must be in the future.';
+    if (!v('pt-pickup')) err.pickup = 'Add a pickup location.';
+    if (!v('pt-dropoff')) err.dropoff = 'Add a drop-off location.';
+    const seats = +v('pt-seats'), price = +v('pt-price');
+    if (!v('pt-seats')) err.seats = 'Enter how many seats are open.'; else if (!Number.isInteger(seats) || seats < 1 || seats > 7) err.seats = 'Seats must be a whole number from 1 to 7.';
+    if (!v('pt-price')) err.price = 'Enter a price per seat.'; else if (!Number.isInteger(price) || price < 1 || price > 150) err.price = 'Price must be a whole dollar amount from $1 to $150.';
+    let rt = null;
+    if (ret){
+      if (!v('pt-rdate')) err.rdate = 'Pick a return date.';
+      if (!v('pt-rtime')) err.rtime = 'Pick a return time.';
+      if (v('pt-rdate') && v('pt-rtime')){ rt = `${v('pt-rdate')}T${v('pt-rtime')}`; if (dep && parse(rt) <= parse(dep)) err.rdate = 'Return must be after departure.'; }
+    }
+    ['dest','date','time','pickup','dropoff','seats','price','rdate','rtime'].forEach(k => { const el = $('pe-'+k); if (el){ el.textContent = err[k] || ''; el.closest('.field').classList.toggle('invalid', !!err[k]); } });
+    $('pt-sum').hidden = !Object.keys(err).length;
+    if (Object.keys(err).length){ const k = Object.keys(err)[0]; $( {dest:'pt-dest',date:'pt-date',time:'pt-time',pickup:'pt-pickup',dropoff:'pt-dropoff',seats:'pt-seats',price:'pt-price',rdate:'pt-rdate',rtime:'pt-rtime'}[k]).focus(); return; }
+    const id = 't' + (TRIPS.length + 1) + Date.now().toString(36).slice(-3);
+    TRIPS.push({id, dest:v('pt-dest'), driver:'me', depart:dep, ret:rt, seats, price, pickup:v('pt-pickup'), dropoff:v('pt-dropoff'), vehicle:'Your vehicle', passengers:[], requests:[]});
+    CHATS[id] = [];
+    go('manage', {id}); toast('Trip published');
+  });
+};
+
+/* Screen 8: Manage rider requests */
+SCREENS.manage = () => {
+  const t = TRIPS.find(x => x.id === S.params.id), d = D(t.dest), drv = U(t.driver), demo = S.params.demo;
+  const pend = t.requests.filter(r => r.status === 'pending'), left = seatsLeft(t);
+  return `${topbar('Manage requests', `${esc(d.name)} · ${fDate(t.depart)}`)}
+<div class="screen">
+  ${demo ? `<div class="alert info small"><b>Prototype driver view.</b> You're seeing this trip as ${esc(fullName(drv))} so you can accept or decline your own request.</div>` : ''}
+  <div class="card"><div class="mtop"><div><h3>${esc(d.name)}</h3><div class="small muted tnum">${fDT(t.depart)}</div></div><span class="tnum"><b>${money(t.price)}</b><span class="small muted"> / seat</span></span></div>
+    <div class="small tnum"><b>${left}</b> of ${t.seats} seats left · ${t.ret ? `Returns ${fDT(t.ret)}` : 'One-way'}</div></div>
+  <div class="section"><div class="section-head"><h2>Pending requests</h2><span class="small muted">${pend.length}</span></div>
+    ${pend.length ? pend.map(r => { const u = U(r.uid); return `<div class="rq"><div class="driver">${av(u,44)}<div style="min-width:0"><div class="nm">${esc(fullName(u))}${r.uid==='me'?' (you)':''}</div><div class="small muted">${esc(u.hometown || '')}</div></div><span style="margin-left:auto">${vBadge(u)}</span></div>
+      ${u.bio ? `<p class="small">${esc(u.bio)}</p>` : ''}${r.note ? `<div class="note">"${esc(r.note)}"</div>` : ''}
+      <div class="row"><button class="btn sm" data-act="decide" data-uid="${r.uid}" data-v="declined">Decline</button><button class="btn sm primary" data-act="decide" data-uid="${r.uid}" data-v="accepted" ${left?'':'disabled'}>Accept</button></div>
+      ${left ? '' : '<p class="small muted">No seats left. Decline or keep this request until a seat opens.</p>'}</div>`; }).join('') : `<div class="empty"><p class="muted">No pending requests.</p></div>`}
+  </div>
+  <div class="section"><div class="section-head"><h2>Confirmed passengers</h2><span class="small muted">${t.passengers.length}</span></div>
+    <div class="card">${t.passengers.length ? `<div class="plist">${t.passengers.map(id => { const u = U(id); return `<div class="driver">${av(u,34)}<div><div class="nm">${esc(fullName(u))}${id==='me'?' (you)':''}</div><div class="small muted">${esc(u.hometown||'')}</div></div></div>`; }).join('')}</div>` : '<p class="muted small">No one confirmed yet.</p>'}</div>
+  </div>
+  ${demo ? '' : `<button class="btn primary block" data-act="chat" data-id="${t.id}">${I.chat.replace('<svg','<svg width="18" height="18"')}Open trip group chat</button>`}
+</div>${nav()}`;
+};
+
+/* Screen 9: Trip group chat */
+function msgsHTML(t){
+  const list = CHATS[t.id] || (CHATS[t.id] = []);
+  if (!list.length) return `<p class="small muted" style="text-align:center;margin:auto">No messages yet. Say hi to your group.</p>`;
+  return list.map(m => { const u = U(m.uid), me = m.uid === 'me'; return `<div class="msg ${me?'me':''}">${me?'':av(u,28)}<div class="bub"><div class="who">${me?'You':esc(u.first)} · ${esc(m.at)}</div>${esc(m.text)}</div></div>`; }).join('');
+}
+SCREENS.chat = () => {
+  const t = TRIPS.find(x => x.id === S.params.id), d = D(t.dest), st = myStatus(t);
+  if (!(st === 'driver' || st === 'confirmed')){
+    return `${topbar('Group chat', esc(d.name))}<div class="screen"><div class="empty">${I.lock}<h2>Chat opens once you're confirmed</h2><p class="muted small">Only the driver and accepted riders can see this trip's chat. ${st === 'pending' ? 'Your request is still awaiting the driver.' : st === 'declined' ? 'Your request for this trip was declined.' : ''}</p><button class="btn primary" data-act="go" data-to="mytrips">View request status</button></div></div>${nav()}`;
+  }
+  return `<header class="topbar"><button class="iconbtn" data-act="back" aria-label="Back to trip">${I.back}</button><div class="title"><h2>${esc(d.name)}</h2><div class="small muted tnum">${fDate(t.depart)} · ${t.passengers.length + 1} people</div></div>
+  <button class="btn sm" data-act="${st==='driver'?'manage':'trip'}" data-id="${t.id}">${st==='driver'?'Manage':'Trip details'}</button></header>
+<div class="chatwrap">
+  <div class="pin">${I.pin}<span class="tnum"><b>Pickup ${fTime(t.depart)}</b> · ${esc(t.pickup)}</span></div>
+  <div class="msgs" id="msgs" aria-live="polite">${msgsHTML(t)}</div>
+  <div class="composer"><form id="chatForm" novalidate><input id="c-in" type="text" placeholder="Message the group" aria-label="Message" autocomplete="off"><button class="btn primary" id="c-send" type="submit" disabled>Send</button></form></div>
+</div>`;
+};
+BIND.chat = () => {
+  const f = document.getElementById('chatForm'); if (!f) return;
+  const t = TRIPS.find(x => x.id === S.params.id), inp = document.getElementById('c-in'), btn = document.getElementById('c-send'), box = document.getElementById('msgs');
+  box.scrollTop = box.scrollHeight; window.scrollTo(0, document.body.scrollHeight);
+  inp.addEventListener('input', () => btn.disabled = !inp.value.trim());
+  f.addEventListener('submit', e => {
+    e.preventDefault(); const text = inp.value.trim(); if (!text) return;
+    const n = new Date();
+    CHATS[t.id].push({uid:'me', at:`${MON[n.getMonth()]} ${n.getDate()} · ${fTimeD(n)}`, text});
+    inp.value = ''; btn.disabled = true; box.innerHTML = msgsHTML(t); box.scrollTop = box.scrollHeight; window.scrollTo(0, document.body.scrollHeight); inp.focus();
+  });
+};
+
+/* Screen 10: Profile / edit profile */
+SCREENS.profile = () => {
+  const m = S.me;
+  return `<header class="topbar"><div class="title"><h2>Profile</h2></div><span class="pill">Demo account</span></header>
+<div class="screen">
+  ${pendingBanner()}
+  <div class="phead">${av(m,96)}<h1>${esc(fullName(m))}</h1>${m.verified === 'verified' ? `<span class="pill ok">${I.check.replace('<svg','<svg width="14" height="14"')}ID verified</span>` : '<span class="pill warn">Verification pending</span>'}</div>
+  <div class="card"><dl class="kv" style="margin:0"><dt>Hometown</dt><dd>${m.hometown ? esc(m.hometown) : '<span class="muted">Not added yet</span>'}</dd><dt>Bio</dt><dd>${m.bio ? esc(m.bio) : '<span class="muted">Not added yet</span>'}</dd></dl></div>
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <button class="btn block" data-act="go" data-to="edit">Edit profile</button>
+    <button class="btn accent block" data-act="nav" data-to="post" ${isVerified()?'':'disabled'}>Post a trip</button>
+    <button class="btn primary block" data-act="mymanage">Manage my trip</button>
+    ${isVerified() ? '' : '<p class="small muted" style="text-align:center">Posting a trip unlocks once your ID is verified.</p>'}
+  </div>
+  <div class="privacy">${I.lock}<span>Demo profile: no student ID or date of birth is collected in this version.</span></div>
+</div>${nav()}`;
+};
+const SAMPLE_COLORS = ['#2F6B5E','#3B6EA8','#B0562F','#7B4FA0','#A8456B','#4F6B2E'];
+SCREENS.edit = () => {
+  const m = S.me;
+  return `${topbar('Edit profile')}
+<div class="screen">
+<form id="edForm" novalidate>
+  <div class="fieldset"><div class="eyebrow">Photo</div>
+    <div class="avpick" role="group" aria-label="Sample avatars">${SAMPLE_COLORS.map(c => `<button type="button" data-c="${c}" aria-label="Avatar color ${c}" aria-pressed="${!m.photo && m.color===c}">${av({...m, photo:null, color:c},48)}</button>`).join('')}</div>
+    <p class="small muted">Prototype uses sample avatars.</p>
+  </div>
+  <div class="fieldset"><div class="eyebrow">Public info</div>
+    <div class="field"><label for="ed-name">Name</label><input id="ed-name" type="text" value="${esc(fullName(m))}" readonly><div class="hint">This classroom demo uses Jordan Hale's sample account.</div></div>
+    <div class="field"><label for="ed-home">Hometown</label><input id="ed-home" type="text" maxlength="100" value="${esc(m.hometown)}" placeholder="e.g. Boise, ID"></div>
+    <div class="field"><label for="ed-bio">Short bio</label><textarea id="ed-bio" maxlength="160" placeholder="Major, where you usually travel, what you're like on a road trip">${esc(m.bio)}</textarea><div class="hint" id="ed-count"></div></div>
+  </div>
+  <div class="privacy">${I.lock}<span>Hometown and bio are public profile fields in the planned app.</span></div>
+  <div class="row"><button type="button" class="btn" data-act="back">Cancel</button><button type="submit" class="btn primary">Save changes</button></div>
+</form>
+</div>${nav()}`;
+};
+BIND.edit = () => {
+  let color = S.me.color, photoCleared = false;
+  const bio = document.getElementById('ed-bio'), cnt = document.getElementById('ed-count');
+  const c = () => cnt.textContent = `${bio.value.length} / 160`; bio.addEventListener('input', c); c();
+  document.querySelectorAll('.avpick button').forEach(b => b.addEventListener('click', () => { color = b.dataset.c; photoCleared = true; document.querySelectorAll('.avpick button').forEach(x => x.setAttribute('aria-pressed', x === b)); }));
+  document.getElementById('edForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const button = e.target.querySelector('[type="submit"]');
+    button.disabled = true; button.textContent = 'Saving…';
+    try {
+      const response = await fetch('/api/profile', {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({hometown:document.getElementById('ed-home').value.trim(), bio:bio.value.trim(), color})
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Save failed');
+      S.me = result; S.hist.pop(); S.screen = 'profile'; S.params = {};
+      render(); toast('Profile saved to database');
+    } catch (error) {
+      toast(error.message); button.disabled = false; button.textContent = 'Save changes';
+    }
+  });
+};
+
+// ---------- render + events ----------
+async function boot(){
+  try {
+    const response = await fetch('/api/profile', {cache:'no-store'});
+    if (!response.ok) throw new Error('Backend unavailable');
+    S.me = await response.json(); S.screen = 'profile'; render();
+  } catch (error) {
+    app.innerHTML = '<div class="screen"><h1>Cannot connect to the database</h1><p>Start python3 server.py and open http://127.0.0.1:8000. Reload to retry.</p></div>';
+  }
+}
+function render(){
+  document.querySelectorAll('.scrim').forEach(x => x.remove());
+  app.innerHTML = '<div class="banner small" role="status">Classroom demo · Profile saving uses a real database. Rides, verification, and chat are prototype interactions.</div>' + SCREENS[S.screen]();
+  BIND[S.screen]?.();
+}
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el || el.disabled) return;
+  const a = el.dataset.act, id = el.dataset.id;
+  switch (a){
+    case 'go': go(el.dataset.to, {}, !['login','signup','forgot'].includes(S.screen)); break;
+    case 'back': back(); break;
+    case 'nav': S.hist = []; if (el.dataset.to === 'home'){ S.miss = null; } go(el.dataset.to, {}, false); break;
+    case 'cat': S.cat = el.dataset.c; render(); break;
+    case 'dest': S.miss = null; S.filters = {max:'', round:false}; go('results', {dest:id}); break;
+    case 'change': S.hist = []; go('home', {}, false); setTimeout(() => document.getElementById('s-dest')?.focus(), 0); break;
+    case 'clearf': S.filters = {max:'', round:false}; render(); break;
+    case 'trip': go('detail', {id}); break;
+    case 'request': openRequestDialog(); break;
+    case 'tab': S.tripsTab = el.dataset.t; render(); break;
+    case 'withdraw': { const t = TRIPS.find(x => x.id === id); t.requests = t.requests.filter(r => r.uid !== 'me'); render(); toast('Request withdrawn'); break; }
+    case 'manage': go('manage', {id, demo: !!el.dataset.demo}); break;
+    case 'chat': go('chat', {id}); break;
+    case 'decide': {
+      const t = TRIPS.find(x => x.id === S.params.id), r = t.requests.find(x => x.uid === el.dataset.uid), u = U(r.uid);
+      if (el.dataset.v === 'accepted'){ if (!seatsLeft(t)) return; t.passengers.push(r.uid); t.requests = t.requests.filter(x => x !== r); toast(`${u.first} is confirmed and added to the group chat`); }
+      else { r.status = 'declined'; if (r.uid !== 'me') t.requests = t.requests.filter(x => x !== r); toast(`Declined ${u.first}'s request`); }
+      render(); break;
+    }
+    case 'mymanage': { const mine = TRIPS.filter(t => t.driver === 'me'); if (mine.length === 1) go('manage', {id:mine[0].id}); else { S.tripsTab = 'driver'; S.hist = []; go('mytrips', {}, false); } break; }
+    case 'approve': S.me.verified = 'verified'; render(); toast('ID verified. You can now request seats and post trips.'); break;
+    case 'signout': toast('Classroom demo uses the fixed Jordan Hale account.'); break;
+    case 'unused-signout': S.me = null; S.hist = []; S.loginNotice = 'You\'ve been signed out.'; S.search = {dest:'',from:'',date:''}; S.cat = 'All'; S.screen = 'login'; render(); break;
+  }
+});
+boot();
+
+</script>
+</body>
+</html>

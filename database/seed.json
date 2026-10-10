@@ -1,0 +1,430 @@
+{
+  "destinations": [
+    {
+      "id": "slc",
+      "name": "Salt Lake City",
+      "alias": [
+        "slc",
+        "salt lake"
+      ],
+      "drive": "45 min",
+      "est": 8,
+      "cat": "Weekend getaways",
+      "art": "city",
+      "near": true
+    },
+    {
+      "id": "sundance",
+      "name": "Sundance",
+      "alias": [],
+      "drive": "35 min",
+      "est": 7,
+      "cat": "Ski trips",
+      "art": "snow",
+      "near": true
+    },
+    {
+      "id": "parkcity",
+      "name": "Park City",
+      "alias": [
+        "pc"
+      ],
+      "drive": "1 hr",
+      "est": 12,
+      "cat": "Ski trips",
+      "art": "snow",
+      "near": true
+    },
+    {
+      "id": "bearlake",
+      "name": "Bear Lake",
+      "alias": [],
+      "drive": "2 hr 45 min",
+      "est": 28,
+      "cat": "Weekend getaways",
+      "art": "lake"
+    },
+    {
+      "id": "moab",
+      "name": "Moab",
+      "alias": [
+        "arches",
+        "canyonlands"
+      ],
+      "drive": "3 hr 40 min",
+      "est": 35,
+      "cat": "National parks",
+      "art": "redrock"
+    },
+    {
+      "id": "stgeorge",
+      "name": "St. George",
+      "alias": [
+        "st george",
+        "saint george"
+      ],
+      "drive": "3 hr 30 min",
+      "est": 32,
+      "cat": "Weekend getaways",
+      "art": "desert"
+    },
+    {
+      "id": "zion",
+      "name": "Zion National Park",
+      "alias": [
+        "zion"
+      ],
+      "drive": "4 hr",
+      "est": 38,
+      "cat": "National parks",
+      "art": "redrock"
+    },
+    {
+      "id": "jackson",
+      "name": "Jackson Hole",
+      "alias": [
+        "jackson"
+      ],
+      "drive": "4 hr 50 min",
+      "est": 45,
+      "cat": "Ski trips",
+      "art": "snow"
+    }
+  ],
+  "users": {
+    "u1": {
+      "first": "Kaylee",
+      "last": "Brooks",
+      "hometown": "Boise, ID",
+      "bio": "Junior in nursing. I head south most weekends and like company on the road.",
+      "color": "#3B6EA8",
+      "verified": "verified"
+    },
+    "u2": {
+      "first": "Marcus",
+      "last": "Tanaka",
+      "hometown": "Mesa, AZ",
+      "bio": "Outdoor rec major. Usually headed to Moab or Zion to climb. Snacks provided.",
+      "color": "#B0562F",
+      "verified": "verified"
+    },
+    "u3": {
+      "first": "Hannah",
+      "last": "Ortiz",
+      "hometown": "St. George, UT",
+      "bio": "Going home to St. George a lot. Quiet drives, good podcasts.",
+      "color": "#7B4FA0",
+      "verified": "verified"
+    },
+    "u4": {
+      "first": "Ben",
+      "last": "Whitaker",
+      "hometown": "Park City, UT",
+      "bio": "On the club ski team. I leave early on Saturdays.",
+      "color": "#2E7D6B",
+      "verified": "verified"
+    },
+    "u5": {
+      "first": "Priya",
+      "last": "Shah",
+      "hometown": "Salt Lake City, UT",
+      "bio": "Accounting major. I visit family in SLC almost every weekend.",
+      "color": "#A8456B",
+      "verified": "verified"
+    },
+    "u6": {
+      "first": "Tyler",
+      "last": "Nguyen",
+      "hometown": "Las Vegas, NV",
+      "bio": "Freshman in CS. Looking for rides to concerts in SLC.",
+      "color": "#4F6B2E",
+      "verified": "verified"
+    },
+    "u7": {
+      "first": "Emma",
+      "last": "Larsen",
+      "hometown": "Logan, UT",
+      "bio": "Exercise science. Happy to split gas and share the aux.",
+      "color": "#9A6A12",
+      "verified": "verified"
+    },
+    "u8": {
+      "first": "Josh",
+      "last": "Rivera",
+      "hometown": "Provo, UT",
+      "bio": "Senior in finance. Downtown SLC for internship stuff.",
+      "color": "#3A5A8C",
+      "verified": "verified"
+    },
+    "u9": {
+      "first": "Sadie",
+      "last": "Cole",
+      "hometown": "Idaho Falls, ID",
+      "bio": "Snowboarder. Sundance whenever there is fresh snow.",
+      "color": "#8C3A3A",
+      "verified": "verified"
+    }
+  },
+  "trips": [
+    {
+      "id": "t1",
+      "dest": "slc",
+      "driver": "u5",
+      "depart": "2026-10-10T09:00",
+      "ret": null,
+      "seats": 3,
+      "price": 8,
+      "pickup": "Wilkinson Student Center lot",
+      "dropoff": "City Creek Center",
+      "vehicle": "2019 Honda Civic, gray",
+      "passengers": [
+        "u7"
+      ],
+      "requests": []
+    },
+    {
+      "id": "t2",
+      "dest": "slc",
+      "driver": "me",
+      "depart": "2026-10-10T14:00",
+      "ret": "2026-10-10T21:00",
+      "seats": 4,
+      "price": 12,
+      "pickup": "Helaman Halls parking",
+      "dropoff": "The Gateway",
+      "vehicle": "2017 Subaru Outback, blue",
+      "passengers": [
+        "u9"
+      ],
+      "requests": [
+        {
+          "uid": "u6",
+          "status": "pending",
+          "note": "Going to a concert at the Delta Center. Fine with leaving at 9."
+        },
+        {
+          "uid": "u8",
+          "status": "pending",
+          "note": "Need to get downtown for an interview. I can be at Helaman early."
+        }
+      ]
+    },
+    {
+      "id": "t3",
+      "dest": "slc",
+      "driver": "u8",
+      "depart": "2026-10-17T10:30",
+      "ret": null,
+      "seats": 2,
+      "price": 7,
+      "pickup": "LaVell Edwards Stadium lot",
+      "dropoff": "University of Utah campus",
+      "vehicle": "2015 Toyota Corolla, white",
+      "passengers": [],
+      "requests": []
+    },
+    {
+      "id": "t4",
+      "dest": "parkcity",
+      "driver": "u4",
+      "depart": "2026-10-17T06:30",
+      "ret": "2026-10-17T18:00",
+      "seats": 3,
+      "price": 18,
+      "pickup": "Heritage Halls",
+      "dropoff": "Park City Mountain base",
+      "vehicle": "2020 Toyota 4Runner, black (ski rack)",
+      "passengers": [
+        "u2"
+      ],
+      "requests": [
+        {
+          "uid": "me",
+          "status": "pending",
+          "note": ""
+        }
+      ]
+    },
+    {
+      "id": "t5",
+      "dest": "parkcity",
+      "driver": "u7",
+      "depart": "2026-10-24T07:00",
+      "ret": null,
+      "seats": 4,
+      "price": 11,
+      "pickup": "Wyview Park",
+      "dropoff": "Main Street, Park City",
+      "vehicle": "2018 Mazda CX-5, red",
+      "passengers": [],
+      "requests": []
+    },
+    {
+      "id": "t6",
+      "dest": "sundance",
+      "driver": "u9",
+      "depart": "2026-10-11T08:00",
+      "ret": "2026-10-11T16:00",
+      "seats": 3,
+      "price": 10,
+      "pickup": "Wilkinson Student Center lot",
+      "dropoff": "Sundance Mountain Resort",
+      "vehicle": "2016 Jeep Cherokee, green",
+      "passengers": [],
+      "requests": []
+    },
+    {
+      "id": "t7",
+      "dest": "moab",
+      "driver": "u2",
+      "depart": "2026-10-16T13:00",
+      "ret": "2026-10-18T16:00",
+      "seats": 4,
+      "price": 45,
+      "pickup": "Helaman Halls parking",
+      "dropoff": "Moab Main Street",
+      "vehicle": "2018 Toyota Tacoma, silver",
+      "passengers": [
+        "me",
+        "u3"
+      ],
+      "requests": []
+    },
+    {
+      "id": "t8",
+      "dest": "moab",
+      "driver": "u6",
+      "depart": "2026-10-23T15:00",
+      "ret": "2026-10-25T14:00",
+      "seats": 3,
+      "price": 40,
+      "pickup": "Wyview Park",
+      "dropoff": "Arches National Park visitor center",
+      "vehicle": "2021 Honda CR-V, white",
+      "passengers": [
+        "u1"
+      ],
+      "requests": []
+    },
+    {
+      "id": "t9",
+      "dest": "moab",
+      "driver": "u1",
+      "depart": "2026-10-09T16:00",
+      "ret": null,
+      "seats": 2,
+      "price": 30,
+      "pickup": "Heritage Halls",
+      "dropoff": "Moab Main Street",
+      "vehicle": "2014 Ford Focus, black",
+      "passengers": [
+        "u4",
+        "u5"
+      ],
+      "requests": []
+    },
+    {
+      "id": "t10",
+      "dest": "stgeorge",
+      "driver": "u3",
+      "depart": "2026-10-09T15:30",
+      "ret": "2026-10-11T15:00",
+      "seats": 3,
+      "price": 50,
+      "pickup": "Wilkinson Student Center lot",
+      "dropoff": "Dixie Regional area",
+      "vehicle": "2019 Hyundai Elantra, gray",
+      "passengers": [],
+      "requests": [
+        {
+          "uid": "me",
+          "status": "declined",
+          "note": ""
+        }
+      ]
+    },
+    {
+      "id": "t11",
+      "dest": "stgeorge",
+      "driver": "u1",
+      "depart": "2026-10-22T17:00",
+      "ret": null,
+      "seats": 4,
+      "price": 30,
+      "pickup": "Heritage Halls",
+      "dropoff": "St. George Temple area",
+      "vehicle": "2014 Ford Focus, black",
+      "passengers": [
+        "u9"
+      ],
+      "requests": []
+    },
+    {
+      "id": "t12",
+      "dest": "zion",
+      "driver": "u2",
+      "depart": "2026-10-23T06:00",
+      "ret": "2026-10-24T19:00",
+      "seats": 3,
+      "price": 55,
+      "pickup": "Helaman Halls parking",
+      "dropoff": "Springdale shuttle stop",
+      "vehicle": "2018 Toyota Tacoma, silver",
+      "passengers": [],
+      "requests": []
+    },
+    {
+      "id": "t13",
+      "dest": "bearlake",
+      "driver": "u5",
+      "depart": "2026-10-17T08:00",
+      "ret": "2026-10-18T17:00",
+      "seats": 4,
+      "price": 35,
+      "pickup": "Wilkinson Student Center lot",
+      "dropoff": "Garden City",
+      "vehicle": "2020 Kia Telluride, white",
+      "passengers": [
+        "u7",
+        "u8"
+      ],
+      "requests": []
+    }
+  ],
+  "chats": {
+    "t7": [
+      {
+        "uid": "u2",
+        "at": "Oct 12 \u00b7 7:42 PM",
+        "text": "Hey all! Leaving Helaman at 1:00 sharp on Friday. Bring a jacket, it gets cold at night."
+      },
+      {
+        "uid": "u3",
+        "at": "Oct 12 \u00b7 8:05 PM",
+        "text": "Sounds good. Should I bring a cooler?"
+      },
+      {
+        "uid": "me",
+        "at": "Oct 12 \u00b7 8:11 PM",
+        "text": "I can grab snacks for the drive."
+      },
+      {
+        "uid": "u2",
+        "at": "Oct 12 \u00b7 8:20 PM",
+        "text": "Cooler would be great. Venmo me after the trip, $45 each covers gas both ways."
+      }
+    ],
+    "t2": [
+      {
+        "uid": "me",
+        "at": "Oct 4 \u00b7 6:15 PM",
+        "text": "Welcome! Meet at the Helaman Halls lot by the volleyball courts at 2."
+      },
+      {
+        "uid": "u9",
+        "at": "Oct 4 \u00b7 6:30 PM",
+        "text": "Perfect, see you there."
+      }
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+1
+00:00:00,000 --> 00:00:06,000
+Hitch Carpool: a profile saved in a real database
+
+2
+00:00:06,000 --> 00:00:18,000
+Edit the hometown, bio, and avatar color
+
+3
+00:00:18,000 --> 00:00:26,000
+Save changes: the backend updates SQLite and returns the saved profile
+
+4
+00:00:26,000 --> 00:00:40,000
+The page reloads. The same values are read back from the database.

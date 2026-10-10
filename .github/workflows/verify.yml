@@ -1,0 +1,56 @@
+name: Verify app and record demo
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/**'
+      - 'database/**'
+      - 'server.py'
+      - 'tests/**'
+      - 'scripts/**'
+      - '.github/workflows/verify.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: hitch-demo-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify database and API
+        run: python3 -m unittest discover -s tests -v
+      - name: Install recording tools
+        run: |
+          npm install --no-save --package-lock=false playwright@1.58.2
+          npx playwright install --with-deps chromium
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+      - name: Record real browser interaction and verify persistence
+        run: node scripts/record-demo.cjs
+      - name: Create captioned MP4
+        run: |
+          ffmpeg -y -i demo-recording/source.webm -vf "subtitles=docs/demo-captions.srt" -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -movflags +faststart -an docs/demo.mp4
+          ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1 docs/demo.mp4
+      - name: Preserve video and verification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: hitch-demo-and-verification
+          path: |
+            docs/demo.mp4
+            docs/verification.json
+      - name: Publish video to this public repository
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/demo.mp4 docs/verification.json
+          git commit -m "Publish verified profile demo recording" || exit 0
+          git push origin HEAD:main
