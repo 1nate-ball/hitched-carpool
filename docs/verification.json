@@ -1,0 +1,30 @@
+{
+  "verifiedAt": "2026-10-10T20:36:20.774Z",
+  "browser": "Chromium",
+  "saveRequestStatus": 200,
+  "updatedValuesDisplayed": true,
+  "browserRefreshPreservedValues": true,
+  "serverRestartPreservedValues": true,
+  "consoleErrors": [],
+  "requests": [
+    {
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "method": "PATCH",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "status": 200
+    }
+  ],
+  "sampleRows": {
+    "Users": 10,
+    "Destinations": 8,
+    "Trips": 13,
+    "RideRequests": 15,
+    "Messages": 6
+  }
+}
