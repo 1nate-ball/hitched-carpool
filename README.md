@@ -1,70 +1,81 @@
-# Hitch Carpool — Data Model and Backend
+# Hitch Carpool
+
+[Demo video](https://github.com/1nate-ball/hitched-carpool/raw/refs/heads/main/docs/demo.mp4) · [Submission links](SUBMISSION.md)
 
 ## App Summary
-Hitch helps BYU students find carpools for weekend trips, visits home, and outdoor activities. Students without a car often need a ride, while drivers have empty seats and want to share travel costs. The app lets students browse destinations, view trip details, and see pickup locations and seat prices. Its screens also show seat requests, driver decisions, and group messages. Student profiles give potential travel companions a name, hometown, and short introduction. This assignment implements one complete feature: editing a profile and permanently saving the hometown, bio, and avatar color. The saved profile comes from a SQLite database and remains after both a browser refresh and a server restart. The remaining trip, account, verification, and chat interactions are clearly labeled prototype features rather than completed backend features.
+
+BYU students often travel to the same places on weekends and school breaks, but finding a ride usually means asking around or checking several group chats. Our app, Hitch, is meant to bring those trips into one place. Students can browse the prototype by destination and date and see who is driving, how many seats are available, and what the ride costs. The prototype also includes screens for requesting a seat, managing requests, and chatting with the people on a trip. For this assignment, we focused on getting the **Save changes** button on the profile page working with a real database. Users can edit their hometown, bio, and avatar color, and their changes are still there after refreshing the page. The other screens use sample data, and real BYU sign-in is not connected in this version.
 
 ## ERD
-![Implemented database ERD with attributes and relationship cardinalities](docs/erd.png)
 
-The database has five entities: **Users, Destinations, Trips, RideRequests, and Messages**. Each driver has many trips; each destination has many trips; each trip and each rider has many ride requests; each trip and each sender has many messages. Riders and trips therefore have a many-to-many relationship resolved by RideRequests. Accepted requests represent passengers; there is no duplicate passenger table. A unique `(TripID, RiderID)` constraint prevents duplicate requests. Foreign keys and checks enforce valid references, statuses, lengths, and positive seat counts.
+![Hitch ERD showing five entities, their attributes, and relationship cardinalities](docs/erd.png)
 
-The supplied team's [original ERD](docs/original-erd.png) is retained for reference. The implemented model adds AvatarColor and VehicleDescription because the screens use them. It omits PasswordHash because this slice uses a fixed classroom demo identity and does not implement password authentication. Uploading IDs, date of birth, email verification, live location permissions, real sign-in, and password reset remain future work; do not enter private documents into this prototype. All sample people are fictional.
+Our database has five tables:
 
-The schema is in [database/schema.sql](database/schema.sql); reproducible sample data is in [database/seed.json](database/seed.json). First startup creates all five tables and adds multiple rows to every table. Later startups preserve existing data. Profile screens load from SQLite; the other screens still use the supplied JavaScript fixture data.
+- **Users:** Student names, hometowns, bios, and profile information.
+- **Destinations:** Places students can travel to.
+- **Trips:** Drivers, destinations, departure and return times, seats, and prices.
+- **RideRequests:** Students' requests to join a trip and whether they are pending, accepted, or declined.
+- **Messages:** Messages associated with a trip and the student who sent them.
+
+The diagram labels the one-to-many relationships. Users and trips also have a many-to-many rider relationship through RideRequests. An accepted request represents a confirmed passenger.
+
+The table definitions are in [schema.sql](database/schema.sql), and the sample records are in [seed.json](database/seed.json). Starting the app creates the database and adds sample data to every table. It only adds that data the first time, so restarting the app does not overwrite saved profile changes.
 
 ## Tech Stack
 
-| Layer | Choice | Why it fits our team |
-|---|---|---|
-| Frontend | Existing HTML, CSS, vanilla JavaScript | Preserves the team's screens and avoids a framework migration. |
-| Backend | Python 3 standard library HTTP server | Uses skills from our programming coursework; no packages or API keys required. |
-| Database | SQLite, using Python's sqlite3 | A real relational database stored on disk, with inspectable tables and zero cloud setup fees. |
-| Version control | Git / GitHub | One reproducible working version for the entire team. |
+| Layer | What we used |
+|---|---|
+| Frontend | HTML, CSS, and JavaScript |
+| Backend | Python's built-in HTTP server |
+| Database | SQLite |
+| Version control | GitHub |
 
-This local classroom stack has no provider free-tier limits. It is suitable for this assignment, not production hosting. It binds to `127.0.0.1` because profile editing intentionally uses the fixed Jordan Hale demo identity. A deployed multiuser version needs real server-side authentication, HTTPS, and persistent hosting storage. GitHub Pages alone cannot run this backend.
-
-No real passwords or service keys are included. `.env`, database files, and generated caches are ignored by Git. `.env.example` documents optional environment variables; the server does not load `.env` automatically.
+We chose this stack because we could keep our existing screens and use Python to connect them to a database. SQLite stores the data in a file on the computer running the app, so there is no paid service or cloud account to set up. Everyone can run the same version and inspect the tables locally. No extra Python packages or API keys are needed, and `.env` files are included in `.gitignore`.
 
 ## How to Get It Running
 
-1. Install **Python 3.10 or newer** and Git. Check with `python3 --version` on macOS/Linux or `py --version` on Windows.
-2. Clone the repository and open its folder:
+1. Install **Python 3.10 or newer** and **Git**.
+2. Open a terminal and clone the project:
+
    ```sh
    git clone https://github.com/1nate-ball/hitched-carpool.git
    cd hitched-carpool
    ```
-3. Start the app from the repository root:
+
+3. Start the server:
+
    ```sh
    python3 server.py
    ```
-   On Windows, use `py server.py`.
-4. Open **http://127.0.0.1:8000** in your browser. The app opens directly to Jordan Hale's demo profile. No sign-in or cloud service setup is needed.
-5. Leave that terminal running while using the app. Stop it with **Ctrl+C**. Start it again with the same command; saved data remains in `data/hitch.sqlite3`.
 
-If port 8000 is occupied, run `PORT=8001 python3 server.py` on macOS/Linux and open http://127.0.0.1:8001. On Windows PowerShell, run `$env:PORT='8001'; py server.py`.
+   On Windows, use `py server.py` instead.
 
-Do not double-click `public/index.html`: the backend must serve it for database requests to work. You may use a SQLite viewer to inspect `data/hitch.sqlite3`. To intentionally reset only the local demo, stop the server, delete that file, and restart; doing so discards your local profile changes.
+4. Open **http://127.0.0.1:8000** in your browser.
+5. The app opens to Jordan Hale's sample profile. No login is needed for the demo.
 
-Run verification from the repository root:
-```sh
-python3 -m unittest discover -s tests -v
-```
-The test uses a temporary database. It checks sample rows in every table, foreign keys, API saving and re-reading, preservation through startup, rejected invalid input, and cross-origin rejection.
+Keep the terminal running while using the app. Press **Ctrl+C** to stop it. The database is saved at `data/hitch.sqlite3` and will be used again the next time you start the server.
+
+Open the app through the address above rather than opening the HTML file directly. This lets the page communicate with the backend. Each teammate's local copy has its own database.
+
+If port 8000 is already in use, run `PORT=8001 python3 server.py` on macOS/Linux, or `$env:PORT='8001'; py server.py` in Windows PowerShell, and open http://127.0.0.1:8001.
 
 ## Verifying the Vertical Slice
 
-1. Open http://127.0.0.1:8000 and choose **Edit profile**.
-2. Change **Hometown** to `Boise, ID` and **Short bio** to a distinctive phrase such as `Ready for our next road trip!`. Optionally choose an avatar color.
-3. Click **Save changes**. The button shows `Saving…` while JavaScript sends `PATCH /api/profile` to Python.
-4. Python validates the fields, performs a parameterized SQLite `UPDATE`, commits the transaction, and returns the saved profile as JSON. The frontend displays that returned profile and the confirmation `Profile saved to database`.
-5. Refresh the browser. `GET /api/profile` reads the stored row and displays your same hometown and bio.
-6. For an additional durability check, stop and restart the server, then refresh again. The saved values remain.
+1. Click **Edit profile**.
+2. Change the hometown to `Boise, ID` and the bio to `Ready for our next road trip!`. You can also choose a different avatar color.
+3. Click **Save changes**.
+4. Check that the profile shows the new information and the message **Profile saved to database**.
+5. Refresh the page. The same hometown, bio, and avatar color should still be there.
 
-To see the network request, open browser developer tools → Network, save again, and inspect `PATCH /api/profile` and its JSON response. If saving fails, the form stays open and displays an error instead of claiming success.
+When Save changes is clicked, JavaScript sends the edited fields to the Python backend. The backend updates the Users table in SQLite and returns the saved profile. The page displays that response, and refreshing loads the profile from the database again.
 
-### Demo video and submission
-[Watch or download the demo video](https://github.com/1nate-ball/hitched-carpool/raw/refs/heads/main/docs/demo.mp4). The recording shows only the profile feature: original profile → Edit profile → changed fields → Save changes → updated profile → browser refresh → same fields. It is generated from real browser interactions by the [verification workflow](.github/workflows/verify.yml), with captions explaining each step. The workflow also checks persistence after a full server restart and writes [verification evidence](docs/verification.json).
+The [35-second demo video](https://github.com/1nate-ball/hitched-carpool/raw/refs/heads/main/docs/demo.mp4) shows this process. It is an automated recording of the app running in a real browser. The checks also confirm that profile changes survive a server restart.
 
-See the [rubric checklist](docs/rubric-checklist.md), [screen-to-data mapping](docs/screen-data-map.md), and [submission links](SUBMISSION.md).
+To run the database and API tests:
 
-The final assignment text entry must contain **two publicly accessible links**: the uploaded demo video and this GitHub repository's README. Verify both in a private/incognito browser window. The repository should be public. A local video file or local server URL is not a public submission link.
+```sh
+python3 -m unittest discover -s tests -v
+```
+
+On Windows, use `py -m unittest discover -s tests -v`.
