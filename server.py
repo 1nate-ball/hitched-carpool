@@ -57,9 +57,9 @@ class Handler(BaseHTTPRequestHandler):
             body=(ROOT/'public/index.html').read_bytes()
             self.send_response(200); self.send_header('Content-Type','text/html; charset=utf-8')
             self.send_header('Content-Length',str(len(body))); self.end_headers(); self.wfile.write(body)
-        elif self.path in ('/supabase-config.json', '/hitch-supabase.js'):
+        elif self.path in ('/supabase-config.json', '/hitch-supabase.js', '/hitch.css'):
             body=(ROOT/'public'/self.path.lstrip('/')).read_bytes()
-            content_type='application/json' if self.path.endswith('.json') else 'text/javascript'
+            content_type={'.json':'application/json','.css':'text/css; charset=utf-8'}.get(Path(self.path).suffix,'text/javascript')
             self.send_response(200); self.send_header('Content-Type',content_type)
             self.send_header('Cache-Control','no-store')
             self.send_header('Content-Length',str(len(body))); self.end_headers(); self.wfile.write(body)

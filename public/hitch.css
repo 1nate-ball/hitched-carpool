@@ -1,0 +1,186 @@
+/* =====================================================================
+   Hitch design system ("Basecamp")
+   ---------------------------------------------------------------------
+   One file for every color, font, size and shared component style.
+   Change a token here and every screen updates.
+
+   How to use it
+   - Use the tokens (var(--brand), var(--r) ...) instead of hex codes.
+   - Buttons:  .btn.primary  (green, main action)
+               .btn.accent   (blue, secondary emphasis)
+               .btn.outline  (green outline)   .btn.outline.sky (blue outline)
+   - Status:   .pill.ok / .pill.warn / .pill.bad / .pill.neutral / .pill.accent
+   - Tints:    .tint-sage / .tint-sky / .tint-sand  (soft backgrounds)
+   - Brand:    .logo holds the Peak H mark, .ridge-hero is the mountain banner
+
+   Every text/background pair below passes WCAG AA (4.5:1) in light and dark.
+   ===================================================================== */
+
+/* ---------- Light theme (default) ---------- */
+:root{
+  /* surfaces */
+  --stage:#EFEDE7;        /* area outside the app column */
+  --bg:#F7F6F2;           /* page background (warm stone) */
+  --surface:#FFFFFF;      /* cards, sheets, inputs */
+  --surface-2:#F0EEE8;    /* quiet fills: segmented control, read-only */
+  --line:#E3E1DA;         /* dividers and card borders */
+  --line-strong:#858D88;  /* input borders (3:1 against surface) */
+
+  /* text */
+  --ink:#1E2622;
+  --muted:#5C6660;
+
+  /* brand */
+  --brand:#3B6E5F;        /* sage green: primary actions, logo */
+  --brand-ink:#FFFFFF;    /* text on --brand */
+  --brand-soft:#E6EFEA;   /* sage tint */
+  --accent:#36608F;       /* dusk blue: links, secondary emphasis */
+  --accent-ink:#FFFFFF;   /* text on --accent */
+  --accent-soft:#E3EBF4;  /* sky tint */
+  --sand-soft:#F3E7C9;    /* warm tint, used sparingly */
+
+  /* legacy names used throughout index.html */
+  --btn:var(--brand);
+  --btn-ink:var(--brand-ink);
+
+  /* status */
+  --ok:#2E6B4A;   --ok-bg:#E1F0E6;
+  --warn:#7A5300; --warn-bg:#F8EDD2;
+  --bad:#9E2E25;  --bad-bg:#F8E3DF;
+
+  /* mountain banner + logo */
+  --sky:#D6E2EE; --sun:#F3E7C9;
+  --ridge-1:#B5CFC3; --ridge-2:#7FA898; --ridge-3:#3B6E5F;
+  --hero-sub:#3A433E;
+  --mark:#3B6E5F; --mark-sun:#36608F;
+
+  /* type */
+  --f-display:'DM Sans','Segoe UI',system-ui,-apple-system,sans-serif;
+  --f-body:'DM Sans','Segoe UI',system-ui,-apple-system,sans-serif;
+
+  /* shape + spacing */
+  --r:20px;        /* cards */
+  --r-sm:14px;     /* inputs, small boxes */
+  --r-pill:999px;  /* buttons, chips, pills */
+  --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:24px; --s-6:32px;
+
+  /* depth */
+  --shadow:0 1px 2px rgba(30,38,34,.06),0 8px 24px rgba(30,38,34,.08);
+  --shadow-lift:0 2px 4px rgba(30,38,34,.06),0 16px 40px rgba(30,38,34,.12);
+  --scrim:rgba(18,22,20,.5);
+  color-scheme:light;
+}
+
+/* ---------- Dark theme: follows the device, or force with data-theme ---------- */
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --stage:#0B0E0D; --bg:#121614; --surface:#1B201E; --surface-2:#232A27;
+  --line:#2B322F; --line-strong:#66726C;
+  --ink:#ECEFEC; --muted:#A4AEA8;
+  --brand:#8CC5B1; --brand-ink:#10201A; --brand-soft:#1C3527;
+  --accent:#9DBBE2; --accent-ink:#0F1A26; --accent-soft:#1D2733;
+  --sand-soft:#38321F;
+  --ok:#93D3AE; --ok-bg:#1C3527; --warn:#EDC56B; --warn-bg:#372C12; --bad:#F0A39A; --bad-bg:#3C1D1A;
+  --sky:#1E2A36; --sun:#C9BB93; --ridge-1:#2B3D37; --ridge-2:#34574B; --ridge-3:#121614;
+  --hero-sub:#C9D3CE; --mark:#8CC5B1; --mark-sun:#9DBBE2;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.3);
+  --shadow-lift:0 2px 4px rgba(0,0,0,.35),0 16px 40px rgba(0,0,0,.4);
+  --scrim:rgba(0,0,0,.6);
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --stage:#0B0E0D; --bg:#121614; --surface:#1B201E; --surface-2:#232A27;
+  --line:#2B322F; --line-strong:#66726C;
+  --ink:#ECEFEC; --muted:#A4AEA8;
+  --brand:#8CC5B1; --brand-ink:#10201A; --brand-soft:#1C3527;
+  --accent:#9DBBE2; --accent-ink:#0F1A26; --accent-soft:#1D2733;
+  --sand-soft:#38321F;
+  --ok:#93D3AE; --ok-bg:#1C3527; --warn:#EDC56B; --warn-bg:#372C12; --bad:#F0A39A; --bad-bg:#3C1D1A;
+  --sky:#1E2A36; --sun:#C9BB93; --ridge-1:#2B3D37; --ridge-2:#34574B; --ridge-3:#121614;
+  --hero-sub:#C9D3CE; --mark:#8CC5B1; --mark-sun:#9DBBE2;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.3);
+  --shadow-lift:0 2px 4px rgba(0,0,0,.35),0 16px 40px rgba(0,0,0,.4);
+  --scrim:rgba(0,0,0,.6);
+  color-scheme:dark}
+
+/* ---------- Type ---------- */
+body{font-family:var(--f-body);font-size:15px;line-height:1.5}
+h1,h2,h3{font-family:var(--f-display);font-weight:800;letter-spacing:-.02em}
+h1{font-size:1.9rem;line-height:1.1}
+h2{font-size:1.25rem;line-height:1.25}
+h3{font-size:1.05rem;font-weight:700}
+.eyebrow{letter-spacing:.08em}
+a{color:var(--accent)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+/* ---------- Logo (Peak H) ---------- */
+.logo{width:36px;height:36px;background:none;border-radius:0;display:grid;place-items:center;flex:none}
+.logo svg{width:36px;height:36px}
+.mark-leg{fill:var(--mark)}
+.mark-peak{fill:none;stroke:var(--mark);stroke-width:6;stroke-linejoin:round}
+.mark-sun{fill:var(--mark-sun)}
+.brand-name{font-family:var(--f-display);font-weight:800;font-size:1.45rem;letter-spacing:-.02em}
+
+/* ---------- Mountain banner ---------- */
+.ridge-hero{position:relative;overflow:hidden;background:var(--sky);margin:-16px -16px 0;min-height:250px;padding:28px 20px 0;display:flex;flex-direction:column;gap:8px}
+.ridge-hero svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.ridge-hero > :not(svg){position:relative}
+.ridge-hero h1{font-size:2.1rem;line-height:1.06;max-width:14ch;letter-spacing:-.03em}
+.ridge-hero p{color:var(--hero-sub);font-size:1rem;max-width:30ch}
+.ridge-hero + .searchcard{margin-top:-60px;position:relative;z-index:1;box-shadow:var(--shadow-lift)}
+.r-sun{fill:var(--sun)} .r-1{fill:var(--ridge-1)} .r-2{fill:var(--ridge-2)} .r-3{fill:var(--ridge-3)}
+
+/* ---------- Buttons ---------- */
+.btn{border-radius:var(--r-pill);min-height:46px;padding:0 22px;font-weight:700;border-color:var(--line-strong)}
+.btn.sm{border-radius:var(--r-pill);min-height:36px;padding:0 14px}
+.btn.primary{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.btn.accent{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.outline{background:transparent;color:var(--brand);border:1.5px solid var(--brand)}
+.btn.outline.sky{color:var(--accent);border-color:var(--accent)}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.link{color:var(--accent)}
+
+/* ---------- Inputs ---------- */
+.input,input[type=text],input[type=password],input[type=email],input[type=tel],input[type=date],input[type=time],input[type=datetime-local],input[type=number],select,textarea{border-color:var(--line-strong);border-radius:var(--r-sm);min-height:48px;padding:10px 14px}
+textarea{border-radius:16px}
+.sfield{border-color:var(--line-strong);border-radius:var(--r-pill);padding:0 16px;background:var(--bg)}
+.filebox{border-radius:var(--r-sm)}
+.choice label{border-radius:var(--r-sm)}
+.choice label:has(input:checked){border-color:var(--brand);background:var(--brand-soft)}
+.check input,.choice input,.toggle input{accent-color:var(--brand)}
+
+/* ---------- Cards ---------- */
+.card,.tcard,.dcard,.mcard,.rq,.fieldset,.searchcard,.empty{border-radius:var(--r)}
+.searchcard{padding:16px;gap:12px}
+.dcard:hover,.tcard:hover{border-color:var(--brand)}
+.dart{aspect-ratio:16/10}
+.twhen,.tprice b,.actionbar .p b{font-weight:800}
+
+/* ---------- Pills, chips, alerts ---------- */
+.pill{padding:4px 11px;font-size:.78rem}
+.pill.accent{background:var(--accent-soft);color:var(--accent)}
+.chip{border-color:var(--line-strong)}
+.chip[aria-pressed="true"]{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.alert{border-radius:var(--r-sm)}
+.alert.info{background:var(--accent-soft)}
+.banner{border-radius:var(--r-sm)}
+.verified{color:var(--ok)}
+
+/* ---------- Soft tints ---------- */
+.tint-sage{background:var(--brand-soft)}
+.tint-sky{background:var(--accent-soft)}
+.tint-sand{background:var(--sand-soft)}
+
+/* ---------- Navigation ---------- */
+.nav button[aria-current="page"]{color:var(--brand)}
+.nav button[aria-current="page"] svg{color:var(--brand)}
+.seg{border-radius:var(--r-pill)}
+.seg button{border-radius:var(--r-pill)}
+.avpick button[aria-pressed="true"]{border-color:var(--brand)}
+
+/* ---------- Chat, sheets, toast ---------- */
+.msg .bub{border-radius:16px 16px 16px 4px}
+.msg.me .bub{background:var(--brand);color:var(--brand-ink);border-color:var(--brand);border-radius:16px 16px 4px 16px}
+.pin{background:var(--accent-soft)}
+.pin svg{color:var(--accent)}
+.sheet{border-radius:24px 24px 0 0}
+@media (min-width:500px){.sheet{border-radius:24px}}
+.toast{background:var(--ink);color:var(--bg);border-radius:var(--r-pill)}

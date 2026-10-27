@@ -7,37 +7,10 @@
 <title>Hitch Carpool</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap">
 <style>
-/* Layout: phone-width app column centered on a quiet stage; sticky top bars, sticky bottom nav. Navy "highway sign" ink + red-rock accent. */
-:root{
-  --stage:#E3E8EF; --bg:#F4F6F9; --surface:#FFFFFF; --surface-2:#EDF1F6;
-  --ink:#13203A; --muted:#5A6479; --line:#D9DFE8;
-  --accent:#C8502A; --accent-soft:#FBE7DE;
-  --btn:#13203A; --btn-ink:#FFFFFF;
-  --ok:#1D7148; --ok-bg:#DFF2E7; --warn:#8A5A06; --warn-bg:#FBEFD3; --bad:#A8271F; --bad-bg:#FBE3E0;
-  --shadow:0 1px 2px rgba(19,32,58,.06),0 6px 20px rgba(19,32,58,.07);
-  --scrim:rgba(10,16,30,.5);
-  --f-display:'Bricolage Grotesque','Avenir Next','Segoe UI',system-ui,sans-serif;
-  --f-body:'Figtree','Segoe UI',system-ui,-apple-system,sans-serif;
-  --r:14px;
-}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --stage:#080C14; --bg:#0E1420; --surface:#161F31; --surface-2:#1C2740;
-  --ink:#E7ECF4; --muted:#9AA5B9; --line:#27324A;
-  --accent:#F08A5D; --accent-soft:#3A2219;
-  --btn:#E7ECF4; --btn-ink:#0E1420;
-  --ok:#6FD39C; --ok-bg:#163326; --warn:#F2C164; --warn-bg:#3A2D10; --bad:#F59088; --bad-bg:#3D1A18;
-  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.25); --scrim:rgba(0,0,0,.6);
-  color-scheme:dark}}
-:root[data-theme="dark"]{
-  --stage:#080C14; --bg:#0E1420; --surface:#161F31; --surface-2:#1C2740;
-  --ink:#E7ECF4; --muted:#9AA5B9; --line:#27324A;
-  --accent:#F08A5D; --accent-soft:#3A2219;
-  --btn:#E7ECF4; --btn-ink:#0E1420;
-  --ok:#6FD39C; --ok-bg:#163326; --warn:#F2C164; --warn-bg:#3A2D10; --bad:#F59088; --bad-bg:#3D1A18;
-  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.25); --scrim:rgba(0,0,0,.6);
-  color-scheme:dark}
+/* Layout: phone-width app column centered on a quiet stage; sticky top bars, sticky bottom nav.
+   Colors, fonts and shared component styles live in hitch.css (the design system). */
 *{box-sizing:border-box}
 html,body{height:100%}
 body{background:var(--stage);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45}
@@ -262,6 +235,7 @@ input[readonly]{background:var(--surface-2);color:var(--muted)}
 .spinner{width:16px;height:16px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 </style>
+<link rel="stylesheet" href="hitch.css">
 </head>
 <body>
 <div class="stage"><div class="app" id="app"></div></div>
@@ -297,6 +271,10 @@ const I = {
   chat:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></svg>',
   road:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3L4 21M16 3l4 18M12 5v2M12 11v2M12 17v2"/></svg>',
 };
+
+// ---------- brand: Peak H logo + mountain banner (colors come from hitch.css) ----------
+const LOGO = '<svg viewBox="0 0 48 48" aria-hidden="true"><rect class="mark-leg" x="9" y="8" width="7" height="32" rx="2"/><rect class="mark-leg" x="32" y="8" width="7" height="32" rx="2"/><path class="mark-peak" d="M16 31 L24 20 L32 31"/><circle class="mark-sun" cx="24" cy="11" r="3"/></svg>';
+const RIDGES = '<svg viewBox="0 0 460 250" preserveAspectRatio="xMidYMax slice" aria-hidden="true"><circle class="r-sun" cx="360" cy="118" r="24"/><path class="r-1" d="M0 170 L60 132 L120 158 L200 106 L270 148 L340 120 L460 160 V250 H0 Z"/><path class="r-2" d="M0 202 L90 170 L170 192 L250 162 L340 198 L460 176 V250 H0 Z"/><path class="r-3" d="M0 232 L100 212 L190 228 L280 208 L370 230 L460 218 V250 H0 Z"/></svg>';
 
 // ---------- destination art (stand-in "photos") ----------
 function art(kind){
@@ -460,19 +438,19 @@ SCREENS.home = () => {
   }
   const miss = S.miss ? `<div class="alert info" role="status"><b>No destinations match "${esc(S.miss)}".</b><span>Try a nearby or popular spot below, like Salt Lake City, Park City, or Moab.</span></div>` : '';
   return `
-<header class="topbar"><div class="brandrow" style="flex:1"><span class="logo">${I.car}</span><div class="brand-name">Hitch</div></div>
+<header class="topbar"><div class="brandrow" style="flex:1"><span class="logo">${LOGO}</span><div class="brand-name">Hitch</div></div>
   <button class="iconbtn" aria-label="Account (not available in prototype)" title="Account">${S.me ? av(S.me, 38) : I.user}</button></header>
 <div class="screen">
-  ${pendingBanner()}
-  <div><h1>Where are you headed?</h1></div>
+  <section class="ridge-hero">${RIDGES}<h1>Hitch a ride this weekend.</h1><p>Split the drive with BYU students already heading your way.</p></section>
   <form class="searchcard" id="searchForm" novalidate role="search">
     <label class="sfield"><span class="tag">To</span><input id="s-dest" type="text" list="destlist" placeholder="Search a destination" value="${esc(S.search.dest)}" aria-label="Destination">${I.search}</label>
     <datalist id="destlist">${DESTS.map(d=>`<option value="${esc(d.name)}">`).join('')}</datalist>
     <label class="sfield"><span class="tag">From</span><input id="s-from" type="text" placeholder="${loc ? 'Current location' : 'Type your starting point'}" value="${esc(S.search.from)}" aria-label="Starting location (optional)">${I.pin}</label>
     <label class="sfield"><span class="tag">Date</span><input id="s-date" type="date" value="${esc(S.search.date)}" aria-label="Travel date (optional)"></label>
     <div class="err" id="s-err"></div>
-    <button class="btn accent block" type="submit">${I.search.replace('<svg','<svg width="18" height="18"')}Search rides</button>
+    <button class="btn primary block" type="submit">${I.search.replace('<svg','<svg width="18" height="18"')}Search rides</button>
   </form>
+  ${pendingBanner()}
   ${!loc ? `<p class="small muted">Location is off, so we're showing popular destinations instead of nearby ones. Type a starting point above.</p>` : ''}
   ${miss}
   <div class="chips" role="group" aria-label="Categories">${cats.map(c => `<button class="chip" data-act="cat" data-c="${c}" aria-pressed="${S.cat===c}">${c}</button>`).join('')}</div>
@@ -548,7 +526,7 @@ SCREENS.detail = () => {
   else if (st === 'declined') action = `<button class="btn" data-act="go" data-to="mytrips">Request declined · View status</button>`;
   else if (!left) action = `<button class="btn" disabled>Trip is full</button>`;
   else if (!isVerified()) action = `<button class="btn" disabled>Verify your ID to request</button>`;
-  else action = `<button class="btn accent" data-act="request">Request a seat</button>`;
+  else action = `<button class="btn primary" data-act="request">Request a seat</button>`;
   return `${topbar('Trip details')}
 <div class="screen">
   <div class="hero">${art(d.art)}<div class="cap"><div class="small" style="opacity:.85">Provo → </div><h1>${esc(d.name)}</h1></div></div>
@@ -579,7 +557,7 @@ function openRequestDialog(){
     <h2 id="rq-h">Would you like to request a seat for this trip?</h2>
     <dl class="kv tnum" style="margin:0"><dt>To</dt><dd>${esc(d.name)}</dd><dt>Leaves</dt><dd>${fDT(t.depart)}</dd><dt>Pickup</dt><dd>${esc(t.pickup)}</dd><dt>Return</dt><dd>${t.ret ? fDT(t.ret) : 'One-way. You arrange your own ride back.'}</dd><dt>Price</dt><dd><b>${money(t.price)}</b> per seat, ${t.ret?'round trip':'one way'}</dd></dl>
     <div class="alert info small">Your seat isn't reserved until ${esc(u.first)} accepts. We'll let you know as soon as they decide.</div>
-    <div class="row"><button class="btn" data-x="no">Keep browsing</button><button class="btn accent" data-x="yes">Confirm request</button></div>
+    <div class="row"><button class="btn" data-x="no">Keep browsing</button><button class="btn primary" data-x="yes">Confirm request</button></div>
     <p class="small muted" id="rq-timer" style="text-align:center"></p>
   </div>`;
   document.body.appendChild(wrap);
@@ -654,7 +632,7 @@ SCREENS.post = () => {
     <div class="alert info small" id="pt-covers"></div>
   </div>
   <div class="alert bad" id="pt-sum" role="alert" hidden>Please fill in the required fields. Fix the highlighted items to publish.</div>
-  <button class="btn accent block" type="submit">Publish trip</button>
+  <button class="btn primary block" type="submit">Publish trip</button>
 </form>
 </div>${nav()}`;
 };
@@ -757,7 +735,7 @@ SCREENS.profile = () => {
   <div class="card"><dl class="kv" style="margin:0"><dt>Hometown</dt><dd>${m.hometown ? esc(m.hometown) : '<span class="muted">Not added yet</span>'}</dd><dt>Bio</dt><dd>${m.bio ? esc(m.bio) : '<span class="muted">Not added yet</span>'}</dd></dl></div>
   <div style="display:flex;flex-direction:column;gap:10px">
     <button class="btn block" data-act="go" data-to="edit">Edit profile</button>
-    <button class="btn accent block" data-act="nav" data-to="post" ${isVerified()?'':'disabled'}>Post a trip</button>
+    <button class="btn primary block" data-act="nav" data-to="post" ${isVerified()?'':'disabled'}>Post a trip</button>
     <button class="btn primary block" data-act="mymanage">Manage my trip</button>
     ${isVerified() ? '' : '<p class="small muted" style="text-align:center">Posting a trip unlocks once your ID is verified.</p>'}
   </div>
