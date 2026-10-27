@@ -79,3 +79,11 @@ python3 -m unittest discover -s tests -v
 ```
 
 On Windows, use `py -m unittest discover -s tests -v`.
+
+## Sprint 1 database setup
+
+We created a separate **Free** Supabase project for Hitch. The `destinations` and `trips` tables are set up with validation and row-level security. Our [field list and setup status](docs/post-a-trip-field-list.md) explains the exact columns and the remaining form work. The applied SQL is saved in [the initial migration file](supabase/migrations/20261027000100_post_a_trip.sql); do not run it again against the existing project.
+
+The local server serves the public connection settings and a [client helper](public/hitch-supabase.js) for loading destinations/trips and publishing a trip with a signed-in session. The trip form still uses prototype data until it is wired to that helper. Our working profile-save feature still uses SQLite.
+
+Run `python3 scripts/check_supabase_connection.py` to check the project connection and confirm signed-out access stays blocked. The connection file contains only a publishable key, never a database password or secret key.
