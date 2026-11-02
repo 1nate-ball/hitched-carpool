@@ -30,3 +30,16 @@ CREATE TABLE IF NOT EXISTS Messages (
  SenderID TEXT NOT NULL REFERENCES Users(UserID), MessageText TEXT NOT NULL,
  SentAt TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_riderequests_tripid ON RideRequests(TripID);
+-- KR: posted trips average 70% of seats filled. Accepted seats per trip, capped at 100%.
+CREATE VIEW IF NOT EXISTS kr_seat_fill_rate AS
+SELECT t.TripID AS trip_id, t.TotalSeats AS seats_total,
+ COALESCE(SUM(CASE WHEN r.RequestStatus='accepted' THEN r.RequestedSeats END),0) AS accepted_seats,
+ MIN(1.0, COALESCE(SUM(CASE WHEN r.RequestStatus='accepted' THEN r.RequestedSeats END),0)*1.0/t.TotalSeats) AS fill_rate,
+ datetime(t.DepartureDateTime) <= datetime('now','localtime') AS has_departed
+FROM Trips t LEFT JOIN RideRequests r ON r.TripID=t.TripID
+GROUP BY t.TripID;
+-- Mean of per-trip fill rates, departed trips only so new trips don't drag it down.
+CREATE VIEW IF NOT EXISTS kr_seat_fill_rate_summary AS
+SELECT COUNT(*) AS departed_trips, ROUND(AVG(fill_rate),4) AS avg_fill_rate
+FROM kr_seat_fill_rate WHERE has_departed=1;
