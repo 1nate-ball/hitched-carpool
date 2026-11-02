@@ -22,6 +22,33 @@ The diagram labels the one-to-many relationships. Users and trips also have a ma
 
 The table definitions are in [schema.sql](database/schema.sql), and the sample records are in [seed.json](database/seed.json). Starting the app creates the database and adds sample data to every table. It only adds that data the first time, so restarting the app does not overwrite saved profile changes.
 
+## Key Results
+
+**Objective 2, Key Result: posted trips average 70% of seats filled.**
+
+For each trip, the fill rate is the number of seats on accepted ride requests (`RideRequests.RequestedSeats`) divided by `Trips.TotalSeats`, capped at 100%. The Key Result is the average of those per-trip rates. Only trips whose `DepartureDateTime` has passed are counted, so new trips that haven't had time to collect requests don't pull the average down.
+
+Two views in [schema.sql](database/schema.sql) compute it:
+
+- `kr_seat_fill_rate` has one row per trip: `trip_id`, `seats_total`, `accepted_seats`, `fill_rate`, and `has_departed`.
+- `kr_seat_fill_rate_summary` has one row: `departed_trips` and `avg_fill_rate`.
+
+To check the current number, run this while the server has created the database:
+
+```sh
+sqlite3 data/hitch.sqlite3 "SELECT * FROM kr_seat_fill_rate_summary;"
+```
+
+To check the math against known test data, use a separate database so the sample data isn't affected:
+
+```sh
+sqlite3 data/kr-test.sqlite3 < database/schema.sql
+sqlite3 data/kr-test.sqlite3 < database/kr_seat_fill_test_seed.sql
+sqlite3 data/kr-test.sqlite3 "SELECT * FROM kr_seat_fill_rate; SELECT * FROM kr_seat_fill_rate_summary;"
+```
+
+Expected results: one trip at 0.75 (3 of 4 seats), one at 0.3333 (1 of 3 seats, plus a declined request), and an average of 0.5417. The future test trip isn't counted.
+
 ## Tech Stack
 
 | Layer | What we used |
