@@ -184,3 +184,70 @@ textarea{border-radius:16px}
 .sheet{border-radius:24px 24px 0 0}
 @media (min-width:500px){.sheet{border-radius:24px}}
 .toast{background:var(--ink);color:var(--bg);border-radius:var(--r-pill)}
+
+/* =====================================================================
+   Desktop layout (960px and wider)
+   - The app fills the whole browser window, edge to edge.
+   - The phone's bottom menu becomes a full-width top navigation bar.
+   - Content lines up on a 1360px grid with 40px side margins.
+   - Home and Post a trip use the full width; other screens keep a
+     comfortable 820px reading column until they get their own layout.
+   ===================================================================== */
+.nav .nav-brand,.nav .nav-me{display:none}
+.post-aside{display:none}
+.two-desk{display:grid;grid-template-columns:1fr;gap:14px}
+.ridge-hero .rg-wide{display:none}
+
+@media (min-width:960px){
+  body{overflow-x:hidden}
+  .stage{display:block}
+  .app{max-width:none;border:0!important;box-shadow:none!important}
+  .app > .banner{border-radius:0;padding:10px max(40px,calc((100% - 1360px)/2))}
+
+  /* top navigation bar */
+  .nav{order:-1;position:sticky;top:0;bottom:auto;z-index:10;display:flex;align-items:center;gap:6px;padding:12px max(40px,calc((100% - 1360px)/2));border-top:0;border-bottom:1px solid var(--line);background:var(--surface)}
+  .nav button{flex-direction:row;gap:8px;font-size:.95rem;padding:10px 16px;border-radius:var(--r-pill)}
+  .nav button[aria-current="page"]{background:var(--brand-soft)}
+  .nav .nav-brand{display:flex;align-items:center;margin-right:auto;padding:0;gap:10px;color:var(--ink);font-size:1.5rem;font-weight:800;letter-spacing:-.02em;background:none}
+  .nav .nav-brand svg{width:40px;height:40px;color:inherit}
+  .nav .nav-me{display:flex;margin-left:12px}
+  .app[data-screen="home"] > .topbar{display:none}
+
+  /* page header + content width */
+  .topbar{position:static;padding:32px max(40px,calc((100% - 1360px)/2)) 4px;border-bottom:0;background:transparent}
+  .topbar .title h2{font-size:2.2rem;font-weight:800;letter-spacing:-.03em}
+  .topbar .title .small{font-size:1rem}
+  .screen{width:100%;max-width:820px;margin:0 auto;padding:24px 40px 64px}
+  .app[data-screen="home"] .screen,.screen.post-layout{max-width:1440px}
+  .toast{bottom:24px}
+
+  /* home: full-width mountain banner, search bar in one row, 4-up grid */
+  .ridge-hero{margin:-24px calc(50% - 50vw) 0;min-height:400px;padding:76px max(40px,calc((100vw - 1360px)/2)) 0}
+  .ridge-hero .rg-phone{display:none}
+  .ridge-hero .rg-wide{display:block}
+  .ridge-hero h1{font-size:3.6rem;max-width:12ch}
+  .ridge-hero p{font-size:1.2rem;max-width:36ch}
+  .ridge-hero + .searchcard{margin-top:-96px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;align-items:center;gap:12px;padding:16px}
+  .ridge-hero + .searchcard .err{grid-column:1/-1;order:5}
+  .ridge-hero + .searchcard .btn{width:auto;padding:0 32px;min-height:50px}
+  .dgrid{grid-template-columns:repeat(4,minmax(0,1fr));gap:20px}
+
+  /* post a trip: form fills the left, live preview on the right */
+  .screen.post-layout{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:40px;align-items:start}
+  .post-layout #ptForm{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+  .post-layout #ptForm > .fieldset:first-child{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:20px;row-gap:16px}
+  .post-layout #ptForm > .fieldset:first-child > .eyebrow,.post-layout #ptForm > .fieldset:first-child > .two-desk{grid-column:1/-1}
+  .post-layout #ptForm > .alert,.post-layout #ptForm > .btn{grid-column:1/-1}
+  .post-layout .fieldset{padding:28px;gap:16px}
+  .two-desk{grid-template-columns:1fr 1fr;gap:20px}
+  .post-layout .btn.primary.block{width:auto;justify-self:end;min-width:240px;min-height:52px}
+  .post-aside{display:flex;flex-direction:column;gap:16px;position:sticky;top:96px}
+}
+
+/* Live trip preview (Post a trip, desktop) */
+.preview{gap:14px;box-shadow:var(--shadow)}
+.preview .dart{border-radius:14px;overflow:hidden}
+.preview .dart.blank{background:var(--sky)}
+.preview .ph{color:var(--muted);font-weight:500}
+.tips{border:0;gap:8px}
+.tips ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:.92rem}
