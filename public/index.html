@@ -793,7 +793,7 @@ async function boot(){
     if (!response.ok) throw new Error('Backend unavailable');
     S.me = await response.json(); S.screen = 'profile'; render();
   } catch (error) {
-    app.innerHTML = '<div class="screen"><h1>Cannot connect to the database</h1><p>Start python3 server.py and open http://127.0.0.1:8000. Reload to retry.</p></div>';
+    app.innerHTML = '<div class="screen"><h1>Cannot connect to the database</h1><p>The Hitch server is not responding. If you are running it locally, start python3 server.py and open http://127.0.0.1:8000. Otherwise wait a minute and reload to retry.</p></div>';
   }
 }
 function render(){

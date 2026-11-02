@@ -1,6 +1,6 @@
 # Hitch Carpool
 
-[Demo video](https://github.com/1nate-ball/hitched-carpool/raw/refs/heads/main/docs/demo.mp4) · [Submission links](SUBMISSION.md)
+[Live site](https://hitch-carpool.onrender.com) · [Demo video](https://github.com/1nate-ball/hitched-carpool/raw/refs/heads/main/docs/demo.mp4) · [Submission links](SUBMISSION.md)
 
 ## App Summary
 
@@ -106,6 +106,27 @@ python3 -m unittest discover -s tests -v
 ```
 
 On Windows, use `py -m unittest discover -s tests -v`.
+
+## Deploying
+
+The live site runs on a free [Render](https://render.com) web service that redeploys whenever `main` changes. The same Python server that runs locally serves both the pages and the profile API, so the frontend and backend share one address and no CORS settings are needed. Trips and destinations use the existing Supabase project (see below), so no separate database host is needed.
+
+**Limitation:** On Render's free plan the server's files reset on every redeploy or restart, so saved profile changes go back to the sample data. That includes the automatic demo-video commit after each push to `main`. Free services also go to sleep when unused, so the first visit can take about a minute.
+
+To set it up (one time):
+
+1. Sign in at [render.com](https://render.com) with GitHub and choose **New → Web Service**.
+2. Connect the `1nate-ball/hitched-carpool` repository and choose the `main` branch.
+3. Use these settings:
+   - **Name:** `hitch-carpool`. If the name is taken, update the Live site link above to the URL Render gives you.
+   - **Language:** Python 3
+   - **Build Command:** `python3 --version` (there is nothing to install)
+   - **Start Command:** `python3 server.py`
+   - **Instance Type:** Free
+4. Under **Environment Variables**, add `HOST` = `0.0.0.0` and `PYTHON_VERSION` = `3.12.7`. Render sets `PORT` itself.
+5. Click **Deploy Web Service**. Auto-deploy from `main` is on by default (Settings → Build & Deploy → Auto-Deploy).
+
+The database tables don't need any extra setup. The server creates the SQLite tables from [schema.sql](database/schema.sql) and loads the sample data on startup. The Supabase tables already exist, and their SQL is in [supabase/migrations](supabase/migrations). Don't rerun it against the existing project.
 
 ## Sprint 1 database setup
 

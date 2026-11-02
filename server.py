@@ -67,9 +67,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_PATCH(self):
         if self.path != '/api/profile': return self.send_json(404,{'error':'Not found'})
-        # Reject cross-origin mutations; bind to loopback for the fixed demo identity.
+        # Reject cross-origin mutations; https covers the hosted copy behind a TLS proxy.
         origin=self.headers.get('Origin')
-        if origin and origin != 'http://' + self.headers.get('Host',''):
+        host=self.headers.get('Host','')
+        if origin and origin not in ('http://'+host,'https://'+host):
             return self.send_json(403,{'error':'Cross-origin request rejected'})
         try:
             length=int(self.headers.get('Content-Length','0'))
@@ -93,5 +94,6 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == '__main__':
     initialize()
     port=int(os.environ.get('PORT','8000'))
+    host=os.environ.get('HOST','127.0.0.1') # Loopback locally; the host sets 0.0.0.0.
     print(f'Hitch classroom demo: http://127.0.0.1:{port}',flush=True)
-    ThreadingHTTPServer(('127.0.0.1',port),Handler).serve_forever()
+    ThreadingHTTPServer((host,port),Handler).serve_forever()
