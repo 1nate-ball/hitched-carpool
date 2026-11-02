@@ -616,8 +616,8 @@ SCREENS.post = () => {
 <form id="ptForm" novalidate>
   <div class="fieldset"><div class="eyebrow">Where & when</div>
     <div class="field"><label for="pt-dest">Destination</label><select id="pt-dest"><option value="">Choose a destination</option>${DESTS.map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select><div class="err" id="pe-dest"></div></div>
-    <div class="two"><div class="field"><label for="pt-date">Departure date</label><input id="pt-date" type="date"><div class="err" id="pe-date"></div></div>
-    <div class="field"><label for="pt-time">Time</label><input id="pt-time" type="time"><div class="err" id="pe-time"></div></div></div>
+    <div class="two"><div class="field"><label for="pt-date">Departure date</label><input id="pt-date" type="date" required aria-describedby="pt-date-hint pe-date"><div class="hint" id="pt-date-hint">Choose today or a later date using the calendar.</div><div class="err" id="pe-date"></div></div>
+    <div class="field"><label for="pt-time">Time</label><input id="pt-time" type="time" required aria-describedby="pe-time"><div class="err" id="pe-time"></div></div></div>
     <div class="two-desk"><div class="field"><label for="pt-pickup">Pickup location</label><input id="pt-pickup" type="text" placeholder="e.g. Helaman Halls parking"><div class="err" id="pe-pickup"></div></div>
     <div class="field"><label for="pt-dropoff">Drop-off location</label><input id="pt-dropoff" type="text" placeholder="e.g. Moab Main Street"><div class="err" id="pe-dropoff"></div></div></div>
   </div>
@@ -627,11 +627,11 @@ SCREENS.post = () => {
   </div>
   <div class="fieldset"><div class="eyebrow">Return trip</div>
     <label class="check"><input type="checkbox" id="pt-ret"><span><b>Include a return trip</b><br><span class="small muted">Riders come back with you.</span></span></label>
-    <div id="pt-retfields" class="two" hidden><div class="field"><label for="pt-rdate">Return date</label><input id="pt-rdate" type="date"><div class="err" id="pe-rdate"></div></div>
-    <div class="field"><label for="pt-rtime">Time</label><input id="pt-rtime" type="time"><div class="err" id="pe-rtime"></div></div></div>
+    <div id="pt-retfields" class="two" hidden><div class="field"><label for="pt-rdate">Return date</label><input id="pt-rdate" type="date" aria-describedby="pe-rdate"><div class="err" id="pe-rdate"></div></div>
+    <div class="field"><label for="pt-rtime">Time</label><input id="pt-rtime" type="time" aria-describedby="pe-rtime"><div class="err" id="pe-rtime"></div></div></div>
     <div class="alert info small" id="pt-covers"></div>
   </div>
-  <div class="alert bad" id="pt-sum" role="alert" hidden>Please fill in the required fields. Fix the highlighted items to publish.</div>
+  <div class="alert bad" id="pt-sum" role="alert" hidden>Check the highlighted fields before publishing.</div>
   <button class="btn primary block" type="submit">Publish trip</button>
 </form>
 <aside class="post-aside" aria-label="Trip preview">
@@ -662,6 +662,23 @@ function postTips(v){
 BIND.post = () => {
   const f = document.getElementById('ptForm'); if (!f) return;
   const $ = id => document.getElementById(id);
+  const today = () => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  };
+  const syncDates = () => {
+    $('pt-date').min = today();
+    $('pt-rdate').min = $('pt-date').value || today();
+  };
+  const dateError = (id, label) => {
+    const input = $(id);
+    // Native date inputs expose invalid/incomplete typed dates as an empty value.
+    if (input.validity.badInput || !input.value) return `Enter a valid ${label} date. Check the month, day, and year, or use the calendar.`;
+    if (input.validity.rangeUnderflow) return label === 'departure' ? 'Departure must be today or later.' : 'Return must be on or after the departure date.';
+    return '';
+  };
+  syncDates();
+  $('pt-date').addEventListener('input', syncDates);
   const refresh = () => {
     if (!$('pt-preview')) return;
     const val = id => $(id).value.trim();
@@ -677,10 +694,13 @@ BIND.post = () => {
     e.preventDefault();
     const v = id => $(id).value.trim(), err = {}, ret = $('pt-ret').checked;
     if (!v('pt-dest')) err.dest = 'Choose a destination.';
-    if (!v('pt-date')) err.date = 'Pick a departure date.';
-    if (!v('pt-time')) err.time = 'Pick a departure time.';
+    syncDates();
+    const departureError = dateError('pt-date', 'departure');
+    if (departureError) err.date = departureError;
+    if ($('pt-time').validity.badInput) err.time = 'Enter a valid departure time.';
+    else if (!v('pt-time')) err.time = 'Pick a departure time.';
     const dep = v('pt-date') && v('pt-time') ? `${v('pt-date')}T${v('pt-time')}` : null;
-    if (dep && parse(dep) <= NOW) err.date = 'Departure must be in the future.';
+    if (dep && !err.date && !err.time && parse(dep).getTime() <= Date.now()) err.date = 'Departure must be in the future.';
     if (!v('pt-pickup')) err.pickup = 'Add a pickup location.';
     if (!v('pt-dropoff')) err.dropoff = 'Add a drop-off location.';
     const seats = +v('pt-seats'), price = +v('pt-price');
@@ -688,11 +708,18 @@ BIND.post = () => {
     if (!v('pt-price')) err.price = 'Enter a price per seat.'; else if (!Number.isInteger(price) || price < 1 || price > 150) err.price = 'Price must be a whole dollar amount from $1 to $150.';
     let rt = null;
     if (ret){
-      if (!v('pt-rdate')) err.rdate = 'Pick a return date.';
-      if (!v('pt-rtime')) err.rtime = 'Pick a return time.';
-      if (v('pt-rdate') && v('pt-rtime')){ rt = `${v('pt-rdate')}T${v('pt-rtime')}`; if (dep && parse(rt) <= parse(dep)) err.rdate = 'Return must be after departure.'; }
+      const returnError = dateError('pt-rdate', 'return');
+      if (returnError) err.rdate = returnError;
+      if ($('pt-rtime').validity.badInput) err.rtime = 'Enter a valid return time.';
+      else if (!v('pt-rtime')) err.rtime = 'Pick a return time.';
+      if (v('pt-rdate') && v('pt-rtime')){ rt = `${v('pt-rdate')}T${v('pt-rtime')}`; if (dep && !err.rdate && !err.rtime && parse(rt) <= parse(dep)) err.rdate = 'Return must be after departure.'; }
     }
-    ['dest','date','time','pickup','dropoff','seats','price','rdate','rtime'].forEach(k => { const el = $('pe-'+k); if (el){ el.textContent = err[k] || ''; el.closest('.field').classList.toggle('invalid', !!err[k]); } });
+    const inputs = {dest:'pt-dest',date:'pt-date',time:'pt-time',pickup:'pt-pickup',dropoff:'pt-dropoff',seats:'pt-seats',price:'pt-price',rdate:'pt-rdate',rtime:'pt-rtime'};
+    Object.keys(inputs).forEach(k => {
+      $('pe-'+k).textContent = err[k] || '';
+      $(inputs[k]).closest('.field').classList.toggle('invalid', !!err[k]);
+      $(inputs[k]).setAttribute('aria-invalid', String(!!err[k]));
+    });
     $('pt-sum').hidden = !Object.keys(err).length;
     if (Object.keys(err).length){ const k = Object.keys(err)[0]; $( {dest:'pt-dest',date:'pt-date',time:'pt-time',pickup:'pt-pickup',dropoff:'pt-dropoff',seats:'pt-seats',price:'pt-price',rdate:'pt-rdate',rtime:'pt-rtime'}[k]).focus(); return; }
     const id = 't' + (TRIPS.length + 1) + Date.now().toString(36).slice(-3);
