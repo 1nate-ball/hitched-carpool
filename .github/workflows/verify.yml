@@ -28,6 +28,8 @@ jobs:
           node-version: '22'
       - name: Verify database and API
         run: python3 -m unittest discover -s tests -v
+      - name: Verify trip form, dates, and account isolation
+        run: node --test tests/test_post_trip.cjs
       - name: Install recording tools
         run: |
           npm install --no-save --package-lock=false playwright@1.58.2

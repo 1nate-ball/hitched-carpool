@@ -1,5 +1,11 @@
 # Post a Trip: database handoff
 
+## Form integration update: November 2, 2026
+
+Robbie's form now uses the existing Supabase helper with email/password test-account sign-in. Departure (`pt-depart`) and optional return (`pt-return`) each use a `datetime-local` input; both mean America/Denver and are converted to offset timestamps. The old separate date/time IDs below describe the original handoff. The helper now also exports `signIn`, `signOut`, and `getSession`; sessions use `accessToken` in JavaScript. Profile saving and verification remain the original classroom demo.
+
+The form loads saved rows after signing in and refreshing. It checks lost responses before reporting success, blocks another submission when the save outcome is unknown, and clears database trips on sign-out/account changes. Automated form/API simulations pass; the two-real-account browser checks below still need to be performed. The remaining sections record the initial database handoff and its original verification evidence.
+
 We set up the initial Post a Trip database in our separate Free Supabase project, `hitch`, on October 27, 2026. The schema matches the form in GitHub main `1202998`. Joey and Robbie should confirm this contract against any newer form changes.
 
 ## What works today

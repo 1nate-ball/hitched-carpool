@@ -22,7 +22,7 @@ async function request(path, accessToken, payload) {
     },
     ...(payload ? { body: JSON.stringify(payload) } : {}),
   });
-  const data = await response.json().catch(() => ({}));
+  const data = await response.json();
   if (!response.ok) {
     const error = new Error(data.message || 'Database request failed.');
     error.status = response.status;
@@ -48,6 +48,7 @@ export async function publishTrip(accessToken, fields) {
     'total_seats', 'price_per_seat', 'return_at',
   ].filter(key => fields[key] !== undefined).map(key => [key, fields[key]]));
   const rows = await request('trips?select=*', accessToken, payload);
+  if (!Array.isArray(rows) || !rows[0]?.id) throw new Error('Could not confirm the saved trip.');
   return rows[0];
 }
 

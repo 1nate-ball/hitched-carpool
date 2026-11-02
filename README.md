@@ -1,6 +1,6 @@
 # Hitch Carpool
 
-[Live site](https://hitch-carpool.onrender.com) · [Demo video](https://github.com/1nate-ball/hitched-carpool/raw/refs/heads/main/docs/demo.mp4) · [Submission links](SUBMISSION.md)
+[Live site](https://hitched-carpool.onrender.com) · [Demo video](https://github.com/1nate-ball/hitched-carpool/raw/refs/heads/main/docs/demo.mp4) · [Submission links](SUBMISSION.md)
 
 ## App Summary
 
@@ -74,7 +74,7 @@ To check the math, paste [the repeat-rate check](database/checks/kr_driver_repea
 |---|---|
 | Frontend | HTML, CSS, and JavaScript |
 | Backend | Python's built-in HTTP server |
-| Database | SQLite |
+| Database | SQLite for profiles; Supabase for posted trips |
 | Version control | GitHub |
 
 We chose this stack because we could keep our existing screens and use Python to connect them to a database. SQLite stores the data in a file on the computer running the app, so there is no paid service or cloud account to set up. Everyone can run the same version and inspect the tables locally. No extra Python packages or API keys are needed, and `.env` files are included in `.gitignore`.
@@ -152,5 +152,9 @@ The database tables don't need any extra setup. The server creates the SQLite ta
 We created a separate **Free** Supabase project for Hitch. The `destinations` and `trips` tables are set up with validation and row-level security. Our [field list and setup status](docs/post-a-trip-field-list.md) explains the exact columns and the remaining form work. The applied SQL is saved in [the initial migration file](supabase/migrations/20261027000100_post_a_trip.sql); do not run it again against the existing project.
 
 The local server serves the public connection settings and a [client helper](public/hitch-supabase.js) for loading destinations/trips and publishing a trip with a signed-in session. The Post a Trip form now saves to the Supabase `trips` table: sign in on the Post a trip screen with a Supabase Auth test account (created under Authentication → Users), fill in the form, and publish. Departure and return each use one date + time input, entered as Utah time. The form validates required fields, future dates, seats (1–7), price ($1–150), and return-after-departure, shows a confirmation only after the database saves, and shows a retryable error if the save fails. Saved trips load again after a refresh. Our working profile-save feature still uses SQLite.
+
+If a network response is lost, we check for the saved trip. If we cannot confirm the result, publishing stays disabled until you reconnect, refresh, and check My Trips before posting again. This avoids encouraging a duplicate post. Sign-up and real BYU verification remain future work; the profile and sample riders are still demo data.
+
+Run `node --test tests/test_post_trip.cjs` for the form regression checks. These use a simulated database API to check date/time conversion, validation, save confirmation, duplicate submission prevention, and account switching. They do not replace testing with two real Supabase test accounts.
 
 Run `python3 scripts/check_supabase_connection.py` to check the project connection and confirm signed-out access stays blocked. The connection file contains only a publishable key, never a database password or secret key.
