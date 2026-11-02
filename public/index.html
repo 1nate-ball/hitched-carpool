@@ -274,7 +274,7 @@ const I = {
 
 // ---------- brand: Peak H logo + mountain banner (colors come from hitch.css) ----------
 const LOGO = '<svg viewBox="0 0 48 48" aria-hidden="true"><rect class="mark-leg" x="9" y="8" width="7" height="32" rx="2"/><rect class="mark-leg" x="32" y="8" width="7" height="32" rx="2"/><path class="mark-peak" d="M16 31 L24 20 L32 31"/><circle class="mark-sun" cx="24" cy="11" r="3"/></svg>';
-const RIDGES = '<svg viewBox="0 0 460 250" preserveAspectRatio="xMidYMax slice" aria-hidden="true"><circle class="r-sun" cx="360" cy="118" r="24"/><path class="r-1" d="M0 170 L60 132 L120 158 L200 106 L270 148 L340 120 L460 160 V250 H0 Z"/><path class="r-2" d="M0 202 L90 170 L170 192 L250 162 L340 198 L460 176 V250 H0 Z"/><path class="r-3" d="M0 232 L100 212 L190 228 L280 208 L370 230 L460 218 V250 H0 Z"/></svg>';
+const RIDGES = '<svg class="rg-wide" viewBox="0 0 1440 400" preserveAspectRatio="xMidYMax slice" aria-hidden="true"><circle class="r-sun" cx="1180" cy="170" r="54"/><path class="r-1" d="M0 280 L160 200 L290 250 L470 145 L620 235 L780 175 L960 260 L1110 170 L1260 230 L1440 185 V400 H0 Z"/><path class="r-2" d="M0 325 L200 255 L370 305 L540 235 L720 315 L900 248 L1080 320 L1260 260 L1440 305 V400 H0 Z"/><path class="r-3" d="M0 365 L220 320 L420 355 L630 315 L850 365 L1050 325 L1260 360 L1440 335 V400 H0 Z"/></svg><svg class="rg-phone" viewBox="0 0 460 250" preserveAspectRatio="xMidYMax slice" aria-hidden="true"><circle class="r-sun" cx="360" cy="118" r="24"/><path class="r-1" d="M0 170 L60 132 L120 158 L200 106 L270 148 L340 120 L460 160 V250 H0 Z"/><path class="r-2" d="M0 202 L90 170 L170 192 L250 162 L340 198 L460 176 V250 H0 Z"/><path class="r-3" d="M0 232 L100 212 L190 228 L280 208 L370 230 L460 218 V250 H0 Z"/></svg>';
 
 // ---------- destination art (stand-in "photos") ----------
 function art(kind){
@@ -400,7 +400,7 @@ const NAVMAP = {home:'home', results:'home', detail:'home', mytrips:'mytrips', m
 function nav(){
   const cur = NAVMAP[S.screen];
   const b = (id, icon, label) => `<button data-act="nav" data-to="${id}" ${cur===id?'aria-current="page"':''}>${icon}${label}</button>`;
-  return `<nav class="nav" aria-label="Main">${b('home',I.compass,'Explore')}${b('mytrips',I.ticket,'My Trips')}${b('post',I.plus,'Post a trip')}${b('profile',I.user,'Profile')}</nav>`;
+  return `<nav class="nav" aria-label="Main"><button class="nav-brand" data-act="nav" data-to="home" aria-label="Hitch home"><span class="logo">${LOGO}</span>Hitch</button>${b('home',I.compass,'Explore')}${b('mytrips',I.ticket,'My Trips')}${b('post',I.plus,'Post a trip')}${b('profile',I.user,'Profile')}<span class="nav-me">${S.me ? av(S.me, 38) : ''}</span></nav>`;
 }
 function topbar(title, sub=''){
   return `<header class="topbar"><button class="iconbtn" data-act="back" aria-label="Back">${I.back}</button><div class="title"><h2>${esc(title)}</h2>${sub?`<div class="small muted">${sub}</div>`:''}</div></header>`;
@@ -612,14 +612,14 @@ SCREENS.post = () => {
   if (!isVerified()) return `<header class="topbar"><div class="title"><h2>Post a trip</h2></div></header>
 <div class="screen">${pendingBanner()}<div class="empty">${I.lock}<h2>Verify your ID to post trips</h2><p class="muted small">Only verified students can offer rides. We'll unlock posting as soon as your ID is approved.</p><button class="btn" data-act="nav" data-to="home">Browse trips instead</button></div></div>${nav()}`;
   return `<header class="topbar"><div class="title"><h2>Post a trip</h2><div class="small muted">Offer seats in your car</div></div></header>
-<div class="screen">
+<div class="screen post-layout">
 <form id="ptForm" novalidate>
   <div class="fieldset"><div class="eyebrow">Where & when</div>
     <div class="field"><label for="pt-dest">Destination</label><select id="pt-dest"><option value="">Choose a destination</option>${DESTS.map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select><div class="err" id="pe-dest"></div></div>
     <div class="two"><div class="field"><label for="pt-date">Departure date</label><input id="pt-date" type="date"><div class="err" id="pe-date"></div></div>
     <div class="field"><label for="pt-time">Time</label><input id="pt-time" type="time"><div class="err" id="pe-time"></div></div></div>
-    <div class="field"><label for="pt-pickup">Pickup location</label><input id="pt-pickup" type="text" placeholder="e.g. Helaman Halls parking"><div class="err" id="pe-pickup"></div></div>
-    <div class="field"><label for="pt-dropoff">Drop-off location</label><input id="pt-dropoff" type="text" placeholder="e.g. Moab Main Street"><div class="err" id="pe-dropoff"></div></div>
+    <div class="two-desk"><div class="field"><label for="pt-pickup">Pickup location</label><input id="pt-pickup" type="text" placeholder="e.g. Helaman Halls parking"><div class="err" id="pe-pickup"></div></div>
+    <div class="field"><label for="pt-dropoff">Drop-off location</label><input id="pt-dropoff" type="text" placeholder="e.g. Moab Main Street"><div class="err" id="pe-dropoff"></div></div></div>
   </div>
   <div class="fieldset"><div class="eyebrow">Seats & price</div>
     <div class="two"><div class="field"><label for="pt-seats">Available seats</label><input id="pt-seats" type="number" min="1" max="7" inputmode="numeric" placeholder="1–7"><div class="err" id="pe-seats"></div></div>
@@ -634,11 +634,42 @@ SCREENS.post = () => {
   <div class="alert bad" id="pt-sum" role="alert" hidden>Please fill in the required fields. Fix the highlighted items to publish.</div>
   <button class="btn primary block" type="submit">Publish trip</button>
 </form>
+<aside class="post-aside" aria-label="Trip preview">
+  <div class="eyebrow">Preview · how riders will see your trip</div>
+  <div class="card preview" id="pt-preview"></div>
+  <div class="card tips tint-sage" id="pt-tips"></div>
+</aside>
 </div>${nav()}`;
 };
+// Live preview for the desktop Post a trip layout (display only; does not affect saving)
+function postPreview(v){
+  const d = D(v.dest), ph = t => `<span class="ph">${t}</span>`;
+  const when = v.date ? (v.time ? fDT(`${v.date}T${v.time}`) : fDate(v.date)) : '';
+  const seats = +v.seats;
+  return `<div class="dart${d ? '' : ' blank'}">${d ? art(d.art) : RIDGES}<span class="count pill ${v.ret ? 'accent' : 'neutral'}" style="background:var(--surface)">${v.ret ? 'Round trip' : 'One-way'}</span></div>
+  <div class="ttop"><div style="min-width:0"><h3>${d ? esc(d.name) : ph('Choose a destination')}</h3><div class="small muted tnum">${when ? esc(when) : 'Pick a date and time'}</div></div>
+    <div class="tprice"><b class="tnum">${+v.price ? money(+v.price) : '$–'}</b><div>per seat</div></div></div>
+  <div class="route"><span class="dot"></span><span>${v.pickup ? esc(v.pickup) : ph('Pickup location')}</span><span class="line"></span><span></span><span class="dot end"></span><span>${v.dropoff ? esc(v.dropoff) : ph('Drop-off location')}</span></div>
+  <div class="tfoot"><div class="driver">${av(S.me,28)}<span class="small"><b>You</b></span>${vBadge(S.me)}</div><span class="pill ok">${seats ? `${seats} seat${seats > 1 ? 's' : ''} open` : 'Seats open'}</span></div>`;
+}
+function postTips(v){
+  const d = D(v.dest);
+  return `<h3>Fill your seats faster</h3><ul>
+    <li>Post at least 3 days before you leave.</li>
+    <li>Pick a pickup spot everyone knows, like a dorm or campus lot.</li>
+    <li>${d ? `Riders expect about <b>${money(d.est)}</b> per seat to ${esc(d.name)}.` : 'Price close to the estimate for your destination.'}</li></ul>`;
+}
 BIND.post = () => {
   const f = document.getElementById('ptForm'); if (!f) return;
   const $ = id => document.getElementById(id);
+  const refresh = () => {
+    if (!$('pt-preview')) return;
+    const val = id => $(id).value.trim();
+    const v = {dest:val('pt-dest'), date:val('pt-date'), time:val('pt-time'), pickup:val('pt-pickup'), dropoff:val('pt-dropoff'), seats:val('pt-seats'), price:val('pt-price'), ret:$('pt-ret').checked};
+    $('pt-preview').innerHTML = postPreview(v);
+    $('pt-tips').innerHTML = postTips(v);
+  };
+  f.addEventListener('input', refresh); f.addEventListener('change', refresh); refresh();
   const covers = () => { $('pt-covers').textContent = $('pt-ret').checked ? 'Your price per seat covers both directions: there and back.' : 'Your price per seat covers one direction only. Riders will see that this is a one-way trip and arrange their own ride back.'; };
   $('pt-ret').addEventListener('change', () => { $('pt-retfields').hidden = !$('pt-ret').checked; covers(); });
   covers();
@@ -798,6 +829,7 @@ async function boot(){
 }
 function render(){
   document.querySelectorAll('.scrim').forEach(x => x.remove());
+  app.dataset.screen = S.screen;
   app.innerHTML = '<div class="banner small" role="status">Classroom demo · Profile saving uses a real database. Rides, verification, and chat are prototype interactions.</div>' + SCREENS[S.screen]();
   BIND[S.screen]?.();
 }
