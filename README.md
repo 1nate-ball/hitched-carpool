@@ -49,6 +49,25 @@ sqlite3 data/kr-test.sqlite3 "SELECT * FROM kr_seat_fill_rate; SELECT * FROM kr_
 
 Expected results: one trip at 0.75 (3 of 4 seats), one at 0.3333 (1 of 3 seats, plus a declined request), and an average of 0.5417. The future test trip isn't counted.
 
+**Objective 2, Key Result: 50% of drivers post a second trip within 30 days of their first.**
+
+This one uses the Supabase `trips` table, where the Post a Trip form saves trips. Each driver's first and second trips are found by `trips.created_at`. A driver counts as a repeat driver if their second trip was posted no more than 30 days after their first. Only drivers whose first trip was at least 30 days ago are counted, so new drivers who haven't had a full 30 days yet don't pull the rate down.
+
+Two views in [the repeat-rate migration](supabase/migrations/20261101000100_kr_driver_repeat_rate.sql) compute it:
+
+- `kr_driver_repeat_rate` has one row per eligible driver: `driver_id`, `first_trip_at`, `second_trip_at`, and `is_repeat`.
+- `kr_driver_repeat_rate_summary` has one row: `eligible_drivers`, `repeat_drivers`, and `repeat_rate` (a percent).
+
+Both views are private. They can be read from the Supabase SQL Editor but not through the app's public API, so driver activity isn't exposed to the browser. To check the current number, run this in the SQL Editor:
+
+```sql
+select * from public.kr_driver_repeat_rate_summary;
+```
+
+`repeat_rate` is empty until at least one driver's first trip is 30 days old.
+
+To check the math, paste [the repeat-rate check](database/checks/kr_driver_repeat_rate_seed.sql) into the SQL Editor and run it. It adds four test drivers inside a transaction, checks for 3 eligible drivers, 1 repeat driver, and 33.3%, and then rolls everything back. It should end with a `PASS` row.
+
 ## Tech Stack
 
 | Layer | What we used |
