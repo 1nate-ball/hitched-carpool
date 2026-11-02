@@ -245,7 +245,7 @@ input[readonly]{background:var(--surface-2);color:var(--muted)}
 // ---------- helpers ----------
 const app = document.getElementById('app');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const NOW = new Date(2026, 9, 3, 10, 0); // prototype "today"
+const NOW = new Date(2026, 9, 3, 10, 0); // prototype "today" for browsing sample trips. Post a Trip validates against the real current time.
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function parse(dt){ const [d,t='00:00'] = dt.split('T'); const [y,m,da] = d.split('-').map(Number); const [h,mi] = t.split(':').map(Number); return new Date(y,m-1,da,h,mi); }
@@ -254,6 +254,28 @@ const fTimeD = d => { let h = d.getHours(), m = d.getMinutes(); const ap = h >= 
 const fTime = dt => fTimeD(parse(dt));
 const fDT = dt => `${fDate(dt)} · ${fTime(dt)}`;
 const money = n => '$' + n;
+
+// ---------- real time in Utah (America/Denver) ----------
+// Trip times are entered and shown as Utah wall-clock time, whatever timezone the browser is in.
+const TZ = 'America/Denver';
+const tzFmt = new Intl.DateTimeFormat('en-CA', {timeZone:TZ, year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hourCycle:'h23'});
+function denverWall(date){ // Date -> 'YYYY-MM-DDTHH:MM' in Utah time
+  const p = Object.fromEntries(tzFmt.formatToParts(date).map(x => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
+}
+// 'YYYY-MM-DDTHH:MM' (Utah wall time) -> ISO string with offset, e.g. 2026-11-06T16:00:00-07:00.
+// Returns {error} for times that don't exist or happen twice on daylight-saving change days.
+function denverISO(wall){
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(wall)) return {error:'Enter a valid date and time. Check the month, day, and year, or use the calendar.'};
+  const [d, t] = wall.split('T'), [y, m, da] = d.split('-').map(Number), [h, mi] = t.split(':').map(Number);
+  const asUTC = Date.UTC(y, m - 1, da, h, mi);
+  const check = new Date(asUTC);
+  if (check.getUTCFullYear() !== y || check.getUTCMonth() !== m - 1 || check.getUTCDate() !== da || check.getUTCHours() !== h || check.getUTCMinutes() !== mi) return {error:'Enter a valid date and time. Check the month, day, and year, or use the calendar.'};
+  const hits = [6, 7].filter(off => denverWall(new Date(asUTC + off * 3600e3)) === wall);
+  if (!hits.length) return {error:'That time is skipped when clocks spring forward. Pick a different time.'};
+  if (hits.length > 1) return {error:'That time happens twice when clocks fall back. Pick a time outside 1:00–1:59 AM.'};
+  return {iso:`${wall}:00-0${hits[0]}:00`, ms:asUTC + hits[0] * 3600e3};
+}
 
 const I = {
   car:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16V11l2-5h10l2 5v5"/><path d="M3 16h18v3H3z"/><circle cx="7.5" cy="16" r="1.5"/><circle cx="16.5" cy="16" r="1.5"/><path d="M5 11h14"/></svg>',
@@ -368,6 +390,46 @@ const S = {
   search:{dest:'', from:'', date:''}, cat:'All', miss:null,
   filters:{max:'', round:false}, tripsTab:'rider', homeLoaded:false, loginNotice:'', loginUser:'',
 };
+
+// ---------- Supabase: Post a Trip ----------
+const DB = {session:null, api:null};
+const loadApi = async () => DB.api || (DB.api = await import('/hitch-supabase.js'));
+const DB_DRIVER = {first:'Hitch', last:'driver', hometown:'', bio:'', color:'#3B6EA8', verified:'pending'};
+function fromRow(r){ // Supabase trips row -> the trip shape the screens already use
+  const driver = DB.session && r.driver_id === DB.session.user.id ? 'me' : r.driver_id;
+  if (driver !== 'me' && !USERS[driver]) USERS[driver] = {...DB_DRIVER};
+  return {id:r.id, dest:r.destination_id, driver, depart:denverWall(new Date(r.departure_at)),
+    ret:r.return_at ? denverWall(new Date(r.return_at)) : null, seats:r.total_seats, price:r.price_per_seat,
+    pickup:r.pickup_location, dropoff:r.dropoff_location, vehicle:null, // no vehicle column yet: hide the line
+    passengers:[], requests:[], departureAt:r.departure_at, dbTrip:true}; // passengers/requests stay empty until ride requests are real
+}
+function upsertTrip(t){
+  const i = TRIPS.findIndex(x => x.id === t.id);
+  if (i >= 0) TRIPS[i] = t; else TRIPS.push(t);
+  if (!CHATS[t.id]) CHATS[t.id] = [];
+  return t;
+}
+async function loadDbTrips(){ // saved trips come back after a reload instead of resetting to the sample list
+  const api = await loadApi();
+  DB.session = await api.getSession();
+  clearDbTrips(); // never retain a prior account's "me" mapping after switching accounts
+  if (!DB.session) return [];
+  const rows = await api.loadTrips(DB.session.accessToken);
+  return rows.map(r => upsertTrip(fromRow(r)));
+}
+function clearDbTrips(){
+  for (let i = TRIPS.length - 1; i >= 0; i--) if (TRIPS[i].dbTrip){
+    delete CHATS[TRIPS[i].id];
+    TRIPS.splice(i, 1);
+  }
+}
+function dbErrorMessage(error){
+  if (error.status === 401) return 'Your sign-in expired. Sign in again, then publish.';
+  if (error.code === '42501' || error.status === 403) return "The database didn't allow this post. Sign out, sign back in, and try again.";
+  if (/Departure must be in the future/.test(error.message)) return 'Departure must be in the future. Pick a later time.';
+  if (error.code === '23514' || error.code === '23503' || error.status === 400) return "The database rejected one of the values. Check the trip details and try again.";
+  return 'Something went wrong saving your trip. Your trip was not published. Please try again.';
+}
 const U = id => id === 'me' ? S.me : USERS[id];
 const fullName = u => `${u.first} ${u.last}`;
 const seatsLeft = t => t.seats - t.passengers.length;
@@ -541,7 +603,7 @@ SCREENS.detail = () => {
   <div class="card"><h3>Driver</h3>
     <div class="driver">${av(u,48)}<div style="min-width:0"><div class="nm">${esc(fullName(u))}${t.driver==='me'?' (you)':''}</div>${vBadge(u)}</div></div>
     <p>${esc(u.bio || 'No bio yet.')}</p>
-    <div class="small muted">${I.car.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px"')} ${esc(t.vehicle)}</div></div>
+    ${t.vehicle ? `<div class="small muted">${I.car.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px"')} ${esc(t.vehicle)}</div>` : ''}</div>
   <div class="card"><div class="section-head"><h3>Who's going</h3><span class="small tnum"><b>${left}</b> of ${t.seats} seats left</span></div>
     ${passengers.length ? `<div class="plist">${passengers.map(p => `<div class="driver">${av(p,34)}<div><div class="nm">${esc(fullName(p))}${p===S.me?' (you)':''}</div>${vBadge(p)}</div></div>`).join('')}</div>` : '<p class="muted small">No confirmed riders yet. Be the first.</p>'}</div>
   <div class="card"><div class="section-head"><h3>Price</h3><span class="tnum"><b>${money(t.price)}</b> per seat</span></div><p class="small muted">${covers} No payment is collected in the app.</p></div>
@@ -611,28 +673,38 @@ SCREENS.mytrips = () => {
 SCREENS.post = () => {
   if (!isVerified()) return `<header class="topbar"><div class="title"><h2>Post a trip</h2></div></header>
 <div class="screen">${pendingBanner()}<div class="empty">${I.lock}<h2>Verify your ID to post trips</h2><p class="muted small">Only verified students can offer rides. We'll unlock posting as soon as your ID is approved.</p><button class="btn" data-act="nav" data-to="home">Browse trips instead</button></div></div>${nav()}`;
-  return `<header class="topbar"><div class="title"><h2>Post a trip</h2><div class="small muted">Offer seats in your car</div></div></header>
+  if (!DB.session) return `<header class="topbar"><div class="title"><h2>Post a trip</h2><div class="small muted">Sign in to save trips</div></div></header>
+<div class="screen">
+<form id="siForm" class="fieldset" novalidate>
+  <div class="eyebrow">Sign in to post</div>
+  <p class="small muted">Trips are saved to the Hitch database, so you need to be signed in. Use your Hitch test account.</p>
+  <div class="field"><label for="si-email">Email</label><input id="si-email" type="email" autocomplete="username" required></div>
+  <div class="field"><label for="si-pass">Password</label><input id="si-pass" type="password" autocomplete="current-password" required></div>
+  <div class="alert bad small" id="si-err" role="alert" hidden></div>
+  <button class="btn primary block" type="submit" id="si-btn">Sign in</button>
+</form>
+</div>${nav()}`;
+  return `<header class="topbar"><div class="title"><h2>Post a trip</h2><div class="small muted">Offer seats in your car · Posting as ${esc(DB.session.user.email)} · <button class="link" type="button" data-act="dbsignout">Sign out</button></div></div></header>
 <div class="screen post-layout">
 <form id="ptForm" novalidate>
   <div class="fieldset"><div class="eyebrow">Where & when</div>
-    <div class="field"><label for="pt-dest">Destination</label><select id="pt-dest"><option value="">Choose a destination</option>${DESTS.map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select><div class="err" id="pe-dest"></div></div>
-    <div class="two"><div class="field"><label for="pt-date">Departure date</label><input id="pt-date" type="date" required aria-describedby="pt-date-hint pe-date"><div class="hint" id="pt-date-hint">Choose today or a later date using the calendar.</div><div class="err" id="pe-date"></div></div>
-    <div class="field"><label for="pt-time">Time</label><input id="pt-time" type="time" required aria-describedby="pe-time"><div class="err" id="pe-time"></div></div></div>
-    <div class="two-desk"><div class="field"><label for="pt-pickup">Pickup location</label><input id="pt-pickup" type="text" placeholder="e.g. Helaman Halls parking"><div class="err" id="pe-pickup"></div></div>
-    <div class="field"><label for="pt-dropoff">Drop-off location</label><input id="pt-dropoff" type="text" placeholder="e.g. Moab Main Street"><div class="err" id="pe-dropoff"></div></div></div>
+    <div class="field"><label for="pt-dest">Destination</label><select id="pt-dest" required><option value="">Choose a destination</option>${DESTS.map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select><div class="err" id="pe-dest"></div></div>
+    <div class="field"><label for="pt-depart">Departure date & time</label><input id="pt-depart" type="datetime-local" required aria-describedby="pt-tzhint pe-depart"><div class="small muted" id="pt-tzhint">Utah time (Mountain Time). Use the calendar to choose a valid date.</div><div class="err" id="pe-depart"></div></div>
+    <div class="two-desk"><div class="field"><label for="pt-pickup">Pickup location</label><input id="pt-pickup" type="text" maxlength="120" placeholder="e.g. Helaman Halls parking" required><div class="err" id="pe-pickup"></div></div>
+    <div class="field"><label for="pt-dropoff">Drop-off location</label><input id="pt-dropoff" type="text" maxlength="120" placeholder="e.g. Moab Main Street" required><div class="err" id="pe-dropoff"></div></div></div>
   </div>
   <div class="fieldset"><div class="eyebrow">Seats & price</div>
-    <div class="two"><div class="field"><label for="pt-seats">Available seats</label><input id="pt-seats" type="number" min="1" max="7" inputmode="numeric" placeholder="1–7"><div class="err" id="pe-seats"></div></div>
-    <div class="field"><label for="pt-price">Price per seat ($)</label><input id="pt-price" type="number" min="1" max="150" inputmode="numeric" placeholder="1–150"><div class="err" id="pe-price"></div></div></div>
+    <div class="two"><div class="field"><label for="pt-seats">Available seats</label><input id="pt-seats" type="number" min="1" max="7" step="1" inputmode="numeric" placeholder="1–7" required><div class="err" id="pe-seats"></div></div>
+    <div class="field"><label for="pt-price">Price per seat ($)</label><input id="pt-price" type="number" min="1" max="150" step="1" inputmode="numeric" placeholder="1–150" required><div class="err" id="pe-price"></div></div></div>
   </div>
   <div class="fieldset"><div class="eyebrow">Return trip</div>
     <label class="check"><input type="checkbox" id="pt-ret"><span><b>Include a return trip</b><br><span class="small muted">Riders come back with you.</span></span></label>
-    <div id="pt-retfields" class="two" hidden><div class="field"><label for="pt-rdate">Return date</label><input id="pt-rdate" type="date" aria-describedby="pe-rdate"><div class="err" id="pe-rdate"></div></div>
-    <div class="field"><label for="pt-rtime">Time</label><input id="pt-rtime" type="time" aria-describedby="pe-rtime"><div class="err" id="pe-rtime"></div></div></div>
+    <div id="pt-retfields" hidden><div class="field"><label for="pt-return">Return date & time</label><input id="pt-return" type="datetime-local" aria-describedby="pt-tzhint pe-return"><div class="err" id="pe-return"></div></div></div>
     <div class="alert info small" id="pt-covers"></div>
   </div>
   <div class="alert bad" id="pt-sum" role="alert" hidden>Check the highlighted fields before publishing.</div>
-  <button class="btn primary block" type="submit">Publish trip</button>
+  <div class="alert bad" id="pt-dberr" role="alert" hidden></div>
+  <button class="btn primary block" type="submit" id="pt-submit">Publish trip</button>
 </form>
 <aside class="post-aside" aria-label="Trip preview">
   <div class="eyebrow">Preview · how riders will see your trip</div>
@@ -644,7 +716,7 @@ SCREENS.post = () => {
 // Live preview for the desktop Post a trip layout (display only; does not affect saving)
 function postPreview(v){
   const d = D(v.dest), ph = t => `<span class="ph">${t}</span>`;
-  const when = v.date ? (v.time ? fDT(`${v.date}T${v.time}`) : fDate(v.date)) : '';
+  const when = v.depart ? fDT(v.depart) : '';
   const seats = +v.seats;
   return `<div class="dart${d ? '' : ' blank'}">${d ? art(d.art) : RIDGES}<span class="count pill ${v.ret ? 'accent' : 'neutral'}" style="background:var(--surface)">${v.ret ? 'Round trip' : 'One-way'}</span></div>
   <div class="ttop"><div style="min-width:0"><h3>${d ? esc(d.name) : ph('Choose a destination')}</h3><div class="small muted tnum">${when ? esc(when) : 'Pick a date and time'}</div></div>
@@ -660,72 +732,119 @@ function postTips(v){
     <li>${d ? `Riders expect about <b>${money(d.est)}</b> per seat to ${esc(d.name)}.` : 'Price close to the estimate for your destination.'}</li></ul>`;
 }
 BIND.post = () => {
-  const f = document.getElementById('ptForm'); if (!f) return;
   const $ = id => document.getElementById(id);
-  const today = () => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-  };
-  const syncDates = () => {
-    $('pt-date').min = today();
-    $('pt-rdate').min = $('pt-date').value || today();
-  };
-  const dateError = (id, label) => {
-    const input = $(id);
-    // Native date inputs expose invalid/incomplete typed dates as an empty value.
-    if (input.validity.badInput || !input.value) return `Enter a valid ${label} date. Check the month, day, and year, or use the calendar.`;
-    if (input.validity.rangeUnderflow) return label === 'departure' ? 'Departure must be today or later.' : 'Return must be on or after the departure date.';
-    return '';
-  };
-  syncDates();
-  $('pt-date').addEventListener('input', syncDates);
+  const si = $('siForm');
+  if (si){
+    si.addEventListener('submit', async e => {
+      e.preventDefault();
+      const btn = $('si-btn'), box = $('si-err'), email = $('si-email').value.trim(), pass = $('si-pass').value;
+      if (!email || !pass){ box.textContent = 'Enter your email and password.'; box.hidden = false; return; }
+      btn.disabled = true; btn.textContent = 'Signing in…'; box.hidden = true;
+      try {
+        const api = await loadApi();
+        DB.session = await api.signIn(email, pass);
+        await loadDbTrips().catch(() => {});
+        render(); toast('Signed in');
+      } catch (error) {
+        box.textContent = error.status === 400 ? 'Wrong email or password.' : "Couldn't reach the sign-in service. Try again.";
+        box.hidden = false; btn.disabled = false; btn.textContent = 'Sign in';
+      }
+    });
+    return;
+  }
+  const f = $('ptForm'); if (!f) return;
   const refresh = () => {
     if (!$('pt-preview')) return;
     const val = id => $(id).value.trim();
-    const v = {dest:val('pt-dest'), date:val('pt-date'), time:val('pt-time'), pickup:val('pt-pickup'), dropoff:val('pt-dropoff'), seats:val('pt-seats'), price:val('pt-price'), ret:$('pt-ret').checked};
+    const v = {dest:val('pt-dest'), depart:val('pt-depart'), pickup:val('pt-pickup'), dropoff:val('pt-dropoff'), seats:val('pt-seats'), price:val('pt-price'), ret:$('pt-ret').checked};
     $('pt-preview').innerHTML = postPreview(v);
     $('pt-tips').innerHTML = postTips(v);
   };
   f.addEventListener('input', refresh); f.addEventListener('change', refresh); refresh();
   const covers = () => { $('pt-covers').textContent = $('pt-ret').checked ? 'Your price per seat covers both directions: there and back.' : 'Your price per seat covers one direction only. Riders will see that this is a one-way trip and arrange their own ride back.'; };
+  const setMins = () => { $('pt-depart').min = denverWall(new Date()); $('pt-return').min = $('pt-depart').value || $('pt-depart').min; };
   $('pt-ret').addEventListener('change', () => { $('pt-retfields').hidden = !$('pt-ret').checked; covers(); });
-  covers();
-  f.addEventListener('submit', e => {
-    e.preventDefault();
-    const v = id => $(id).value.trim(), err = {}, ret = $('pt-ret').checked;
+  $('pt-depart').addEventListener('change', setMins);
+  covers(); setMins();
+
+  const FIELDS = {dest:'pt-dest', depart:'pt-depart', pickup:'pt-pickup', dropoff:'pt-dropoff', seats:'pt-seats', price:'pt-price', return:'pt-return'};
+  function validate(){
+    const v = id => $(id).value.trim(), err = {}, out = {}, now = Date.now();
     if (!v('pt-dest')) err.dest = 'Choose a destination.';
-    syncDates();
-    const departureError = dateError('pt-date', 'departure');
-    if (departureError) err.date = departureError;
-    if ($('pt-time').validity.badInput) err.time = 'Enter a valid departure time.';
-    else if (!v('pt-time')) err.time = 'Pick a departure time.';
-    const dep = v('pt-date') && v('pt-time') ? `${v('pt-date')}T${v('pt-time')}` : null;
-    if (dep && !err.date && !err.time && parse(dep).getTime() <= Date.now()) err.date = 'Departure must be in the future.';
+    if ($('pt-depart').validity.badInput || !v('pt-depart')) err.depart = 'Enter a valid departure date and time. Check the month, day, and year, or use the calendar.';
+    else {
+      const dep = denverISO(v('pt-depart'));
+      if (dep.error) err.depart = dep.error;
+      else if (dep.ms <= now) err.depart = 'Departure must be in the future.';
+      else out.dep = dep;
+    }
     if (!v('pt-pickup')) err.pickup = 'Add a pickup location.';
     if (!v('pt-dropoff')) err.dropoff = 'Add a drop-off location.';
-    const seats = +v('pt-seats'), price = +v('pt-price');
+    const seats = Number(v('pt-seats')), price = Number(v('pt-price'));
     if (!v('pt-seats')) err.seats = 'Enter how many seats are open.'; else if (!Number.isInteger(seats) || seats < 1 || seats > 7) err.seats = 'Seats must be a whole number from 1 to 7.';
     if (!v('pt-price')) err.price = 'Enter a price per seat.'; else if (!Number.isInteger(price) || price < 1 || price > 150) err.price = 'Price must be a whole dollar amount from $1 to $150.';
-    let rt = null;
-    if (ret){
-      const returnError = dateError('pt-rdate', 'return');
-      if (returnError) err.rdate = returnError;
-      if ($('pt-rtime').validity.badInput) err.rtime = 'Enter a valid return time.';
-      else if (!v('pt-rtime')) err.rtime = 'Pick a return time.';
-      if (v('pt-rdate') && v('pt-rtime')){ rt = `${v('pt-rdate')}T${v('pt-rtime')}`; if (dep && !err.rdate && !err.rtime && parse(rt) <= parse(dep)) err.rdate = 'Return must be after departure.'; }
+    out.ret = null;
+    if ($('pt-ret').checked){
+      if ($('pt-return').validity.badInput || !v('pt-return')) err.return = 'Enter a valid return date and time. Check the month, day, and year, or use the calendar.';
+      else {
+        const rt = denverISO(v('pt-return'));
+        if (rt.error) err.return = rt.error;
+        else if (rt.ms <= (out.dep ? out.dep.ms : Date.now())) err.return = 'Return must be after departure.';
+        else out.ret = rt;
+      }
     }
-    const inputs = {dest:'pt-dest',date:'pt-date',time:'pt-time',pickup:'pt-pickup',dropoff:'pt-dropoff',seats:'pt-seats',price:'pt-price',rdate:'pt-rdate',rtime:'pt-rtime'};
-    Object.keys(inputs).forEach(k => {
-      $('pe-'+k).textContent = err[k] || '';
-      $(inputs[k]).closest('.field').classList.toggle('invalid', !!err[k]);
-      $(inputs[k]).setAttribute('aria-invalid', String(!!err[k]));
-    });
+    Object.keys(FIELDS).forEach(k => { const el = $('pe-'+k); el.textContent = err[k] || ''; el.closest('.field').classList.toggle('invalid', !!err[k]); $(FIELDS[k]).setAttribute('aria-invalid', err[k] ? 'true' : 'false'); });
     $('pt-sum').hidden = !Object.keys(err).length;
-    if (Object.keys(err).length){ const k = Object.keys(err)[0]; $( {dest:'pt-dest',date:'pt-date',time:'pt-time',pickup:'pt-pickup',dropoff:'pt-dropoff',seats:'pt-seats',price:'pt-price',rdate:'pt-rdate',rtime:'pt-rtime'}[k]).focus(); return; }
-    const id = 't' + (TRIPS.length + 1) + Date.now().toString(36).slice(-3);
-    TRIPS.push({id, dest:v('pt-dest'), driver:'me', depart:dep, ret:rt, seats, price, pickup:v('pt-pickup'), dropoff:v('pt-dropoff'), vehicle:'Your vehicle', passengers:[], requests:[]});
-    CHATS[id] = [];
-    go('manage', {id}); toast('Trip published');
+    if (Object.keys(err).length){ $(FIELDS[Object.keys(err)[0]]).focus(); return null; }
+    return {
+      destination_id: v('pt-dest'), departure_at: out.dep.iso,
+      pickup_location: v('pt-pickup'), dropoff_location: v('pt-dropoff'),
+      total_seats: seats, price_per_seat: price, return_at: out.ret ? out.ret.iso : null,
+    };
+  }
+
+  let busy = false; // stops double-clicks from creating duplicate trips
+  f.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (busy) return;
+    const btn = $('pt-submit'), dbErr = $('pt-dberr');
+    dbErr.hidden = true;
+    const payload = validate(); if (!payload) return;
+    busy = true; btn.disabled = true; btn.setAttribute('aria-busy', 'true'); btn.textContent = 'Publishing…';
+    let saved = null, uncertain = false;
+    const existingIds = new Set(TRIPS.filter(t => t.dbTrip).map(t => t.id));
+    try {
+      const api = await loadApi();
+      DB.session = await api.getSession();
+      if (!DB.session){ const ex = new Error('Signed out'); ex.status = 401; throw ex; }
+      saved = await api.publishTrip(DB.session.accessToken, payload);
+    } catch (error) {
+      if (error.status === undefined){
+        // No answer from the database (network dropped). The trip may or may not have saved,
+        // so check before telling the driver to retry; otherwise a retry could post it twice.
+        try {
+          const mine = await loadDbTrips();
+          const match = mine.find(t => !existingIds.has(t.id) && t.driver === 'me' && t.dest === payload.destination_id && t.pickup === payload.pickup_location && t.dropoff === payload.dropoff_location && t.seats === payload.total_seats && t.price === payload.price_per_seat && t.ret === (payload.return_at ? denverWall(new Date(payload.return_at)) : null) && new Date(t.departureAt).getTime() === new Date(payload.departure_at).getTime());
+          if (match) saved = 'found:' + match.id;
+        } catch { /* still unreachable */ }
+        if (!saved){
+          uncertain = true;
+          dbErr.textContent = "We couldn't confirm whether your trip saved. Check My Trips after reconnecting and refreshing before posting again, so you don't create a duplicate.";
+        }
+      } else {
+        dbErr.textContent = dbErrorMessage(error);
+        if (error.status === 401){ (await loadApi()).signOut(); DB.session = null; clearDbTrips(); dbErr.innerHTML = esc(dbErrorMessage(error)) + ' <button class="link" type="button" data-act="dbsignout">Sign in again</button>'; }
+      }
+    }
+    if (saved){
+      // Success only after the database confirms the row. Navigate with the database UUID.
+      const id = typeof saved === 'string' ? saved.slice(6) : upsertTrip(fromRow(saved)).id;
+      go('manage', {id}); toast('Trip published');
+      return;
+    }
+    dbErr.hidden = false;
+    if (uncertain){ btn.removeAttribute('aria-busy'); btn.textContent = 'Check My Trips before posting again'; return; }
+    busy = false; btn.disabled = false; btn.removeAttribute('aria-busy'); btn.textContent = 'Publish trip';
   });
 };
 
@@ -852,12 +971,15 @@ async function boot(){
     S.me = await response.json(); S.screen = 'profile'; render();
   } catch (error) {
     app.innerHTML = '<div class="screen"><h1>Cannot connect to the database</h1><p>The Hitch server is not responding. If you are running it locally, start python3 server.py and open http://127.0.0.1:8000. Otherwise wait a minute and reload to retry.</p></div>';
+    return;
   }
+  // Load trips saved in Supabase (needs a signed-in session). Sample trips still fill the other screens.
+  try { await loadDbTrips(); render(); } catch (error) { console.warn('Could not load saved trips:', error.message); }
 }
 function render(){
   document.querySelectorAll('.scrim').forEach(x => x.remove());
   app.dataset.screen = S.screen;
-  app.innerHTML = '<div class="banner small" role="status">Classroom demo · Profile saving uses a real database. Rides, verification, and chat are prototype interactions.</div>' + SCREENS[S.screen]();
+  app.innerHTML = '<div class="banner small" role="status">Classroom demo · Profile saving and Post a trip use real databases. Other rides, verification, and chat are prototype interactions.</div>' + SCREENS[S.screen]();
   BIND[S.screen]?.();
 }
 document.addEventListener('click', e => {
@@ -885,6 +1007,7 @@ document.addEventListener('click', e => {
     }
     case 'mymanage': { const mine = TRIPS.filter(t => t.driver === 'me'); if (mine.length === 1) go('manage', {id:mine[0].id}); else { S.tripsTab = 'driver'; S.hist = []; go('mytrips', {}, false); } break; }
     case 'approve': S.me.verified = 'verified'; render(); toast('ID verified. You can now request seats and post trips.'); break;
+    case 'dbsignout': loadApi().then(api => { api.signOut(); DB.session = null; clearDbTrips(); render(); }); break;
     case 'signout': toast('Classroom demo uses the fixed Jordan Hale account.'); break;
     case 'unused-signout': S.me = null; S.hist = []; S.loginNotice = 'You\'ve been signed out.'; S.search = {dest:'',from:'',date:''}; S.cat = 'All'; S.screen = 'login'; render(); break;
   }
