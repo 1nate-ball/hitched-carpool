@@ -388,7 +388,7 @@ const S = {
   me:null, screen:'login', params:{}, hist:[],
   accounts:{}, taken:['jhale','kbrooks','mtanaka','hortiz','admin'],
   search:{dest:'', from:'', date:''}, cat:'All', miss:null,
-  filters:{max:'', round:false}, dbSearch:{key:'', state:'idle', ids:[]}, tripsTab:'rider', homeLoaded:false, loginNotice:'', loginUser:'',
+  filters:{max:'', round:false}, dbSearch:{key:'', state:'idle', ids:[]}, dbBase:{key:'', ids:[]}, tripsTab:'rider', homeLoaded:false, loginNotice:'', loginUser:'',
 };
 
 // ---------- Supabase: Post a Trip ----------
@@ -568,7 +568,18 @@ async function searchDbTrips(){
   const dest = S.params.dest, date = S.search.date, max = S.filters.max;
   const key = [dest, date, max].join('|');
   S.dbSearch = {key, state:'loading', ids:[]};
-  const show = () => { if (S.screen === 'results' && S.dbSearch.key === key){ const el = document.getElementById('rlist'); if (el) el.innerHTML = resultsList(); } };
+  const show = () => {
+    if (S.screen !== 'results' || S.dbSearch.key !== key) return;
+    const el = document.getElementById('rlist'); if (el) el.innerHTML = resultsList();
+    const slider = document.getElementById('f-max'); // saved trips may change the slider's range and count
+    if (slider){
+      const top = priceCeiling(), atTop = !S.filters.max;
+      slider.max = top; if (atTop) slider.value = top;
+      document.querySelector('.pf-foot span:last-child').textContent = `${money(top)}+`;
+      document.getElementById('f-count').textContent = priceCount(S.filters.max);
+      slider.setAttribute('aria-valuetext', `${priceLabel(S.filters.max)}, ${priceCount(S.filters.max)}`);
+    }
+  };
   show();
   try {
     const api = await loadApi();
@@ -581,7 +592,13 @@ async function searchDbTrips(){
       if (!start.error && start.iso > fromIso) fromIso = start.iso;
       if (!end.error) toIso = end.iso;
     }
-    const rows = await api.searchTrips(DB.session.accessToken, {destinationId:dest, fromIso, toIso, maxPrice:max});
+    const baseKey = [dest, date].join('|');
+    const [rows, base] = await Promise.all([
+      api.searchTrips(DB.session.accessToken, {destinationId:dest, fromIso, toIso, maxPrice:max}),
+      // Same search at any price, so the price slider can show a live count while dragging.
+      S.dbBase.key === baseKey ? null : api.searchTrips(DB.session.accessToken, {destinationId:dest, fromIso, toIso}),
+    ]);
+    if (base) S.dbBase = {key:baseKey, ids:base.map(r => upsertTrip(fromRow(r)).id)};
     if (S.dbSearch.key !== key) return; // a newer search replaced this one
     S.dbSearch = {key, state:'done', ids:rows.map(r => upsertTrip(fromRow(r)).id)};
   } catch (error) {
@@ -590,6 +607,32 @@ async function searchDbTrips(){
   }
   show();
 }
+// Price slider: the right end means "Any price". Count updates live while dragging.
+function priceCeiling(){
+  const top = Math.max(0, ...priceSet().map(t => t.price));
+  return Math.max(50, Math.ceil(top / 10) * 10);
+}
+function priceSet(){ // trips for this destination + date at any price (sample trips + saved trips)
+  const d = S.params.dest, date = S.search.date;
+  const samples = openTrips(d).filter(t => !t.dbTrip && (!date || t.depart.slice(0,10) === date));
+  const saved = S.dbBase.key === [d, date].join('|') ? S.dbBase.ids.map(id => TRIPS.find(t => t.id === id)).filter(t => t && seatsLeft(t) > 0) : [];
+  return samples.concat(saved).filter(t => !S.filters.round || t.ret);
+}
+const priceLabel = v => v ? `Up to ${money(+v)}` : 'Any price';
+function priceCount(v){
+  const n = priceSet().filter(t => !v || t.price <= +v).length;
+  return `${n} trip${n === 1 ? '' : 's'}`;
+}
+function priceSlider(){
+  const top = priceCeiling(), v = S.filters.max ? Math.min(+S.filters.max, top) : top;
+  return `<div class="pfwrap"><button type="button" class="chip pfbtn" id="f-price-btn" aria-expanded="false" aria-controls="f-price-panel" ${S.filters.max ? 'aria-pressed="true"' : ''}>${S.filters.max ? priceLabel(S.filters.max) : 'Price'}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+  <div class="pricefilter" id="f-price-panel" role="dialog" aria-label="Price filter" hidden>
+    <div class="pf-head"><label for="f-max">Max price per seat</label><output id="f-max-out" for="f-max">${priceLabel(S.filters.max)}</output></div>
+    <input id="f-max" type="range" min="5" max="${top}" step="1" value="${v}" aria-valuetext="${priceLabel(S.filters.max)}, ${priceCount(S.filters.max)}">
+    <div class="pf-foot small muted"><span>$5</span><span id="f-count" aria-live="polite">${priceCount(S.filters.max)}</span><span>${money(top)}+</span></div>
+    <div class="pf-actions"><button type="button" class="link" id="f-price-clear">Clear</button><button type="button" class="btn primary sm" id="f-price-apply">Show ${priceCount(S.filters.max)}</button></div>
+  </div></div>`;
+}
 SCREENS.results = () => {
   const d = D(S.params.dest);
   const from = S.search.from || (S.me.location === 'allowed' ? 'Current location' : 'Provo');
@@ -597,7 +640,7 @@ SCREENS.results = () => {
 <div class="screen">
   <div class="row" style="justify-content:space-between"><div class="filters">
     <label class="fdate"><span class="sr-only">Travel date</span><input id="f-date" type="date" value="${esc(S.search.date)}" aria-label="Travel date"></label>
-    <select id="f-max" aria-label="Maximum price per rider"><option value="">Any price</option>${[10,20,30,40,50].map(v=>`<option value="${v}" ${S.filters.max==v?'selected':''}>Up to $${v}</option>`).join('')}</select>
+    ${priceSlider()}
     <label class="toggle"><input type="checkbox" id="f-round" ${S.filters.round?'checked':''}>Round trips only</label>
     ${S.search.date || S.filters.max || S.filters.round ? '<button class="btn sm" data-act="clearf">Clear filters</button>' : ''}
   </div><button class="btn sm" data-act="change">Change search</button></div>
@@ -610,7 +653,30 @@ BIND.results = () => {
   // function sends a new database search whenever the date or price filter changed.
   const keep = id => { render(); document.getElementById(id)?.focus(); };
   document.getElementById('f-date').addEventListener('change', e => { S.search.date = e.target.value; keep('f-date'); });
-  document.getElementById('f-max').addEventListener('change', e => { S.filters.max = e.target.value; keep('f-max'); });
+  const slider = document.getElementById('f-max');
+  const valueOf = () => +slider.value >= +slider.max ? '' : slider.value; // far right = any price
+  const btn = document.getElementById('f-price-btn'), panel = document.getElementById('f-price-panel');
+  const sync = () => {
+    const v = valueOf();
+    document.getElementById('f-max-out').textContent = priceLabel(v);
+    document.getElementById('f-count').textContent = priceCount(v);
+    document.getElementById('f-price-apply').textContent = `Show ${priceCount(v)}`;
+    slider.setAttribute('aria-valuetext', `${priceLabel(v)}, ${priceCount(v)}`);
+  };
+  const open = yes => {
+    panel.hidden = !yes; btn.setAttribute('aria-expanded', String(yes));
+    if (yes){ sync(); slider.focus(); }
+  };
+  const apply = v => { S.filters.max = v; keep('f-price-btn'); }; // re-render runs the database search
+  btn.addEventListener('click', () => open(panel.hidden));
+  slider.addEventListener('input', sync);
+  document.getElementById('f-price-apply').addEventListener('click', () => apply(valueOf()));
+  document.getElementById('f-price-clear').addEventListener('click', () => { slider.value = slider.max; sync(); });
+  panel.addEventListener('keydown', e => { if (e.key === 'Escape'){ open(false); btn.focus(); } });
+  document.addEventListener('click', function outside(e){
+    if (!document.body.contains(panel)) return document.removeEventListener('click', outside);
+    if (!panel.hidden && !e.target.closest('.pfwrap')) open(false);
+  });
   document.getElementById('f-round').addEventListener('change', e => { S.filters.round = e.target.checked; keep('f-round'); });
   const key = [S.params.dest, S.search.date, S.filters.max].join('|');
   if (S.dbSearch.key !== key) searchDbTrips();
