@@ -388,7 +388,7 @@ const S = {
   me:null, screen:'login', params:{}, hist:[],
   accounts:{}, taken:['jhale','kbrooks','mtanaka','hortiz','admin'],
   search:{dest:'', from:'', date:''}, cat:'All', miss:null,
-  filters:{max:'', round:false}, tripsTab:'rider', homeLoaded:false, loginNotice:'', loginUser:'',
+  filters:{max:'', round:false}, dbSearch:{key:'', state:'idle', ids:[]}, tripsTab:'rider', homeLoaded:false, loginNotice:'', loginUser:'',
 };
 
 // ---------- Supabase: Post a Trip ----------
@@ -548,14 +548,47 @@ function tripCard(t){
   </button>`;
 }
 function resultsList(){
-  const d = D(S.params.dest), {max, round} = S.filters;
-  let list = openTrips(d.id);
+  const d = D(S.params.dest), {max, round} = S.filters, q = S.dbSearch;
+  // Sample trips are filtered here; saved trips are filtered by the database (see searchDbTrips).
+  let list = openTrips(d.id).filter(t => !t.dbTrip);
   if (S.search.date) list = list.filter(t => t.depart.slice(0,10) === S.search.date);
   if (max) list = list.filter(t => t.price <= +max);
+  const fromDb = q.state === 'done' ? q.ids.map(id => TRIPS.find(t => t.id === id)).filter(t => t && seatsLeft(t) > 0) : [];
+  list = list.concat(fromDb);
   if (round) list = list.filter(t => !!t.ret);
+  if (q.state === 'loading') return `<p class="small muted" role="status">Searching saved trips…</p>`;
   list.sort((a,b) => parse(a.depart) - parse(b.depart));
   if (!list.length) return `<div class="empty">${I.road}<h2>No rides found</h2><p class="muted small">No trips to ${esc(d.name)}${S.search.date ? ` on ${fDate(S.search.date)}` : ''} match your search${max||round?' and filters':''}. Try a different date or destination${max||round?', or clear your filters':''}.</p><div class="row" style="width:100%">${max||round?'<button class="btn" data-act="clearf">Clear filters</button>':''}<button class="btn primary" data-act="change">Change search</button></div></div>`;
-  return `<p class="small muted">${list.length} trip${list.length>1?'s':''} · earliest departure first</p>` + list.map(tripCard).join('');
+  const note = q.state === 'error' ? `<div class="alert warn small" role="status">Couldn't reach the trip database, so only sample trips are shown. Try again in a moment.</div>`
+    : q.state === 'signedout' ? `<p class="small muted">Showing sample trips. <button class="link" data-act="nav" data-to="post">Sign in</button> to include trips other students have posted.</p>` : '';
+  return note + `<p class="small muted" role="status">${list.length} trip${list.length>1?'s':''} · earliest departure first</p>` + list.map(tripCard).join('');
+}
+// Ask Supabase for this destination's trips matching the current date and max-price filters.
+async function searchDbTrips(){
+  const dest = S.params.dest, date = S.search.date, max = S.filters.max;
+  const key = [dest, date, max].join('|');
+  S.dbSearch = {key, state:'loading', ids:[]};
+  const show = () => { if (S.screen === 'results' && S.dbSearch.key === key){ const el = document.getElementById('rlist'); if (el) el.innerHTML = resultsList(); } };
+  show();
+  try {
+    const api = await loadApi();
+    DB.session = await api.getSession();
+    if (!DB.session){ if (S.dbSearch.key === key) S.dbSearch = {key, state:'signedout', ids:[]}; return show(); }
+    let fromIso = new Date().toISOString(), toIso;
+    if (date){
+      const start = denverISO(`${date}T00:00`), next = new Date(`${date}T12:00:00Z`); next.setUTCDate(next.getUTCDate() + 1);
+      const end = denverISO(`${next.toISOString().slice(0,10)}T00:00`);
+      if (!start.error && start.iso > fromIso) fromIso = start.iso;
+      if (!end.error) toIso = end.iso;
+    }
+    const rows = await api.searchTrips(DB.session.accessToken, {destinationId:dest, fromIso, toIso, maxPrice:max});
+    if (S.dbSearch.key !== key) return; // a newer search replaced this one
+    S.dbSearch = {key, state:'done', ids:rows.map(r => upsertTrip(fromRow(r)).id)};
+  } catch (error) {
+    console.warn('Trip search failed:', error.message);
+    if (S.dbSearch.key === key) S.dbSearch = {key, state:'error', ids:[]};
+  }
+  show();
 }
 SCREENS.results = () => {
   const d = D(S.params.dest);
@@ -563,17 +596,24 @@ SCREENS.results = () => {
   return `${topbar(d.name, `${esc(from)} → ${esc(d.name)} · ${S.search.date ? fDate(S.search.date) : 'Any date'}`)}
 <div class="screen">
   <div class="row" style="justify-content:space-between"><div class="filters">
+    <label class="fdate"><span class="sr-only">Travel date</span><input id="f-date" type="date" value="${esc(S.search.date)}" aria-label="Travel date"></label>
     <select id="f-max" aria-label="Maximum price per rider"><option value="">Any price</option>${[10,20,30,40,50].map(v=>`<option value="${v}" ${S.filters.max==v?'selected':''}>Up to $${v}</option>`).join('')}</select>
     <label class="toggle"><input type="checkbox" id="f-round" ${S.filters.round?'checked':''}>Round trips only</label>
+    ${S.search.date || S.filters.max || S.filters.round ? '<button class="btn sm" data-act="clearf">Clear filters</button>' : ''}
   </div><button class="btn sm" data-act="change">Change search</button></div>
   <p class="small muted">Prices are per rider. Round-trip prices cover there and back; one-way prices cover the drive there only.</p>
   <div id="rlist" style="display:flex;flex-direction:column;gap:12px">${resultsList()}</div>
 </div>${nav()}`;
 };
 BIND.results = () => {
-  const r = () => document.getElementById('rlist').innerHTML = resultsList();
-  document.getElementById('f-max').addEventListener('change', e => { S.filters.max = e.target.value; r(); });
-  document.getElementById('f-round').addEventListener('change', e => { S.filters.round = e.target.checked; r(); });
+  // Re-render so the subtitle and Clear filters button update; the check at the end of this
+  // function sends a new database search whenever the date or price filter changed.
+  const keep = id => { render(); document.getElementById(id)?.focus(); };
+  document.getElementById('f-date').addEventListener('change', e => { S.search.date = e.target.value; keep('f-date'); });
+  document.getElementById('f-max').addEventListener('change', e => { S.filters.max = e.target.value; keep('f-max'); });
+  document.getElementById('f-round').addEventListener('change', e => { S.filters.round = e.target.checked; keep('f-round'); });
+  const key = [S.params.dest, S.search.date, S.filters.max].join('|');
+  if (S.dbSearch.key !== key) searchDbTrips();
 };
 
 /* Screen 5: Trip details / request a seat */
@@ -992,7 +1032,7 @@ document.addEventListener('click', e => {
     case 'cat': S.cat = el.dataset.c; render(); break;
     case 'dest': S.miss = null; S.filters = {max:'', round:false}; go('results', {dest:id}); break;
     case 'change': S.hist = []; go('home', {}, false); setTimeout(() => document.getElementById('s-dest')?.focus(), 0); break;
-    case 'clearf': S.filters = {max:'', round:false}; render(); break;
+    case 'clearf': S.filters = {max:'', round:false}; S.search.date = ''; render(); break;
     case 'trip': go('detail', {id}); break;
     case 'request': openRequestDialog(); break;
     case 'tab': S.tripsTab = el.dataset.t; render(); break;
