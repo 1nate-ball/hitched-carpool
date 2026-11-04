@@ -265,3 +265,20 @@ textarea{border-radius:16px}
 /* ---------- Find Rides filters ---------- */
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 .filters .fdate input{width:auto;min-height:38px;padding:6px 12px;border-radius:var(--r-pill);font-weight:600;font-size:.88rem}
+.pfwrap{position:relative}
+.pfbtn{display:inline-flex;align-items:center;gap:6px;min-height:38px}
+.pricefilter{position:absolute;z-index:20;top:calc(100% + 8px);left:0;width:min(340px,calc(100vw - 32px));display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;box-shadow:var(--shadow-lift)}
+.pricefilter[hidden]{display:none}
+.pf-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid var(--line);padding-top:12px}
+.pf-actions .btn{min-height:42px}
+.pf-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:.9rem}
+.pf-head label{font-weight:700}
+.pf-head output{font-weight:800;color:var(--brand)}
+.pf-foot{display:flex;justify-content:space-between}
+.pf-foot #f-count{font-weight:700;color:var(--ink)}
+.pricefilter input[type=range]{width:100%;min-height:28px;padding:0;border:0;background:transparent;accent-color:var(--brand)}
+@media (max-width:600px){
+  .filters{position:relative}
+  .pfwrap{position:static}
+  .pricefilter{left:0;right:0;width:auto}
+}
