@@ -63,6 +63,19 @@ export async function publishTrip(accessToken, fields) {
   return rows[0];
 }
 
+// Request a Seat. rider_id and status ('pending') are set by the database, never sent from here.
+// The database rejects a second request for the same trip (23505) and requests on your own trip (42501).
+export async function requestSeat(accessToken, tripId, note = '') {
+  const rows = await request('ride_requests?select=*', accessToken, { trip_id: tripId, note: note.trim() });
+  if (!Array.isArray(rows) || !rows[0]?.id) throw new Error('Could not confirm the seat request.');
+  return rows[0];
+}
+
+// The signed-in rider's own requests (RLS also lets drivers read requests on their trips; filter those out).
+export function loadMyRequests(accessToken, riderId) {
+  return request(`ride_requests?select=trip_id,status,note,created_at&rider_id=eq.${encodeURIComponent(riderId)}`, accessToken);
+}
+
 // ---------- Supabase Auth (email + password test accounts) ----------
 // Sign-up UI is separate backlog work. For Sprint 1 the team signs in with test
 // accounts created in the Supabase dashboard (Authentication -> Users).

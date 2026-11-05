@@ -415,7 +415,46 @@ async function loadDbTrips(){ // saved trips come back after a reload instead of
   clearDbTrips(); // never retain a prior account's "me" mapping after switching accounts
   if (!DB.session) return [];
   const rows = await api.loadTrips(DB.session.accessToken);
-  return rows.map(r => upsertTrip(fromRow(r)));
+  const trips = rows.map(r => upsertTrip(fromRow(r)));
+  await loadMyDbRequests(api);
+  return trips;
+}
+async function loadMyDbRequests(api){ // attach the signed-in rider's saved requests so Trip Detail shows "Request sent"
+  let rows;
+  try { rows = await api.loadMyRequests(DB.session.accessToken, DB.session.user.id); }
+  catch (error) { console.warn('Could not load seat requests:', error.message); return; } // the database still blocks duplicates
+  for (const r of rows){
+    const t = TRIPS.find(x => x.dbTrip && x.id === r.trip_id); if (!t) continue;
+    if (r.status === 'accepted'){ if (!t.passengers.includes('me')) t.passengers.push('me'); t.requests = []; }
+    else t.requests = [{uid:'me', status:r.status, note:r.note}];
+  }
+}
+function seatErrorMessage(error){
+  if (error.status === 401) return 'Your sign-in expired. Sign in again, then request your seat.';
+  if (error.code === '42501' || error.status === 403) return "You can't request a seat on your own trip.";
+  if (error.code === '23503') return 'This trip is no longer available.';
+  if (error.code === '23514' || error.status === 400) return 'The database rejected your note. Keep it under 300 characters and try again.';
+  if (error.status === undefined) return "We couldn't reach the database. Your request was not sent. Check your connection and try again.";
+  return 'Something went wrong. Your request was not sent. Please try again.';
+}
+// Saves a seat request. Returns {ok:true}, {ok:false, already:true} or {ok:false, message}.
+async function sendSeatRequest(t, note){
+  if (!t.dbTrip){ t.requests = t.requests.filter(r => r.uid !== 'me'); t.requests.push({uid:'me', status:'pending', note}); return {ok:true}; }
+  const api = await loadApi();
+  try {
+    DB.session = await api.getSession();
+    if (!DB.session){ const ex = new Error('Signed out'); ex.status = 401; throw ex; }
+    const row = await api.requestSeat(DB.session.accessToken, t.id, note);
+    t.requests = [{uid:'me', status:row.status, note:row.note}];
+    return {ok:true};
+  } catch (error) {
+    if (error.code === '23505'){ // already requested (another tab, or a retry after a lost response)
+      await loadMyDbRequests(api);
+      if (!myStatus(t)) t.requests = [{uid:'me', status:'pending', note}];
+      return {ok:false, already:true};
+    }
+    return {ok:false, message:seatErrorMessage(error)};
+  }
 }
 function clearDbTrips(){
   for (let i = TRIPS.length - 1; i >= 0; i--) if (TRIPS[i].dbTrip){
@@ -724,20 +763,33 @@ function openRequestDialog(){
   wrap.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="rq-h">
     <h2 id="rq-h">Would you like to request a seat for this trip?</h2>
     <dl class="kv tnum" style="margin:0"><dt>To</dt><dd>${esc(d.name)}</dd><dt>Leaves</dt><dd>${fDT(t.depart)}</dd><dt>Pickup</dt><dd>${esc(t.pickup)}</dd><dt>Return</dt><dd>${t.ret ? fDT(t.ret) : 'One-way. You arrange your own ride back.'}</dd><dt>Price</dt><dd><b>${money(t.price)}</b> per seat, ${t.ret?'round trip':'one way'}</dd></dl>
+    <div class="field"><label for="rq-note">Note to ${esc(u.first)} <span class="muted">(optional)</span></label>
+      <textarea id="rq-note" rows="3" maxlength="300" placeholder="Where you're headed, flexible times, luggage…"></textarea></div>
     <div class="alert info small">Your seat isn't reserved until ${esc(u.first)} accepts. We'll let you know as soon as they decide.</div>
+    <div class="alert warn small" id="rq-err" role="alert" hidden></div>
     <div class="row"><button class="btn" data-x="no">Keep browsing</button><button class="btn primary" data-x="yes">Confirm request</button></div>
     <p class="small muted" id="rq-timer" style="text-align:center"></p>
   </div>`;
   document.body.appendChild(wrap);
-  let secs = 60; const timerEl = wrap.querySelector('#rq-timer');
+  let secs = 60, busy = false; const timerEl = wrap.querySelector('#rq-timer');
   const tick = () => { timerEl.textContent = `This prompt closes in 0:${String(secs).padStart(2,'0')}`; };
   tick();
   const iv = setInterval(() => { secs--; if (secs <= 0){ close(); toast('Request timed out. No request was sent.'); } else tick(); }, 1000);
+  const stopTimer = () => { clearInterval(iv); timerEl.textContent = ''; };
+  wrap.querySelector('#rq-note').addEventListener('input', stopTimer); // don't discard a note mid-sentence
   function close(){ clearInterval(iv); wrap.remove(); }
-  wrap.addEventListener('click', e => {
+  wrap.addEventListener('click', async e => {
     const x = e.target.closest('[data-x]')?.dataset.x;
+    if (busy) return;
     if (e.target === wrap || x === 'no'){ close(); }
-    if (x === 'yes'){ close(); t.requests = t.requests.filter(r => r.uid !== 'me'); t.requests.push({uid:'me', status:'pending', note:''}); S.tripsTab = 'rider'; go('mytrips'); toast(`Request sent to ${u.first}`); }
+    if (x !== 'yes') return;
+    const btn = wrap.querySelector('[data-x="yes"]'), err = wrap.querySelector('#rq-err');
+    busy = true; stopTimer(); btn.disabled = true; btn.setAttribute('aria-busy', 'true'); btn.textContent = 'Sending…'; err.hidden = true;
+    const res = await sendSeatRequest(t, wrap.querySelector('#rq-note').value.trim());
+    if (res.ok){ close(); S.tripsTab = 'rider'; go('mytrips'); toast(t.dbTrip ? 'Seat request sent. Waiting on the driver.' : `Request sent to ${u.first}`); return; }
+    if (res.already){ close(); render(); toast("You've already requested a seat on this trip."); return; }
+    err.textContent = res.message; err.hidden = false;
+    busy = false; btn.disabled = false; btn.removeAttribute('aria-busy'); btn.textContent = 'Confirm request';
   });
   wrap.querySelector('[data-x="yes"]').focus();
 }
@@ -751,7 +803,9 @@ SCREENS.mytrips = () => {
     body = mine.length ? mine.map(t => {
       const st = myStatus(t), d = D(t.dest), u = U(t.driver);
       const pill = st === 'confirmed' ? '<span class="pill ok">Seat confirmed</span>' : st === 'pending' ? '<span class="pill warn">Awaiting driver</span>' : '<span class="pill bad">Request declined</span>';
-      const acts = st === 'pending' ? `<div class="row"><button class="btn sm" data-act="trip" data-id="${t.id}">View trip</button><button class="btn sm danger" data-act="withdraw" data-id="${t.id}">Withdraw request</button></div>
+      const acts = st === 'pending' && t.dbTrip ? `<div class="row"><button class="btn sm" data-act="trip" data-id="${t.id}">View trip</button></div>
+          <p class="small muted">Group chat opens once the driver accepts. Your seat isn't confirmed yet.</p>`
+        : st === 'pending' ? `<div class="row"><button class="btn sm" data-act="trip" data-id="${t.id}">View trip</button><button class="btn sm danger" data-act="withdraw" data-id="${t.id}">Withdraw request</button></div>
           <p class="small muted">Group chat opens once ${esc(u.first)} accepts. Your seat isn't confirmed yet.</p>
           <div class="demo">Prototype: <button class="link" data-act="manage" data-id="${t.id}" data-demo="1">respond as the driver</button> to see your status change.</div>`
         : st === 'confirmed' ? `<div class="row"><button class="btn sm" data-act="trip" data-id="${t.id}">Trip details</button><button class="btn sm primary" data-act="chat" data-id="${t.id}">Group chat</button></div>`
@@ -1085,7 +1139,7 @@ async function boot(){
 function render(){
   document.querySelectorAll('.scrim').forEach(x => x.remove());
   app.dataset.screen = S.screen;
-  app.innerHTML = '<div class="banner small" role="status">Classroom demo · Profile saving and Post a trip use real databases. Other rides, verification, and chat are prototype interactions.</div>' + SCREENS[S.screen]();
+  app.innerHTML = '<div class="banner small" role="status">Classroom demo · Profile saving, Post a trip, and seat requests on posted trips use real databases. Other rides, verification, and chat are prototype interactions.</div>' + SCREENS[S.screen]();
   BIND[S.screen]?.();
 }
 document.addEventListener('click', e => {
