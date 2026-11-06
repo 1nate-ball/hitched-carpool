@@ -43,20 +43,26 @@ export function loadTrips(accessToken) {
 
 // Find Rides: the database does the filtering (destination, date window, max price).
 // Only future trips come back. `fromIso`/`toIso` are UTC ISO strings; `maxPrice` is whole dollars.
-export function searchTrips(accessToken, { destinationId, fromIso, toIso, maxPrice } = {}) {
+export function searchTrips(accessToken, { destinationId, fromCity, fromIso, toIso, maxPrice } = {}) {
   const q = ['select=*', 'order=departure_at', 'limit=100'];
   if (destinationId) q.push(`destination_id=eq.${encodeURIComponent(destinationId)}`);
   q.push(`departure_at=gte.${encodeURIComponent(fromIso || new Date().toISOString())}`);
   if (toIso) q.push(`departure_at=lt.${encodeURIComponent(toIso)}`);
+  if (fromCity) q.push(`origin_city=ilike.${encodeURIComponent(fromCity.trim().replace(/[\%_*]/g, ''))}`);
   if (maxPrice) q.push(`price_per_seat=lte.${Number(maxPrice)}`);
-  return request(`trips?${q.join('&')}`, accessToken);
+  return request(`available_trips?${q.join('&')}`, accessToken);
+}
+
+export function loadLocations(accessToken) {
+  return request('locations?select=id,name,city,latitude,longitude&order=name&limit=200', accessToken);
 }
 
 export async function publishTrip(accessToken, fields) {
   // Identity, UUID and creation timestamp come from the database.
   const payload = Object.fromEntries([
     'destination_id', 'departure_at', 'pickup_location', 'dropoff_location',
-    'total_seats', 'price_per_seat', 'return_at',
+    'total_seats', 'price_per_seat', 'return_at', 'origin_city',
+    'pickup_latitude', 'pickup_longitude', 'dropoff_latitude', 'dropoff_longitude',
   ].filter(key => fields[key] !== undefined).map(key => [key, fields[key]]));
   const rows = await request('trips?select=*', accessToken, payload);
   if (!Array.isArray(rows) || !rows[0]?.id) throw new Error('Could not confirm the saved trip.');

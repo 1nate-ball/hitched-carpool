@@ -1,5 +1,13 @@
 # Post a Trip: database handoff
 
+## Sprint 2 update: November 6, 2026
+
+Trips now also store `origin_city` (required, up to 80 characters; legacy default Provo) and optional paired `pickup_latitude`/`pickup_longitude`, `dropoff_latitude`/`dropoff_longitude` values. Coordinates must be valid and both members of a pair must be present or NULL. The `locations` table has 13 searchable starter meeting places. All place reads require a signed-in session.
+
+`available_trips` exposes future trips with open seats and an aggregate `seats_available`, without exposing other riders' identities or notes. From filters the starting city; To filters destination. Only the owning driver can update trip details, and client updates cannot modify `driver_id`, `id`, or `created_at`. The original no-update handoff below is superseded by this owner-only policy.
+
+Applied setup: `20261104000100_request_a_seat.sql` and `20261106000100_trip_locations_search_ownership.sql`, through SQL Editor on November 6. Do not reapply. Both local PostgreSQL and rollback-only live role checks passed; real test-account browser checks are tracked separately.
+
 ## Form integration update: November 2, 2026
 
 Robbie's form now uses the existing Supabase helper with email/password test-account sign-in. Departure (`pt-depart`) and optional return (`pt-return`) each use a `datetime-local` input; both mean America/Denver and are converted to offset timestamps. The old separate date/time IDs below describe the original handoff. The helper now also exports `signIn`, `signOut`, and `getSession`; sessions use `accessToken` in JavaScript. Profile saving and verification remain the original classroom demo.
