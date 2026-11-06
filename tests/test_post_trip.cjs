@@ -33,7 +33,7 @@ function fixture() {
     const row = {id:'saved-trip',driver_id:session.user.id,...payload}; rows.push(row); return row;
   },loadMyRequests:async()=>[],signOut(){}};
   run('DB.api = api;');
-  get('pt-dest').value='moab'; get('pt-depart').value='2099-11-06T16:00';
+  get('pt-origin').value='Provo'; get('pt-dest').value='moab'; get('pt-depart').value='2099-11-06T16:00';
   get('pt-pickup').value='Helaman Halls'; get('pt-dropoff').value='Moab Main Street';
   get('pt-seats').value='3'; get('pt-price').value='25';
   run('BIND.post();');
