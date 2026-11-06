@@ -49,3 +49,29 @@ test('search uses real time, does not mix sample rows into signed-in results, an
   assert.equal(run('seatsLeft({dbTrip:true,available:0,seats:3,passengers:[]})'),0);
   assert.equal(run('seatsLeft({dbTrip:true,available:2,seats:3,passengers:["me"]})'),2);
 });
+
+test('saved-place selection attaches separate pins, updates starting city, and clears changed addresses',async()=>{
+  const {bindLocationPickers}=await import(moduleURL('public/hitch-locations.js'));
+  const fields=new Map();
+  function element(){return {value:'',textContent:'',innerHTML:'',children:[],listeners:{},isConnected:true,open:true,
+    addEventListener(name,fn){this.listeners[name]=fn;},replaceChildren(){this.children=[];},append(child){this.children.push(child);}};}
+  const get=id=>{if(!fields.has(id)) fields.set(id,element());return fields.get(id);};
+  const originalDocument=global.document;
+  global.document={createElement:element};
+  let changes=0;
+  const api={loadLocations:async()=>[{name:'Campus meeting point',city:'Orem',latitude:40.2786,longitude:-111.7187}]};
+  try {
+    const picker=bindLocationPickers({api,session:{accessToken:'test'},form:{querySelector:selector=>get(selector.slice(1))},onChange(){changes++;}});
+    await get('pt-pickup-picker').listeners.toggle();
+    get('pt-pickup-places').children[0].listeners.click();
+    assert.equal(picker.pins.pickup.lat,40.2786); assert.equal(picker.pins.dropoff,null);
+    assert.equal(get('pt-origin').value,'Orem'); assert.equal(get('pt-pickup').value,'Campus meeting point');
+    assert.equal(get('pt-pickup-center').disabled,true); // Address/list fallback works without the map library.
+    await get('pt-dropoff-picker').listeners.toggle();
+    get('pt-dropoff-places').children[0].listeners.click();
+    assert.ok(picker.pins.dropoff); assert.equal(changes,2);
+    get('pt-pickup').value='A changed address'; get('pt-pickup').listeners.input();
+    assert.equal(picker.pins.pickup,null); assert.ok(picker.pins.dropoff);
+    picker.destroy();
+  } finally {global.document=originalDocument;}
+});
