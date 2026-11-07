@@ -388,11 +388,11 @@ const S = {
   me:null, screen:'login', params:{}, hist:[],
   accounts:{}, taken:['jhale','kbrooks','mtanaka','hortiz','admin'],
   search:{dest:'', from:'', date:''}, cat:'All', miss:null,
-  filters:{max:'', round:false}, dbSearch:{key:'', state:'idle', ids:[]}, dbBase:{key:'', ids:[]}, tripsTab:'rider', homeLoaded:false, loginNotice:'', loginUser:'',
+  filters:{max:'', round:false}, dbSearch:{key:'', state:'idle', ids:[]}, dbBase:{key:'', ids:[]}, tripsTab:'rider', homeLoaded:false, loginNotice:'', loginUser:'', after:null,
 };
 
 // ---------- Supabase: Post a Trip ----------
-const DB = {session:null, api:null};
+const DB = {session:null, api:null, profile:null};
 const loadApi = async () => DB.api || (DB.api = await import('/hitch-supabase.js'));
 const DB_DRIVER = {first:'Hitch', last:'driver', hometown:'', bio:'', color:'#3B6EA8', verified:'pending'};
 function fromRow(r){ // Supabase trips row -> the trip shape the screens already use
@@ -484,14 +484,17 @@ const openTrips = destId => TRIPS.filter(t => t.dest === destId && seatsLeft(t) 
 
 function av(u, size=36){
   const style = `width:${size}px;height:${size}px;font-size:${Math.round(size*.38)}px;background:${u.color}`;
-  const inner = u.photo ? `<img src="${u.photo}" alt="">` : esc(u.first[0] + u.last[0]);
+  const inner = u.photo ? `<img src="${u.photo}" alt="">` : esc((u.first[0] || '') + (u.last[0] || ''));
   return `<span class="av" style="${style}" aria-hidden="true">${inner}</span>`;
 }
 const vBadge = u => u.verified === 'verified' ? `<span class="verified">${I.check}Verified</span>` : `<span class="pill warn">Verification pending</span>`;
 
 // ---------- navigation ----------
+// Screens that need a signed-in user. Signed out, they send you to Log in and come back after.
+const AUTH_SCREENS = new Set(['mytrips', 'manage', 'post', 'profile', 'edit', 'chat']);
+const PUBLIC_SCREENS = new Set(['login', 'signup']);
 function go(screen, params={}, push=true){
-  if (push && S.screen !== 'login') S.hist.push({screen:S.screen, params:S.params});
+  if (push && !PUBLIC_SCREENS.has(S.screen)) S.hist.push({screen:S.screen, params:S.params});
   S.screen = screen; S.params = params; render(); window.scrollTo(0,0);
 }
 function back(){ const h = S.hist.pop(); if (h){ S.screen = h.screen; S.params = h.params; render(); window.scrollTo(0,0);} else go('home',{},false); }
@@ -501,7 +504,7 @@ const NAVMAP = {home:'home', results:'home', detail:'home', mytrips:'mytrips', m
 function nav(){
   const cur = NAVMAP[S.screen];
   const b = (id, icon, label) => `<button data-act="nav" data-to="${id}" ${cur===id?'aria-current="page"':''}>${icon}${label}</button>`;
-  return `<nav class="nav" aria-label="Main"><button class="nav-brand" data-act="nav" data-to="home" aria-label="Hitch home"><span class="logo">${LOGO}</span>Hitch</button>${b('home',I.compass,'Explore')}${b('mytrips',I.ticket,'My Trips')}${b('post',I.plus,'Post a trip')}${b('profile',I.user,'Profile')}<span class="nav-me">${S.me ? av(S.me, 38) : ''}</span></nav>`;
+  return `<nav class="nav" aria-label="Main"><button class="nav-brand" data-act="nav" data-to="home" aria-label="Hitch home"><span class="logo">${LOGO}</span>Hitch</button>${b('home',I.compass,'Explore')}${b('mytrips',I.ticket,'My Trips')}${b('post',I.plus,'Post a trip')}${b('profile',I.user,'Profile')}<span class="nav-me">${S.me && DB.session ? av(S.me, 38) : ''}</span></nav>`;
 }
 function topbar(title, sub=''){
   return `<header class="topbar"><button class="iconbtn" data-act="back" aria-label="Back">${I.back}</button><div class="title"><h2>${esc(title)}</h2>${sub?`<div class="small muted">${sub}</div>`:''}</div></header>`;
@@ -599,7 +602,7 @@ function resultsList(){
   list.sort((a,b) => parse(a.depart) - parse(b.depart));
   if (!list.length) return `<div class="empty">${I.road}<h2>No rides found</h2><p class="muted small">No trips to ${esc(d.name)}${S.search.date ? ` on ${fDate(S.search.date)}` : ''} match your search${max||round?' and filters':''}. Try a different date or destination${max||round?', or clear your filters':''}.</p><div class="row" style="width:100%">${max||round?'<button class="btn" data-act="clearf">Clear filters</button>':''}<button class="btn primary" data-act="change">Change search</button></div></div>`;
   const note = q.state === 'error' ? `<div class="alert warn small" role="status">Couldn't reach the trip database, so only sample trips are shown. Try again in a moment.</div>`
-    : q.state === 'signedout' ? `<p class="small muted">Showing sample trips. <button class="link" data-act="nav" data-to="post">Sign in</button> to include trips other students have posted.</p>` : '';
+    : q.state === 'signedout' ? `<p class="small muted">Showing sample trips. <button class="link" data-act="needlogin">Log in</button> to include trips other students have posted.</p>` : '';
   return note + `<p class="small muted" role="status">${list.length} trip${list.length>1?'s':''} · earliest departure first</p>` + list.map(tripCard).join('');
 }
 // Ask Supabase for this destination's trips matching the current date and max-price filters.
@@ -732,6 +735,7 @@ SCREENS.detail = () => {
   else if (st === 'pending') action = `<button class="btn" data-act="go" data-to="mytrips">Request sent · Awaiting driver</button>`;
   else if (st === 'declined') action = `<button class="btn" data-act="go" data-to="mytrips">Request declined · View status</button>`;
   else if (!left) action = `<button class="btn" disabled>Trip is full</button>`;
+  else if (!DB.session) action = `<button class="btn primary" data-act="needlogin">Log in to request a seat</button>`;
   else if (!isVerified()) action = `<button class="btn" disabled>Verify your ID to request</button>`;
   else action = `<button class="btn primary" data-act="request">Request a seat</button>`;
   return `${topbar('Trip details')}
@@ -833,18 +837,7 @@ SCREENS.mytrips = () => {
 SCREENS.post = () => {
   if (!isVerified()) return `<header class="topbar"><div class="title"><h2>Post a trip</h2></div></header>
 <div class="screen">${pendingBanner()}<div class="empty">${I.lock}<h2>Verify your ID to post trips</h2><p class="muted small">Only verified students can offer rides. We'll unlock posting as soon as your ID is approved.</p><button class="btn" data-act="nav" data-to="home">Browse trips instead</button></div></div>${nav()}`;
-  if (!DB.session) return `<header class="topbar"><div class="title"><h2>Post a trip</h2><div class="small muted">Sign in to save trips</div></div></header>
-<div class="screen">
-<form id="siForm" class="fieldset" novalidate>
-  <div class="eyebrow">Sign in to post</div>
-  <p class="small muted">Trips are saved to the Hitch database, so you need to be signed in. Use your Hitch test account.</p>
-  <div class="field"><label for="si-email">Email</label><input id="si-email" type="email" autocomplete="username" required></div>
-  <div class="field"><label for="si-pass">Password</label><input id="si-pass" type="password" autocomplete="current-password" required></div>
-  <div class="alert bad small" id="si-err" role="alert" hidden></div>
-  <button class="btn primary block" type="submit" id="si-btn">Sign in</button>
-</form>
-</div>${nav()}`;
-  return `<header class="topbar"><div class="title"><h2>Post a trip</h2><div class="small muted">Offer seats in your car · Posting as ${esc(DB.session.user.email)} · <button class="link" type="button" data-act="dbsignout">Sign out</button></div></div></header>
+  return `<header class="topbar"><div class="title"><h2>Post a trip</h2><div class="small muted">Offer seats in your car · Posting as ${esc(DB.session?.user.email || '')} · <button class="link" type="button" data-act="logout">Log out</button></div></div></header>
 <div class="screen post-layout">
 <form id="ptForm" novalidate>
   <div class="fieldset"><div class="eyebrow">Where & when</div>
@@ -893,25 +886,6 @@ function postTips(v){
 }
 BIND.post = () => {
   const $ = id => document.getElementById(id);
-  const si = $('siForm');
-  if (si){
-    si.addEventListener('submit', async e => {
-      e.preventDefault();
-      const btn = $('si-btn'), box = $('si-err'), email = $('si-email').value.trim(), pass = $('si-pass').value;
-      if (!email || !pass){ box.textContent = 'Enter your email and password.'; box.hidden = false; return; }
-      btn.disabled = true; btn.textContent = 'Signing in…'; box.hidden = true;
-      try {
-        const api = await loadApi();
-        DB.session = await api.signIn(email, pass);
-        await loadDbTrips().catch(() => {});
-        render(); toast('Signed in');
-      } catch (error) {
-        box.textContent = error.status === 400 ? 'Wrong email or password.' : "Couldn't reach the sign-in service. Try again.";
-        box.hidden = false; btn.disabled = false; btn.textContent = 'Sign in';
-      }
-    });
-    return;
-  }
   const f = $('ptForm'); if (!f) return;
   const refresh = () => {
     if (!$('pt-preview')) return;
@@ -993,7 +967,7 @@ BIND.post = () => {
         }
       } else {
         dbErr.textContent = dbErrorMessage(error);
-        if (error.status === 401){ (await loadApi()).signOut(); DB.session = null; clearDbTrips(); dbErr.innerHTML = esc(dbErrorMessage(error)) + ' <button class="link" type="button" data-act="dbsignout">Sign in again</button>'; }
+        if (error.status === 401){ (await loadApi()).signOut(); DB.session = null; clearDbTrips(); dbErr.innerHTML = esc(dbErrorMessage(error)) + ' <button class="link" type="button" data-act="expired">Log in again</button>'; }
       }
     }
     if (saved){
@@ -1062,6 +1036,141 @@ BIND.chat = () => {
   });
 };
 
+/* Screens 1-2: Log in / Sign up (Supabase Auth) */
+const SCHOOL_EMAIL = /^[^\s@]+@([a-z0-9-]+\.)*byu\.edu$/i; // BYU email addresses only
+const SCREEN_KEY = 'hitch-last-screen';
+const RESTORABLE = new Set(['home', 'mytrips', 'post', 'profile']);
+function rememberScreen(){ // so a refresh returns to the same tab instead of always Explore
+  if (!DB.session || !RESTORABLE.has(S.screen)) return;
+  try { sessionStorage.setItem(SCREEN_KEY, S.screen); } catch { /* storage blocked */ }
+}
+function lastScreen(){
+  try { const v = sessionStorage.getItem(SCREEN_KEY); return RESTORABLE.has(v) ? v : null; } catch { return null; }
+}
+// Weak-password rule shown on the form. Supabase also enforces its own minimum.
+function passwordProblem(p){
+  if (p.length < 8) return 'Use at least 8 characters.';
+  if (!/[a-z]/i.test(p) || !/\d/.test(p)) return 'Include at least one letter and one number.';
+  return '';
+}
+// The signed-in user's public.profiles row. Its name replaces the sample name on screens that show "you".
+async function loadAccount(){
+  DB.profile = null;
+  try { DB.profile = await (await loadApi()).loadMyProfile(DB.session.accessToken, DB.session.user.id); }
+  catch (error) { console.warn('Could not load your profile:', error.message); }
+  applyAccountName();
+}
+function applyAccountName(){
+  if (!S.me || !DB.profile) return;
+  const parts = DB.profile.full_name.trim().split(/\s+/);
+  S.me.first = parts[0]; S.me.last = parts.slice(1).join(' ');
+}
+async function afterSignIn(session, message){
+  DB.session = session;
+  await loadAccount();
+  const to = S.after || {screen:'home', params:{}};
+  S.after = null; S.loginNotice = ''; S.hist = [];
+  go(to.screen, to.params, false);
+  toast(message);
+  loadDbTrips().then(() => { if (!['post', 'edit', 'chat'].includes(S.screen)) render(); }) // don't wipe a half-typed form.catch(error => console.warn('Could not load saved trips:', error.message));
+}
+async function logOut(notice, returnTo = null){
+  try { (await loadApi()).signOut(); } catch { /* still clear local state */ }
+  DB.session = null; DB.profile = null; clearDbTrips();
+  try { sessionStorage.removeItem(SCREEN_KEY); } catch { /* ignore */ }
+  S.hist = []; S.after = returnTo; S.loginNotice = notice; S.screen = 'login'; S.params = {};
+  render(); window.scrollTo(0,0);
+}
+function authHeader(sub){
+  return `<div class="brandrow"><span class="logo">${LOGO}</span><div><div class="brand-name">Hitch</div><div class="brand-sub">${sub}</div></div></div>`;
+}
+
+SCREENS.login = () => `<div class="screen">
+  ${authHeader('Rides with BYU students')}
+  <h1>Log in</h1>
+  ${S.loginNotice ? `<div class="alert ok small" role="status">${esc(S.loginNotice)}</div>` : ''}
+  ${S.after ? '<p class="small muted">Log in to continue.</p>' : ''}
+  <form id="liForm" class="fieldset" novalidate>
+    <div class="field"><label for="li-email">BYU email</label><input id="li-email" type="email" autocomplete="username" value="${esc(S.loginUser)}" required></div>
+    <div class="field"><label for="li-pass">Password</label><input id="li-pass" type="password" autocomplete="current-password" required></div>
+    <div class="alert bad small" id="li-err" role="alert" hidden></div>
+    <button class="btn primary block" type="submit" id="li-btn">Log in</button>
+  </form>
+  <p class="small" style="text-align:center">New to Hitch? <button class="link" data-act="auth" data-to="signup">Create an account</button></p>
+  <p class="small" style="text-align:center"><button class="link" data-act="auth" data-to="home">Browse trips without logging in</button></p>
+</div>`;
+BIND.login = () => {
+  const $ = id => document.getElementById(id);
+  $(S.loginUser ? 'li-pass' : 'li-email').focus();
+  $('liForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn = $('li-btn'), box = $('li-err'), email = $('li-email').value.trim(), pass = $('li-pass').value;
+    S.loginUser = email;
+    if (!email || !pass){ box.textContent = 'Enter your email and password.'; box.hidden = false; return; }
+    btn.disabled = true; btn.textContent = 'Logging in…'; box.hidden = true;
+    try {
+      const session = await (await loadApi()).signIn(email, pass);
+      await afterSignIn(session, 'Logged in');
+    } catch (error) {
+      box.textContent = error.code === 'email_not_confirmed' ? 'Confirm your email first. Check your inbox for the link from Hitch.'
+        : error.status === 400 ? 'Wrong email or password.'
+        : error.status === 429 ? 'Too many attempts. Wait a minute and try again.'
+        : "Couldn't reach the sign-in service. Try again.";
+      box.hidden = false; btn.disabled = false; btn.textContent = 'Log in';
+    }
+  });
+};
+
+SCREENS.signup = () => `<div class="screen">
+  ${authHeader('Rides with BYU students')}
+  <h1>Create your account</h1>
+  <form id="suForm" class="fieldset" novalidate>
+    <div class="field"><label for="su-name">Full name</label><input id="su-name" type="text" autocomplete="name" maxlength="80" required aria-describedby="se-name"><div class="err" id="se-name"></div></div>
+    <div class="field"><label for="su-email">BYU email</label><input id="su-email" type="email" autocomplete="email" placeholder="you@byu.edu" required aria-describedby="se-email"><div class="err" id="se-email"></div></div>
+    <div class="field"><label for="su-pass">Password</label><input id="su-pass" type="password" autocomplete="new-password" required aria-describedby="su-passhint se-pass"><div class="hint" id="su-passhint">At least 8 characters, with a letter and a number.</div><div class="err" id="se-pass"></div></div>
+    <div class="alert bad small" id="su-err" role="alert" hidden></div>
+    <button class="btn primary block" type="submit" id="su-btn">Create account</button>
+  </form>
+  <p class="small" style="text-align:center">Already have an account? <button class="link" data-act="auth" data-to="login">Log in</button></p>
+</div>`;
+BIND.signup = () => {
+  const $ = id => document.getElementById(id);
+  const FIELDS = {name:'su-name', email:'su-email', pass:'su-pass'};
+  const show = err => {
+    Object.keys(FIELDS).forEach(k => { $('se-'+k).innerHTML = err[k] || ''; $(FIELDS[k]).closest('.field').classList.toggle('invalid', !!err[k]); $(FIELDS[k]).setAttribute('aria-invalid', err[k] ? 'true' : 'false'); });
+    const first = Object.keys(err)[0]; if (first) $(FIELDS[first]).focus();
+  };
+  $('su-name').focus();
+  $('suForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn = $('su-btn'), box = $('su-err');
+    const name = $('su-name').value.trim(), email = $('su-email').value.trim().toLowerCase(), pass = $('su-pass').value;
+    const err = {};
+    if (!name) err.name = 'Enter your name.';
+    if (!email) err.email = 'Enter your BYU email.'; else if (!SCHOOL_EMAIL.test(email)) err.email = 'Use your BYU email address (ending in @byu.edu).';
+    const weak = passwordProblem(pass); if (weak) err.pass = weak;
+    box.hidden = true; show(err);
+    if (Object.keys(err).length) return;
+    btn.disabled = true; btn.textContent = 'Creating account…';
+    try {
+      const result = await (await loadApi()).signUp(name, email, pass);
+      if (result.session) return afterSignIn(result.session, `Welcome to Hitch, ${name.split(/\s+/)[0]}!`);
+      S.loginUser = email; S.loginNotice = `Account created. Check ${email} for a confirmation link, then log in.`;
+      go('login', {}, false);
+    } catch (error) {
+      btn.disabled = false; btn.textContent = 'Create account';
+      if (error.code === 'user_already_exists' || error.code === 'email_exists' || /already registered/i.test(error.message))
+        return show({email:'An account with this email already exists. <button class="link" type="button" data-act="auth" data-to="login">Log in instead</button>'});
+      if (error.code === 'weak_password' || (error.status === 422 && /password/i.test(error.message)))
+        return show({pass:esc(error.message || 'Choose a stronger password.')});
+      box.textContent = error.status === 429 ? 'Too many sign-up attempts. Wait a few minutes and try again.'
+        : error.code === 'email_address_invalid' ? 'That email address was not accepted. Check it and try again.'
+        : "Couldn't create your account right now. Try again.";
+      box.hidden = false;
+    }
+  });
+};
+
 /* Screen 10: Profile / edit profile */
 SCREENS.profile = () => {
   const m = S.me;
@@ -1075,6 +1184,8 @@ SCREENS.profile = () => {
     <button class="btn primary block" data-act="nav" data-to="post" ${isVerified()?'':'disabled'}>Post a trip</button>
     <button class="btn primary block" data-act="mymanage">Manage my trip</button>
     ${isVerified() ? '' : '<p class="small muted" style="text-align:center">Posting a trip unlocks once your ID is verified.</p>'}
+    <button class="btn block danger" data-act="logout">Log out</button>
+    ${DB.session ? `<p class="small muted" style="text-align:center">Signed in as ${esc(DB.session.user.email)}</p>` : ''}
   </div>
   <div class="privacy">${I.lock}<span>Demo profile: no student ID or date of birth is collected in this version.</span></div>
 </div>${nav()}`;
@@ -1090,7 +1201,7 @@ SCREENS.edit = () => {
     <p class="small muted">Prototype uses sample avatars.</p>
   </div>
   <div class="fieldset"><div class="eyebrow">Public info</div>
-    <div class="field"><label for="ed-name">Name</label><input id="ed-name" type="text" value="${esc(fullName(m))}" readonly><div class="hint">This classroom demo uses Jordan Hale's sample account.</div></div>
+    <div class="field"><label for="ed-name">Name</label><input id="ed-name" type="text" value="${esc(fullName(m))}" readonly><div class="hint">${DB.profile ? 'Your name comes from your Hitch account.' : "This classroom demo uses Jordan Hale's sample account."}</div></div>
     <div class="field"><label for="ed-home">Hometown</label><input id="ed-home" type="text" maxlength="100" value="${esc(m.hometown)}" placeholder="e.g. Boise, ID"></div>
     <div class="field"><label for="ed-bio">Short bio</label><textarea id="ed-bio" maxlength="160" placeholder="Major, where you usually travel, what you're like on a road trip">${esc(m.bio)}</textarea><div class="hint" id="ed-count"></div></div>
   </div>
@@ -1115,7 +1226,7 @@ BIND.edit = () => {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Save failed');
-      S.me = result; S.hist.pop(); S.screen = 'profile'; S.params = {};
+      S.me = result; applyAccountName(); S.hist.pop(); S.screen = 'profile'; S.params = {};
       render(); toast('Profile saved to database');
     } catch (error) {
       toast(error.message); button.disabled = false; button.textContent = 'Save changes';
@@ -1128,18 +1239,34 @@ async function boot(){
   try {
     const response = await fetch('/api/profile', {cache:'no-store'});
     if (!response.ok) throw new Error('Backend unavailable');
-    S.me = await response.json(); S.screen = 'profile'; render();
+    S.me = await response.json();
   } catch (error) {
     app.innerHTML = '<div class="screen"><h1>Cannot connect to the database</h1><p>The Hitch server is not responding. If you are running it locally, start python3 server.py and open http://127.0.0.1:8000. Otherwise wait a minute and reload to retry.</p></div>';
     return;
   }
-  // Load trips saved in Supabase (needs a signed-in session). Sample trips still fill the other screens.
+  // Keep the user signed in across refreshes: the saved Supabase session is reused (and refreshed if needed).
+  let confirmed = null;
+  try {
+    const api = await loadApi();
+    confirmed = await api.sessionFromUrl().catch(() => null); // back from the email confirmation link
+    DB.session = await api.getSession();
+  } catch (error) { console.warn('Could not check sign-in:', error.message); DB.session = null; }
+  if (DB.session){ await loadAccount(); S.screen = lastScreen() || 'home'; }
+  else S.screen = 'login';
+  render();
+  if (confirmed) toast("Email confirmed. You're logged in.");
+  if (!DB.session) return;
+  // Load trips saved in Supabase. Sample trips still fill the other screens.
   try { await loadDbTrips(); render(); } catch (error) { console.warn('Could not load saved trips:', error.message); }
 }
 function render(){
   document.querySelectorAll('.scrim').forEach(x => x.remove());
+  if (AUTH_SCREENS.has(S.screen) && !DB.session){ // signed out: send to Log in, then come back here
+    S.after = {screen:S.screen, params:S.params}; S.screen = 'login'; S.params = {}; S.hist = [];
+  }
+  rememberScreen();
   app.dataset.screen = S.screen;
-  app.innerHTML = '<div class="banner small" role="status">Classroom demo · Profile saving, Post a trip, and seat requests on posted trips use real databases. Other rides, verification, and chat are prototype interactions.</div>' + SCREENS[S.screen]();
+  app.innerHTML = '<div class="banner small" role="status">Classroom demo · Accounts, profile saving, Post a trip, and seat requests on posted trips use real databases. Other rides, verification, and chat are prototype interactions.</div>' + SCREENS[S.screen]();
   BIND[S.screen]?.();
 }
 document.addEventListener('click', e => {
@@ -1167,9 +1294,10 @@ document.addEventListener('click', e => {
     }
     case 'mymanage': { const mine = TRIPS.filter(t => t.driver === 'me'); if (mine.length === 1) go('manage', {id:mine[0].id}); else { S.tripsTab = 'driver'; S.hist = []; go('mytrips', {}, false); } break; }
     case 'approve': S.me.verified = 'verified'; render(); toast('ID verified. You can now request seats and post trips.'); break;
-    case 'dbsignout': loadApi().then(api => { api.signOut(); DB.session = null; clearDbTrips(); render(); }); break;
-    case 'signout': toast('Classroom demo uses the fixed Jordan Hale account.'); break;
-    case 'unused-signout': S.me = null; S.hist = []; S.loginNotice = 'You\'ve been signed out.'; S.search = {dest:'',from:'',date:''}; S.cat = 'All'; S.screen = 'login'; render(); break;
+    case 'logout': logOut("You've been logged out."); break;
+    case 'expired': logOut('Your session expired. Log in again to continue.', {screen:S.screen, params:S.params}); break;
+    case 'needlogin': S.after = {screen:S.screen, params:S.params}; S.loginNotice = ''; go('login', {}, false); break;
+    case 'auth': S.loginNotice = ''; go(el.dataset.to, {}, false); break;
   }
 });
 boot();
