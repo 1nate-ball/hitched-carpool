@@ -82,9 +82,8 @@ export function loadMyRequests(accessToken, riderId) {
   return request(`ride_requests?select=trip_id,status,note,created_at&rider_id=eq.${encodeURIComponent(riderId)}`, accessToken);
 }
 
-// ---------- Supabase Auth (email + password test accounts) ----------
-// Sign-up UI is separate backlog work. For Sprint 1 the team signs in with test
-// accounts created in the Supabase dashboard (Authentication -> Users).
+// ---------- Supabase Auth (email + password) ----------
+// The session is kept in localStorage so a page refresh keeps the user signed in.
 const SESSION_KEY = 'hitch-supabase-session';
 
 function readSession() {
@@ -94,45 +93,115 @@ function saveSession(session) {
   try { localStorage.setItem(SESSION_KEY, JSON.stringify(session)); } catch { /* private window */ }
   return session;
 }
-
-async function authRequest(grantType, body) {
-  const { url, publishableKey } = await config();
-  const response = await fetch(`${url}/auth/v1/token?grant_type=${grantType}`, {
-    method: 'POST',
-    headers: { apikey: publishableKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const error = new Error(data.error_description || data.msg || 'Sign-in failed.');
-    error.status = response.status;
-    throw error;
-  }
-  return saveSession({
+function toSession(data) {
+  return {
     accessToken: data.access_token,
     refreshToken: data.refresh_token,
     expiresAt: data.expires_at || Math.floor(Date.now() / 1000) + (data.expires_in || 3600),
     user: { id: data.user.id, email: data.user.email },
+  };
+}
+
+// Supabase Auth errors come back as {error_code, msg} (newer) or {error, error_description} (older).
+function authError(response, data, fallback) {
+  const error = new Error(data.msg || data.error_description || data.message || fallback);
+  error.status = response.status;
+  error.code = data.error_code || data.code || data.error;
+  return error;
+}
+
+async function authFetch(path, body, accessToken) {
+  const { url, publishableKey } = await config();
+  const response = await fetch(`${url}/auth/v1/${path}`, {
+    method: 'POST',
+    headers: {
+      apikey: publishableKey,
+      'Content-Type': 'application/json',
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify(body || {}),
   });
+  const data = await response.json().catch(() => ({}));
+  return { response, data };
+}
+
+async function tokenRequest(grantType, body) {
+  const { response, data } = await authFetch(`token?grant_type=${grantType}`, body);
+  if (!response.ok) throw authError(response, data, 'Sign-in failed.');
+  return saveSession(toSession(data));
 }
 
 export function signIn(email, password) {
-  return authRequest('password', { email, password });
+  return tokenRequest('password', { email: email.trim().toLowerCase(), password });
+}
+
+// Sign Up. The full name goes into the user's metadata; a database trigger copies it
+// into public.profiles (see supabase/migrations/20261105000100_profiles_auth.sql).
+// Returns {session} when the user is signed in right away, or {needsConfirmation: true}
+// when the project requires email confirmation first.
+// Errors: code 'user_already_exists' (duplicate email) and 'weak_password'.
+export async function signUp(fullName, email, password) {
+  const redirect = encodeURIComponent(globalThis.location ? location.origin : '');
+  const { response, data } = await authFetch(`signup?redirect_to=${redirect}`, {
+    email: email.trim().toLowerCase(),
+    password,
+    data: { full_name: fullName.trim() },
+  });
+  if (!response.ok) throw authError(response, data, 'Sign-up failed.');
+  if (data.access_token) return { session: saveSession(toSession(data)) };
+  // With email confirmation on, Supabase hides duplicates: it answers 200 with a user
+  // that has no identities instead of an error. Treat that as a duplicate email.
+  const user = data.user || data;
+  if (Array.isArray(user.identities) && user.identities.length === 0) {
+    const error = new Error('User already registered');
+    error.status = 422; error.code = 'user_already_exists';
+    throw error;
+  }
+  return { needsConfirmation: true };
+}
+
+// After the user clicks the confirmation link, Supabase redirects back with the
+// session in the URL hash (#access_token=...). Save it and clean the URL.
+export async function sessionFromUrl() {
+  const hash = globalThis.location ? location.hash.slice(1) : '';
+  if (!hash.includes('access_token=')) return null;
+  const p = new URLSearchParams(hash);
+  history.replaceState(null, '', location.pathname + location.search);
+  const { url, publishableKey } = await config();
+  const response = await fetch(`${url}/auth/v1/user`, {
+    headers: { apikey: publishableKey, Authorization: `Bearer ${p.get('access_token')}` },
+  });
+  if (!response.ok) return null;
+  const user = await response.json();
+  return saveSession(toSession({
+    access_token: p.get('access_token'), refresh_token: p.get('refresh_token'),
+    expires_at: Number(p.get('expires_at')) || undefined, expires_in: Number(p.get('expires_in')) || undefined, user,
+  }));
 }
 
 export function signOut() {
+  const session = readSession();
   try { localStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
+  // Best effort: also revoke the refresh token on the server.
+  if (session?.accessToken) authFetch('logout', {}, session.accessToken).catch(() => {});
 }
 
 // Returns a session with a usable access token, refreshing it if it is about to expire.
+// Only a rejected refresh signs the user out; a dropped connection keeps the saved session.
 export async function getSession() {
   const session = readSession();
   if (!session) return null;
   if (session.expiresAt - 60 > Date.now() / 1000) return session;
   try {
-    return await authRequest('refresh_token', { refresh_token: session.refreshToken });
-  } catch {
-    signOut();
+    return await tokenRequest('refresh_token', { refresh_token: session.refreshToken });
+  } catch (error) {
+    if (error.status === 400 || error.status === 401) signOut();
     return null;
   }
+}
+
+// The signed-in user's row in public.profiles (created at sign-up).
+export async function loadMyProfile(accessToken, userId) {
+  const rows = await request(`profiles?select=id,full_name&id=eq.${encodeURIComponent(userId)}`, accessToken);
+  return rows[0] || null;
 }

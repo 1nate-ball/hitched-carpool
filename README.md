@@ -68,6 +68,21 @@ select * from public.kr_driver_repeat_rate_summary;
 
 To check the math, paste [the repeat-rate check](database/checks/kr_driver_repeat_rate_seed.sql) into the SQL Editor and run it. It adds four test drivers inside a transaction, checks for 3 eligible drivers, 1 repeat driver, and 33.3%, and then rolls everything back. It should end with a `PASS` row.
 
+## Accounts: Sign Up, Log In, Log Out
+
+The app opens to a **Log in** screen. New users choose **Create an account** and enter their full name, BYU email (must end in `@byu.edu`), and a password (at least 8 characters with a letter and a number). Supabase Auth creates the user, and a database trigger creates the matching row in `public.profiles` with their name. The SQL is in [the profiles migration](supabase/migrations/20261105000100_profiles_auth.sql).
+
+- **Duplicate email:** the form says an account already exists and links to Log in.
+- **Weak password:** the form checks it before sending, and also shows Supabase's own password message if Supabase rejects it.
+- **Email confirmation:** if the Supabase project requires it, sign-up tells the user to check their email. The link brings them back already logged in. If confirmation is off, they are logged in right away.
+- **Staying signed in:** the session is saved in the browser and refreshed automatically, so a page refresh keeps you logged in (and on the same tab).
+- **Log out** (on Profile and Post a trip) clears the session and returns to the Log in screen.
+- **Protected pages:** My Trips, Manage requests, Post a trip, Profile, Edit profile, and Group chat send signed-out users to Log in, then back to the page they wanted. Explore, search results, and trip details stay public; requesting a seat asks you to log in.
+
+The profile page shows the logged-in user's name from `profiles`. Hometown, bio, and avatar color still use the shared SQLite demo profile until the profile page moves to Supabase.
+
+To verify: create an account, refresh (still logged in), log out (back to Log in), then try opening My Trips while logged out (sent to Log in). In Supabase, check **Authentication → Users** and the `profiles` table for the new row. Run `node --test tests/test_auth.cjs` for the automated checks; they use a fake Supabase API and create no real accounts.
+
 ## Tech Stack
 
 | Layer | What we used |
@@ -98,7 +113,7 @@ We chose this stack because we could keep our existing screens and use Python to
    On Windows, use `py server.py` instead.
 
 4. Open **http://127.0.0.1:8000** in your browser.
-5. The app opens to Jordan Hale's sample profile. No login is needed for the demo.
+5. The app opens to the Log in screen. Create an account or log in, or choose **Browse trips without logging in**.
 
 Keep the terminal running while using the app. Press **Ctrl+C** to stop it. The database is saved at `data/hitch.sqlite3` and will be used again the next time you start the server.
 
@@ -151,9 +166,9 @@ The database tables don't need any extra setup. The server creates the SQLite ta
 
 We created a separate **Free** Supabase project for Hitch. The `destinations` and `trips` tables are set up with validation and row-level security. Our [field list and setup status](docs/post-a-trip-field-list.md) explains the exact columns and the remaining form work. The applied SQL is saved in [the initial migration file](supabase/migrations/20261027000100_post_a_trip.sql); do not run it again against the existing project.
 
-The local server serves the public connection settings and a [client helper](public/hitch-supabase.js) for loading destinations/trips and publishing a trip with a signed-in session. The Post a Trip form now saves to the Supabase `trips` table: sign in on the Post a trip screen with a Supabase Auth test account (created under Authentication → Users), fill in the form, and publish. Departure and return each use one date + time input, entered as Utah time. The form validates required fields, future dates, seats (1–7), price ($1–150), and return-after-departure, shows a confirmation only after the database saves, and shows a retryable error if the save fails. Saved trips load again after a refresh. Our working profile-save feature still uses SQLite.
+The local server serves the public connection settings and a [client helper](public/hitch-supabase.js) for loading destinations/trips and publishing a trip with a signed-in session. The Post a Trip form now saves to the Supabase `trips` table: log in (or create an account), open Post a trip, fill in the form, and publish. Departure and return each use one date + time input, entered as Utah time. The form validates required fields, future dates, seats (1–7), price ($1–150), and return-after-departure, shows a confirmation only after the database saves, and shows a retryable error if the save fails. Saved trips load again after a refresh. Our working profile-save feature still uses SQLite.
 
-If a network response is lost, we check for the saved trip. If we cannot confirm the result, publishing stays disabled until you reconnect, refresh, and check My Trips before posting again. This avoids encouraging a duplicate post. Sign-up and real BYU verification remain future work; the profile and sample riders are still demo data.
+If a network response is lost, we check for the saved trip. If we cannot confirm the result, publishing stays disabled until you reconnect, refresh, and check My Trips before posting again. This avoids encouraging a duplicate post. Real BYU ID verification remains future work; sample riders are still demo data.
 
 Run `node --test tests/test_post_trip.cjs` for the form regression checks. These use a simulated database API to check date/time conversion, validation, save confirmation, duplicate submission prevention, and account switching. They do not replace testing with two real Supabase test accounts.
 
@@ -171,3 +186,6 @@ We use [Leaflet 1.9.4](https://leafletjs.com/examples-v1/quick-start/) and [Open
 The new schema is in `supabase/migrations/20261106000100_trip_locations_search_ownership.sql`. It and the previously merged seat-request migration were applied to the existing Hitch project through SQL Editor on November 6. Don't rerun either migration against these tables. Existing trips default to Provo because the original demo used BYU pickups; those older trips have no map coordinates.
 
 Checks: `node --test tests/*.cjs`, `python3 -m unittest discover -s tests -v`, and `python3 scripts/check_sprint2_schema.py` (local PostgreSQL 18). `database/checks/sprint2_live.sql` checks live roles and constraints inside a rollback transaction. It does not create permanent test users or establish browser sign-in evidence. Two actual test accounts are needed for the final driver/rider browser check.
+
+
+PR #12 now includes Robbie's signup/login flow. A signed-out visitor going to Post a Trip logs in (or signs up), then returns to that form with their account name. Background requests from a previous login are discarded after logout or account switching. The combined form/API tests are in `tests/test_auth_trip_integration.cjs`; they use a fake Auth/Data API, not real test accounts. GitHub runs all JavaScript and Python checks on pull requests as well as main. The demo recording is published to main only on main-branch runs.

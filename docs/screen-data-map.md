@@ -13,6 +13,6 @@
 | Group chat: sender, text, time | Messages.TripID, SenderID, MessageText, SentAt | Seeded relational sample rows; sending remains a prototype interaction. |
 | Search/filter controls | Temporary UI state (destination, date, max price, return trip) | Query criteria, not entities. |
 
-The earlier sign-up, sign-in, and password-reset forms are not active in this classroom build. Authentication, email, DOB, private verification uploads, and real location permissions are future scope. The app opens directly to the fixed sample profile; it makes no claim to authenticate a BYU student.
+Sign up, log in, and log out use Supabase Auth with a matching `profiles` row (see the README). Password reset, DOB, private verification uploads, and real location permissions are future scope. The app opens directly to the fixed sample profile; it makes no claim to authenticate a BYU student.
 
 All six foreign-key relationships are one-to-many from parent to child. A parent may have zero children; each child has exactly one referenced parent. Users and Trips also have a conceptual many-to-many rider relationship implemented through RideRequests.

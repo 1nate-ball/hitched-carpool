@@ -30,12 +30,20 @@ async function stop(){
     await start();
     browser=await chromium.launch({headless:true});
     const context=await browser.newContext({viewport:{width:1280,height:1000},colorScheme:'light',recordVideo:{dir:'demo-recording',size:{width:1280,height:1000}}});
+    // The app now requires a Supabase login. CI has no real account, so start with a saved
+    // demo session and answer Supabase calls locally. The profile save still hits the real SQLite API.
+    await context.addInitScript(()=>{localStorage.setItem('hitch-supabase-session',JSON.stringify({accessToken:'demo',refreshToken:'demo',expiresAt:4102444800,user:{id:'demo-user',email:'jhale@byu.edu'}}));});
+    await context.route('https://*.supabase.co/**',route=>{
+      const body=new URL(route.request().url()).pathname==='/rest/v1/profiles'?[{id:'demo-user',full_name:'Jordan Hale'}]:[];
+      return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(body)});
+    });
     const page=await context.newPage();
     const errors=[];
     page.on('pageerror',e=>errors.push(e.message));
     const requests=[];
     page.on('response',r=>{if(r.url().includes('/api/profile'))requests.push({method:r.request().method(),status:r.status()});});
     await page.goto(base);
+    await page.getByRole('navigation').getByRole('button',{name:'Profile',exact:true}).click();
     await page.getByRole('heading',{name:'Jordan Hale'}).waitFor();
     // Keep each milestone visible long enough to follow in the submission video.
     await page.waitForTimeout(6000);
