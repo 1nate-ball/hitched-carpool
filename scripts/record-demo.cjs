@@ -30,18 +30,28 @@ async function stop(){
     await start();
     browser=await chromium.launch({headless:true});
     const context=await browser.newContext({viewport:{width:1280,height:1000},colorScheme:'light',recordVideo:{dir:'demo-recording',size:{width:1280,height:1000}}});
-    // The app now requires a Supabase login. CI has no real account, so start with a saved
-    // demo session and answer Supabase calls locally. The profile save still hits the real SQLite API.
+    // Start with a demo session and bridge the account profile calls to the temporary SQLite API.
     await context.addInitScript(()=>{localStorage.setItem('hitch-supabase-session',JSON.stringify({accessToken:'demo',refreshToken:'demo',expiresAt:4102444800,user:{id:'demo-user',email:'jhale@byu.edu'}}));});
-    await context.route('https://*.supabase.co/**',route=>{
-      const body=new URL(route.request().url()).pathname==='/rest/v1/profiles'?[{id:'demo-user',full_name:'Jordan Hale'}]:[];
-      return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(body)});
+    await context.route('https://*.supabase.co/**',async route=>{
+      const request=route.request(), path=new URL(request.url()).pathname;
+      let body=path==='/rest/v1/profiles'?[{id:'demo-user',full_name:'Jordan Hale'}]:[];
+      let status=200;
+      if(path==='/auth/v1/user'){
+        const data=request.method()==='PUT' ? request.postDataJSON().data : null;
+        const options=data ? {method:'PATCH',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({hometown:data.hometown,bio:data.bio,color:data.avatar_color})} : undefined;
+        const response=await fetch(base+'/api/profile',options);
+        status=response.status;
+        const profile=await response.json();
+        body={id:'demo-user',user_metadata:{hometown:profile.hometown,bio:profile.bio,avatar_color:profile.color}};
+      }
+      return route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
     });
     const page=await context.newPage();
     const errors=[];
     page.on('pageerror',e=>errors.push(e.message));
     const requests=[];
-    page.on('response',r=>{if(r.url().includes('/api/profile'))requests.push({method:r.request().method(),status:r.status()});});
+    page.on('response',r=>{if(r.url().endsWith('/auth/v1/user'))requests.push({method:r.request().method(),status:r.status()});});
     await page.goto(base);
     await page.getByRole('navigation').getByRole('button',{name:'Profile',exact:true}).click();
     await page.getByRole('heading',{name:'Jordan Hale'}).waitFor();
@@ -55,11 +65,11 @@ async function stop(){
     await page.getByLabel('Short bio',{exact:true}).pressSequentially('Ready for our next road trip!',{delay:100});
     await page.getByRole('button',{name:'Avatar color #3B6EA8',exact:true}).click();
     await page.waitForTimeout(4000);
-    const saved=page.waitForResponse(r=>r.url().endsWith('/api/profile')&&r.request().method()==='PATCH');
+    const saved=page.waitForResponse(r=>r.url().endsWith('/auth/v1/user')&&r.request().method()==='PUT');
     await page.getByRole('button',{name:'Save changes',exact:true}).click();
     const response=await saved;
     assert.equal(response.status(),200);
-    const payload=await response.json();
+    const payload=(await response.json()).user_metadata;
     assert.equal(payload.hometown,'Boise, ID');
     assert.equal(payload.bio,'Ready for our next road trip!');
     await page.getByText('Ready for our next road trip!',{exact:true}).waitFor();

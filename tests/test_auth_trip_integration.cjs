@@ -18,7 +18,7 @@ async function fixture({confirmation=false}={}){
       closest(){return {classList:{toggle(){}}};},querySelectorAll(){return [];}});
     return fields.get(id);
   };
-  const names=new Map([['driver','Driver One'],['rider','Rider Two']]);
+  const names=new Map([['driver','Driver One'],['rider','Rider Two']]), profileDetails=new Map();
   const account=id=>({id,email:`${id}@byu.edu`});
   global.localStorage=storage(local);
   global.fetch=async(url,options={})=>{
@@ -33,8 +33,13 @@ async function fixture({confirmation=false}={}){
     }
     if(u.pathname.endsWith('/signup')){
       const id=body.email.split('@')[0]; names.set(id,body.data.full_name);
+      profileDetails.set(id, body.data);
       if(confirmation) return reply({user:{...account(id),identities:[{}]}});
       return reply({access_token:`token-${id}`,refresh_token:`refresh-${id}`,expires_in:3600,user:account(id)});
+    }
+    if(u.pathname.endsWith('/user')){
+      if (options.method === 'PUT') profileDetails.set(who, {...profileDetails.get(who), ...body.data});
+      return reply({...account(who), user_metadata:profileDetails.get(who) || {}});
     }
     if(u.pathname.endsWith('/logout')) return reply({});
     if(u.pathname.endsWith('/profiles')) return reply([{id:who,full_name:names.get(who)||'Test Student'}]);
@@ -99,10 +104,18 @@ test('logout cancels an older trip/profile response instead of restoring the old
 test('Robbie signup returns a new account to the requested post screen',async()=>{
   const f=await fixture(); f.run("go('post',{},false); go('signup',{},false);");
   f.get('su-name').value='New Student';f.get('su-email').value='new-driver@byu.edu';f.get('su-pass').value='fake-password1';
+  f.get('su-home').value=' Orem, UT '; f.get('su-bio').value='I like hiking.';
   await f.submit('suForm');await tick();
   assert.equal(f.run('S.screen'),'post');assert.equal(f.run('DB.session.user.id'),'new-driver');
   assert.equal(f.run('fullName(S.me)'),'New Student');
   assert.match(f.get('app').innerHTML,/Choose pickup map pin/);
+  f.run("go('profile',{},false)");
+  assert.match(f.get('app').innerHTML,/Orem, UT/);
+  assert.match(f.get('app').innerHTML,/I like hiking/);
+  await f.run("logOut('bye')"); await f.login('rider');
+  f.run("go('profile',{},false)");
+  assert.doesNotMatch(f.get('app').innerHTML,/Orem, UT|I like hiking/);
+  assert.match(f.get('app').innerHTML,/Not added yet/);
 });
 
 test('signup needing email confirmation stays signed out and preserves the return route',async()=>{

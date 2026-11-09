@@ -151,7 +151,7 @@ async function authFetch(path, body, accessToken, method = 'POST') {
       'Content-Type': 'application/json',
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
-    body: JSON.stringify(body || {}),
+    ...(method === 'GET' ? {} : {body: JSON.stringify(body || {})}),
   });
   const data = await response.json().catch(() => ({}));
   return { response, data };
@@ -180,17 +180,39 @@ export async function updatePassword(accessToken, password) {
   if (!response.ok) throw authError(response, data, 'Could not update the password.');
 }
 
+function profileDetails(user) {
+  const data = user.user_metadata || {};
+  const readText = (value, limit) => typeof value === 'string' ? [...value.trim()].slice(0, limit).join('') : '';
+  return {hometown:readText(data.hometown, 100), bio:readText(data.bio, 160), color:readText(data.avatar_color, 7)};
+}
+
+export async function loadProfileDetails(accessToken) {
+  const {response, data} = await authFetch('user', null, accessToken, 'GET');
+  if (!response.ok) throw authError(response, data, 'Could not load your profile details.');
+  return profileDetails(data);
+}
+
+export async function saveProfileDetails(accessToken, {hometown, bio, color}) {
+  const {response, data} = await authFetch('user', {data:{hometown, bio, avatar_color:color}}, accessToken, 'PUT');
+  if (!response.ok) throw authError(response, data, 'Could not save your profile details.');
+  return profileDetails(data);
+}
+
 // Sign Up. The full name goes into the user's metadata; a database trigger copies it
 // into public.profiles (see supabase/migrations/20261105000100_profiles_auth.sql).
 // Returns {session} when the user is signed in right away, or {needsConfirmation: true}
 // when the project requires email confirmation first.
 // Errors: code 'user_already_exists' (duplicate email) and 'weak_password'.
-export async function signUp(fullName, email, password) {
+export async function signUp(fullName, email, password, {hometown = '', bio = ''} = {}) {
   const redirect = encodeURIComponent(globalThis.location ? location.origin : '');
   const { response, data } = await authFetch(`signup?redirect_to=${redirect}`, {
     email: email.trim().toLowerCase(),
     password,
-    data: { full_name: fullName.trim() },
+    data: {
+      full_name: fullName.trim(),
+      ...(hometown.trim() ? {hometown:hometown.trim()} : {}),
+      ...(bio.trim() ? {bio:bio.trim()} : {}),
+    },
   });
   if (!response.ok) throw authError(response, data, 'Sign-up failed.');
   if (data.access_token) return { session: saveSession(toSession(data)) };

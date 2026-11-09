@@ -63,9 +63,9 @@ test('saved-place selection attaches separate pins, updates starting city, and c
   const {bindLocationPickers}=await import(moduleURL('public/hitch-locations.js'));
   const fields=new Map();
   function element(){return {value:'',textContent:'',innerHTML:'',children:[],listeners:{},isConnected:true,open:true,
-    addEventListener(name,fn){this.listeners[name]=fn;},replaceChildren(){this.children=[];},append(child){this.children.push(child);}};}
+    focus(){},addEventListener(name,fn){this.listeners[name]=fn;},replaceChildren(){this.children=[];},append(...children){this.children.push(...children);}};}
   const get=id=>{if(!fields.has(id)) fields.set(id,element());return fields.get(id);};
-  const originalDocument=global.document;
+  const originalDocument=global.document, originalFetch=global.fetch;
   global.document={createElement:element};
   let changes=0;
   const api={loadLocations:async()=>[{name:'Campus meeting point',city:'Orem',latitude:40.2786,longitude:-111.7187}]};
@@ -81,6 +81,21 @@ test('saved-place selection attaches separate pins, updates starting city, and c
     assert.ok(picker.pins.dropoff); assert.equal(changes,2);
     get('pt-pickup').value='A changed address'; get('pt-pickup').listeners.input();
     assert.equal(picker.pins.pickup,null); assert.ok(picker.pins.dropoff);
+    const response=new Promise(resolve=>{
+      global.fetch=async url=>{
+        assert.equal(new URL(url).searchParams.get('q'),'A changed address');
+        return {ok:true,json:async()=>{
+          resolve();
+          return {features:[{geometry:{type:'Point',coordinates:[-111.6,40.2]},properties:{name:'Library',street:'Main Street',city:'Provo'}}]};
+        }};
+      };
+    });
+    await response; await new Promise(resolve=>setImmediate(resolve));
+    get('pt-pickup-suggestions').children[0].listeners.click();
+    assert.deepEqual(picker.pins.pickup,{lat:40.2,lng:-111.6});
+    assert.equal(get('pt-pickup').value,'Library, Main Street, Provo');
+    assert.equal(get('pt-origin').value,'Provo');
+    assert.equal(get('pt-pickup-suggestions').hidden,true);
     picker.destroy();
-  } finally {global.document=originalDocument;}
+  } finally {global.document=originalDocument;global.fetch=originalFetch;}
 });
