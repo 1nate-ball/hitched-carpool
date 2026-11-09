@@ -596,7 +596,7 @@ const vBadge = u => u.verified === 'verified' ? `<span class="verified">${I.chec
 
 // ---------- navigation ----------
 // Screens that need a signed-in user. Signed out, they send you to Log in and come back after.
-const AUTH_SCREENS = new Set(['mytrips', 'manage', 'post', 'profile', 'edit', 'chat']);
+const AUTH_SCREENS = new Set(['mytrips', 'manage', 'post', 'profile', 'edit', 'chat', 'reset']);
 const PUBLIC_SCREENS = new Set(['login', 'signup']);
 function go(screen, params={}, push=true){
   if (push && !PUBLIC_SCREENS.has(S.screen)) S.hist.push({screen:S.screen, params:S.params});
@@ -1343,6 +1343,7 @@ SCREENS.login = () => `<div class="screen auth-layout">${authArt('login')}<div c
     <div class="alert bad small" id="li-err" role="alert" hidden></div>
     <button class="btn primary block" type="submit" id="li-btn">Log in</button>
   </form>
+  <p class="small" style="text-align:center"><button class="link" data-act="forgot">Forgot password?</button></p>
   <p class="small" style="text-align:center">New to Hitch? <button class="link" data-act="auth" data-to="signup">Create an account</button></p>
   <p class="small" style="text-align:center"><button class="link" data-act="auth" data-to="home">Browse trips without logging in</button></p>
 </div></div>`;
@@ -1364,6 +1365,85 @@ BIND.login = () => {
         : error.status === 429 ? 'Too many attempts. Wait a minute and try again.'
         : "Couldn't reach the sign-in service. Try again.";
       box.hidden = false; btn.disabled = false; btn.textContent = 'Log in';
+    }
+  });
+};
+
+SCREENS.forgot = () => `<div class="screen auth-layout">${authArt('login')}<div class="auth-form">
+  ${authHeader('Rides with BYU students')}
+  <h1>Reset your password</h1>
+  <p>Enter the BYU email you used to sign up.</p>
+  <form id="forgotForm" class="fieldset" novalidate>
+    <div class="field"><label for="forgot-email">BYU email</label><input id="forgot-email" type="email" autocomplete="email" value="${esc(S.loginUser)}" required></div>
+    <div id="forgot-err" class="alert bad small" role="alert" hidden></div>
+    <button id="forgot-btn" class="btn primary block" type="submit">Send reset link</button>
+  </form>
+  <p class="small" style="text-align:center"><button class="link" data-act="auth" data-to="login">Back to log in</button></p>
+</div></div>`;
+BIND.forgot = () => {
+  const $ = id => document.getElementById(id);
+  const emailField = $('forgot-email'), box = $('forgot-err'), btn = $('forgot-btn');
+  emailField.focus();
+  $('forgotForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    if (btn.disabled) return;
+    const email = emailField.value.trim();
+    if (!SCHOOL_EMAIL.test(email)){
+      box.textContent = 'Enter the BYU email you used to sign up.'; box.hidden = false; emailField.focus(); return;
+    }
+    btn.disabled = true; box.hidden = true;
+    try {
+      await (await loadApi()).requestPasswordReset(email);
+      if (S.screen !== 'forgot') return;
+      S.loginUser = email;
+      S.loginNotice = 'If this email has a Hitch account, a password reset link is on its way.';
+      go('login', {}, false);
+    } catch (error) {
+      box.textContent = error.status === 429 ? 'Too many email requests. Wait and try again.' : 'Could not send a reset link. Try again.';
+      box.hidden = false; btn.disabled = false;
+    }
+  });
+};
+
+SCREENS.reset = () => `<div class="screen auth-layout">${authArt('login')}<div class="auth-form">
+  ${authHeader('Rides with BYU students')}
+  <h1>Choose a new password</h1>
+  <form id="resetForm" class="fieldset" novalidate>
+    <div class="field"><label for="reset-pass">New password</label><input id="reset-pass" type="password" autocomplete="new-password" aria-describedby="reset-hint" required><div class="hint" id="reset-hint">At least 8 characters, with a letter and a number.</div></div>
+    <div id="reset-err" class="alert bad small" role="alert" hidden></div>
+    <button id="reset-btn" class="btn primary block" type="submit">Save new password</button>
+  </form>
+  <p class="small" style="text-align:center"><button class="link" data-act="logout">Back to log in</button></p>
+</div></div>`;
+BIND.reset = () => {
+  const $ = id => document.getElementById(id);
+  const field = $('reset-pass'), box = $('reset-err'), btn = $('reset-btn');
+  field.focus();
+  $('resetForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    if (btn.disabled) return;
+    const password = field.value, problem = passwordProblem(password);
+    if (problem){ box.textContent = problem; box.hidden = false; field.focus(); return; }
+    btn.disabled = true; box.hidden = true;
+    const generation = DB.generation;
+    try {
+      const api = await loadApi();
+      const session = await api.getSession();
+      if (generation !== DB.generation) return;
+      if (session && session.user.id !== DB.session?.user.id){
+        box.textContent = 'The signed-in account changed. Open your reset link again or request a new one.';
+        box.hidden = false; btn.disabled = false; return;
+      }
+      if (!session?.recovery) return logOut('This reset link expired. Request a new link with Forgot password.');
+      await api.updatePassword(session.accessToken, password);
+      if (generation !== DB.generation) return;
+      S.loginUser = session.user.email;
+      await logOut('Password updated. Log in with your new password.');
+    } catch (error) {
+      if (generation !== DB.generation) return;
+      if (error.status === 401 || error.status === 403) return logOut('This reset link expired. Request a new link with Forgot password.');
+      box.textContent = ['weak_password', 'same_password'].includes(error.code) ? error.message : 'Could not save your new password. Try again.';
+      box.hidden = false; btn.disabled = false;
     }
   });
 };
@@ -1492,16 +1572,22 @@ async function boot(){
     return;
   }
   // Keep the user signed in across refreshes: the saved Supabase session is reused (and refreshed if needed).
-  let confirmed = null;
+  let emailSession = null;
+  const emailLink = new URLSearchParams(location.hash.slice(1));
+  if (emailLink.has('error_code')) history.replaceState(null, '', location.pathname + location.search);
   try {
     const api = await loadApi();
-    confirmed = await api.sessionFromUrl().catch(() => null); // back from the email confirmation link
+    emailSession = await api.sessionFromUrl().catch(() => null);
     DB.session = await api.getSession();
   } catch (error) { console.warn('Could not check sign-in:', error.message); DB.session = null; }
+  if (DB.session?.recovery){ S.screen = 'reset'; render(); return; }
   if (DB.session){ await loadAccount(); S.screen = lastScreen() || 'home'; }
-  else S.screen = 'login';
+  else {
+    S.screen = 'login';
+    if (emailLink.has('error_code')) S.loginNotice = 'This email link expired or was already used. Log in or request a new reset link.';
+  }
   render();
-  if (confirmed) toast("Email confirmed. You're logged in.");
+  if (emailSession) toast(emailLink.get('type') === 'signup' ? "Email confirmed. You're logged in." : 'Logged in with your email link.');
   if (!DB.session) return;
   // Load trips saved in Supabase. Sample trips still fill the other screens.
   const generation = DB.generation;
@@ -1550,6 +1636,7 @@ document.addEventListener('click', e => {
     case 'logout': logOut("You've been logged out."); break;
     case 'expired': logOut('Your session expired. Log in again to continue.', {screen:S.screen, params:S.params}); break;
     case 'needlogin': S.after = {screen:S.screen, params:S.params}; S.loginNotice = ''; go('login', {}, false); break;
+    case 'forgot': S.loginUser = document.getElementById('li-email').value.trim(); S.loginNotice = ''; go('forgot', {}, false); break;
     case 'auth': S.loginNotice = ''; go(el.dataset.to, {}, false); break;
   }
 });

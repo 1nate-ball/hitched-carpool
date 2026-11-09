@@ -15,7 +15,7 @@ async function helper(handler) {
   global.fetch = async (url, init = {}) => {
     if (url === '/supabase-config.json') return {ok:true, json:async () => ({url:'https://db.test', publishableKey:'pk'})};
     const body = init.body ? JSON.parse(init.body) : undefined;
-    calls.push({url, body});
+    calls.push({url, body, method:init.method, authorization:init.headers?.Authorization});
     const [status, data] = handler(url, body);
     return {ok:status < 300, status, json:async () => data};
   };
@@ -60,6 +60,29 @@ test('log in saves the session, log out clears it and revokes the token', async 
   assert.equal(await api.getSession(), null);
   assert.equal(store.size, 0);
   assert.match(calls.at(-1).url, /\/auth\/v1\/logout/);
+});
+
+test('a password recovery link survives refresh and updates only the authenticated user', async () => {
+  const previousLocation = global.location, previousHistory = global.history;
+  global.location = {origin:'https://hitch.test', pathname:'/', search:'', hash:'#access_token=at&refresh_token=rt&type=recovery&expires_in=1'};
+  global.history = {replaceState(_state, _title, url){ assert.equal(url, '/'); global.location.hash = ''; }};
+  try {
+    const {api, calls} = await helper(url => {
+      if (url.includes('grant_type=refresh_token')) return [200, {...authOk, access_token:'refreshed'}];
+      return [200, authOk.user];
+    });
+    await api.requestPasswordReset(' Jo@BYU.edu ');
+    assert.deepEqual(calls[0].body, {email:'jo@byu.edu'});
+    assert.equal(new URL(calls[0].url).searchParams.get('redirect_to'), 'https://hitch.test');
+    assert.equal((await api.sessionFromUrl()).recovery, true);
+    assert.equal(global.location.hash, '');
+    const session = await api.getSession();
+    assert.equal(session.recovery, true);
+    await api.updatePassword(session.accessToken, 'newpass123');
+    assert.deepEqual(calls.at(-1), {url:'https://db.test/auth/v1/user', body:{password:'newpass123'}, method:'PUT', authorization:'Bearer refreshed'});
+  } finally {
+    global.location = previousLocation; global.history = previousHistory;
+  }
 });
 
 test('expired token refreshes; a rejected refresh signs out; a network drop keeps the session', async () => {
