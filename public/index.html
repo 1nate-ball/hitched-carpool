@@ -759,7 +759,7 @@ SCREENS.detail = () => {
   else action = `<button class="btn primary" data-act="request">Request a seat</button>`;
   return `${topbar('Trip details')}
 <div class="screen">
-  <div class="hero">${art(d.art)}<div class="cap"><div class="small" style="opacity:.85">Provo → </div><h1>${esc(d.name)}</h1></div></div>
+  <div class="hero">${art(d.art)}<div class="cap"><div class="small" style="opacity:.85">${esc(t.origin || 'Provo')} → </div><h1>${esc(d.name)}</h1></div></div>
   ${!isVerified() && !st ? `<div class="alert warn">${I.lock.replace('<svg','<svg width="18" height="18"')}<span>You need a verified ID before you can request a seat. Verification is pending.</span></div>` : ''}
   <div class="card"><h3>Trip</h3>
     <dl class="kv tnum" style="margin:0">

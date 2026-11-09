@@ -50,6 +50,15 @@ test('search uses real time, does not mix sample rows into signed-in results, an
   assert.equal(run('seatsLeft({dbTrip:true,available:2,seats:3,passengers:["me"]})'),2);
 });
 
+test('trip details show the saved starting city',()=>{
+  const code=fs.readFileSync('public/index.html','utf8').match(/<script>([\s\S]*?)<\/script>/)[1].replace(/\nboot\(\);/,'');
+  const c=vm.createContext({console,Date,Intl,setTimeout,clearTimeout,document:{getElementById(){return null;},addEventListener(){}},window:{}});
+  vm.runInContext(code,c);
+  const detail=vm.runInContext("TRIPS.push({...TRIPS[0],id:'saved-ride',origin:'Orem'}); S.params.id='saved-ride'; SCREENS.detail()",c);
+  assert.match(detail,/Orem →/);
+  assert.doesNotMatch(detail,/Provo →/);
+});
+
 test('saved-place selection attaches separate pins, updates starting city, and clears changed addresses',async()=>{
   const {bindLocationPickers}=await import(moduleURL('public/hitch-locations.js'));
   const fields=new Map();
