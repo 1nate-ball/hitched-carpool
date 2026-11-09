@@ -51,7 +51,7 @@ async function fixture({confirmation=false}={}){
     sessionStorage:storage(new Map()),document:{getElementById:get,addEventListener(){},querySelectorAll(){return [];},querySelector(){return get('query-match');}},window:{scrollTo(){}}});
   vm.runInContext(source,context);context.api=api;
   const run=code=>vm.runInContext(code,context);
-  run("DB.api=api; S.me={first:'Jordan',last:'Hale',color:'#3B6EA8',verified:'verified',hometown:'',bio:''};");
+  run("DB.api=api; S.me={first:'Jordan',last:'Hale',color:'#3B6EA8',verified:'verified',hometown:'',bio:''}; openPublishedDialog=t=>{S.dialogTrip=t.id;};");
   const submit=id=>get(id).listeners.submit({preventDefault(){}});
   async function login(id){get('li-email').value=`${id}@byu.edu`;get('li-pass').value='fake-password1';await submit('liForm');await tick();}
   return {run,get,login,submit,api,calls,rows,warnings};
@@ -63,7 +63,7 @@ test('protected post -> Robbie login -> account name -> publish -> logout -> ano
   await f.login('driver');assert.equal(f.run('S.screen'),'post');assert.equal(f.run('fullName(S.me)'),'Driver One');
   const values={'pt-origin':'Orem','pt-dest':'moab','pt-depart':'2099-11-06T16:00','pt-pickup':'UVU','pt-dropoff':'Moab','pt-seats':'3','pt-price':'25'};
   for(const [id,value] of Object.entries(values)) f.get(id).value=value;
-  await f.submit('ptForm');assert.equal(f.run('S.screen'),'manage');
+  await f.submit('ptForm');assert.equal(f.run('S.screen'),'post');assert.equal(f.run('S.dialogTrip'),f.rows[0].id);
   assert.equal(f.rows[0].driver_id,'driver');assert.equal(f.rows[0].origin_city,'Orem');
   assert.equal(f.calls.find(c=>c.body?.destination_id).body.driver_id,undefined);
   await f.run("logOut('Logged out')");assert.equal(f.run('S.screen'),'login');assert.equal(f.run('TRIPS.filter(t=>t.dbTrip).length'),0);

@@ -126,6 +126,7 @@ input[readonly]{background:var(--surface-2);color:var(--muted)}
 .dcard:hover{border-color:var(--muted)}
 .dart{aspect-ratio:16/11;max-width:100%;background:var(--surface-2);position:relative}
 .dart svg{position:absolute;inset:0;width:100%;height:100%}
+.dphoto{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
 .dart .count{position:absolute;left:8px;top:8px}
 .dbody{padding:10px 11px 12px;display:flex;flex-direction:column;gap:3px;min-width:0}
 .dbody h3{font-size:.98rem;line-height:1.2}
@@ -344,6 +345,8 @@ const DESTS = [
   {id:'jackson', name:'Jackson Hole', alias:['jackson'], drive:'4 hr 50 min', est:45, cat:'Ski trips', art:'snow'},
 ];
 const D = id => DESTS.find(d => d.id === id);
+// Real photo over the drawn picture; if the photo is missing, the drawing shows instead.
+const destArt = d => `${art(d.art)}<img class="dphoto" src="images/dest-${d.id}.jpg" alt="" loading="lazy" onerror="this.remove()">`;
 
 const USERS = {
   u1:{first:'Kaylee', last:'Brooks', hometown:'Boise, ID', bio:'Junior in nursing. I head south most weekends and like company on the road.', color:'#3B6EA8', verified:'verified'},
@@ -619,7 +622,7 @@ const SCREENS = {}, BIND = {};
 function destCard(d){
   const n = openTrips(d.id).length;
   return `<button class="dcard" data-act="dest" data-id="${d.id}" aria-label="${esc(d.name)}: ${n} trips available">
-    <div class="dart">${art(d.art)}<span class="count pill ${n?'neutral':'warn'}" style="background:var(--surface)">${n ? `${n} trip${n>1?'s':''}` : 'No trips yet'}</span></div>
+    <div class="dart">${destArt(d)}<span class="count pill ${n?'neutral':'warn'}" style="background:var(--surface)">${n ? `${n} trip${n>1?'s':''}` : 'No trips yet'}</span></div>
     <div class="dbody"><h3>${esc(d.name)}</h3><div class="dmeta">${d.drive} drive</div><div class="dprice tnum">est. ${money(d.est)} <span>/ rider</span></div></div>
   </button>`;
 }
@@ -787,7 +790,7 @@ SCREENS.results = () => {
   const from = S.search.from || (S.me.location === 'allowed' ? 'Current location' : 'Provo');
   return `${topbar(d.name, `${esc(from)} → ${esc(d.name)} · ${S.search.date ? fDate(S.search.date) : 'Any date'}`)}
 <div class="screen">
-  <div class="hero rhero">${art(d.art)}<button class="iconbtn" data-act="back" aria-label="Back">${I.back}</button><div class="cap"><div class="small" style="opacity:.9">${esc(from)} →</div><h1>${esc(d.name)}</h1><div class="small" style="opacity:.9">${S.search.date ? fDate(S.search.date) : 'Any date'}</div></div></div>
+  <div class="hero rhero">${destArt(d)}<button class="iconbtn" data-act="back" aria-label="Back">${I.back}</button><div class="cap"><div class="small" style="opacity:.9">${esc(from)} →</div><h1>${esc(d.name)}</h1><div class="small" style="opacity:.9">${S.search.date ? fDate(S.search.date) : 'Any date'}</div></div></div>
   <div class="row" style="justify-content:space-between"><div class="filters">
     <label class="fdate"><span class="sr-only">Travel date</span><input id="f-date" type="date" value="${esc(S.search.date)}" aria-label="Travel date"></label>
     ${priceSlider()}
@@ -852,7 +855,7 @@ SCREENS.detail = () => {
   else action = `<button class="btn primary" data-act="request">Request a seat</button>`;
   return `${topbar('Trip details')}
 <div class="screen detail-layout">
-  <div class="hero">${art(d.art)}<div class="cap"><div class="small" style="opacity:.85">${esc(t.origin || 'Provo')} → </div><h1>${esc(d.name)}</h1></div></div>
+  <div class="hero">${destArt(d)}<div class="cap"><div class="small" style="opacity:.85">${esc(t.origin || 'Provo')} → </div><h1>${esc(d.name)}</h1></div></div>
   ${!isVerified() && !st ? `<div class="alert warn">${I.lock.replace('<svg','<svg width="18" height="18"')}<span>You need a verified ID before you can request a seat. Verification is pending.</span></div>` : ''}
   <div class="dmain">
   <div class="card"><h3>Trip</h3>
@@ -893,6 +896,37 @@ BIND.detail = () => {
     S.detailLoad = TRIPS.some(x => x.id === id) ? {id, state:'done'} : {id, state:'error', message:error.message};
   }).finally(() => { if (S.screen === 'detail' && S.params.id === id) render(); });
 };
+// Shown after a trip is saved: what was posted, and where to go next.
+function openPublishedDialog(t){
+  if (!t) return toast('Trip published');
+  const d = D(t.dest), back = document.activeElement;
+  const wrap = document.createElement('div');
+  wrap.className = 'scrim';
+  wrap.innerHTML = `<div class="sheet published" role="dialog" aria-modal="true" aria-labelledby="pd-h" aria-describedby="pd-sub">
+    <div class="pd-icon" aria-hidden="true">${I.check}</div>
+    <h2 id="pd-h">Your trip is posted!</h2>
+    <p id="pd-sub" class="muted" style="margin:0">Riders can now find it and request a seat. You'll see requests in My Trips.</p>
+    <dl class="kv tnum" style="margin:0"><dt>To</dt><dd>${esc(d.name)}</dd><dt>Leaves</dt><dd>${fDT(t.depart)}</dd><dt>Pickup</dt><dd>${esc(t.pickup)}</dd><dt>Seats</dt><dd>${t.seats} · ${money(t.price)} each</dd><dt>Return</dt><dd>${t.ret ? fDT(t.ret) : 'One-way'}</dd></dl>
+    <div class="pd-actions"><button class="btn primary" data-x="trips">View my trips</button><button class="btn" data-x="manage">Manage this trip</button><button class="btn" data-x="again">Post another trip</button></div>
+  </div>`;
+  document.body.appendChild(wrap);
+  const first = wrap.querySelector('[data-x="trips"]'); first.focus();
+  const close = () => { wrap.remove(); document.removeEventListener('keydown', onKey); (document.getElementById('pt-dest') || back)?.focus?.(); };
+  const onKey = e => {
+    if (e.key === 'Escape') close();
+    if (e.key === 'Tab'){ // keep keyboard focus inside the window
+      const b = [...wrap.querySelectorAll('button')], i = b.indexOf(document.activeElement);
+      if (e.shiftKey && i <= 0){ e.preventDefault(); b[b.length-1].focus(); } else if (!e.shiftKey && i === b.length-1){ e.preventDefault(); b[0].focus(); }
+    }
+  };
+  document.addEventListener('keydown', onKey);
+  wrap.addEventListener('click', e => {
+    const x = e.target.closest('[data-x]')?.dataset.x;
+    if (e.target === wrap || x === 'again') return close();
+    if (x === 'trips'){ close(); S.tripsTab = 'driver'; go('mytrips'); }
+    if (x === 'manage'){ close(); go('manage', {id:t.id}); }
+  });
+}
 function openRequestDialog(){
   const t = TRIPS.find(x => x.id === S.params.id), d = D(t.dest), u = U(t.driver);
   const wrap = document.createElement('div');
@@ -932,6 +966,23 @@ function openRequestDialog(){
 }
 
 /* Screen 6: My trips / request status */
+// Trips the signed-in user is driving, soonest first (only saved trips once signed in).
+function myDriverTrips(){
+  return TRIPS.filter(t => t.driver === 'me' && (!DB.session || t.dbTrip)).sort((a,b) => parse(a.depart) - parse(b.depart));
+}
+function driverTripCard(t, compact){
+  const d = D(t.dest), pend = t.requests.filter(r => r.status === 'pending').length;
+  return `<div class="mcard${compact ? ' mini' : ''}"><div class="mtop"><div><h3>${esc(d.name)}</h3><div class="small muted tnum">${fDT(t.depart)}</div></div>${pend ? `<span class="pill warn">${pend} pending</span>` : '<span class="pill neutral">No pending</span>'}</div>
+    <div class="small tnum"><b>${seatsLeft(t)}</b> of ${t.seats} seats left · ${money(t.price)} per seat${t.ret ? ' · round trip' : ''}</div>
+    <div class="row"><button class="btn sm primary" data-act="manage" data-id="${t.id}">Manage requests</button>${compact ? `<button class="btn sm" data-act="trip" data-id="${t.id}">View as rider</button>` : `<button class="btn sm" data-act="chat" data-id="${t.id}">Group chat</button>`}</div></div>`;
+}
+function postedTripsSection(){
+  const mine = myDriverTrips();
+  return `<h2 id="pt-mine-h">Your posted trips <span class="muted small" style="font-weight:600">${mine.length ? `· ${mine.length}` : ''}</span></h2>
+    ${mine.length ? `<div class="mine-grid">${mine.map(t => driverTripCard(t, true)).join('')}</div>
+      <button class="link" type="button" data-act="viewmytrips">See everything in My Trips</button>`
+    : `<p class="muted small">Trips you publish show up here, so you can manage requests without leaving this page.</p>`}`;
+}
 SCREENS.mytrips = () => {
   const tab = S.tripsTab;
   let body;
@@ -951,13 +1002,8 @@ SCREENS.mytrips = () => {
         <div class="row" style="justify-content:space-between"><div class="driver">${av(u,28)}<span class="small">${esc(fullName(u))}</span></div><span class="tnum small"><b>${money(t.price)}</b> · ${t.ret?'round trip':'one way'}</span></div>${acts}</div>`;
     }).join('') : `<div class="empty">${I.ticket}<h2>No trips yet</h2><p class="muted small">Seat requests and confirmed rides will show up here.</p><button class="btn primary" data-act="nav" data-to="home">Find a ride</button></div>`;
   } else {
-    const mine = TRIPS.filter(t => t.driver === 'me' && (!DB.session || t.dbTrip)).sort((a,b) => parse(a.depart) - parse(b.depart));
-    body = mine.length ? mine.map(t => {
-      const d = D(t.dest), pend = t.requests.filter(r => r.status === 'pending').length;
-      return `<div class="mcard"><div class="mtop"><div><h3>${esc(d.name)}</h3><div class="small muted tnum">${fDT(t.depart)}</div></div>${pend ? `<span class="pill warn">${pend} pending</span>` : '<span class="pill neutral">No pending</span>'}</div>
-        <div class="small tnum"><b>${seatsLeft(t)}</b> of ${t.seats} seats left · ${money(t.price)} per seat</div>
-        <div class="row"><button class="btn sm primary" data-act="manage" data-id="${t.id}">Manage requests</button><button class="btn sm" data-act="chat" data-id="${t.id}">Group chat</button></div></div>`;
-    }).join('') : `<div class="empty">${I.car}<h2>You haven't posted a trip</h2><p class="muted small">Offer seats in your car and riders can request to join.</p><button class="btn primary" data-act="nav" data-to="post">Post a trip</button></div>`;
+    const mine = myDriverTrips();
+    body = mine.length ? mine.map(t => driverTripCard(t)).join('') : `<div class="empty">${I.car}<h2>You haven't posted a trip</h2><p class="muted small">Offer seats in your car and riders can request to join.</p><button class="btn primary" data-act="nav" data-to="post">Post a trip</button></div>`;
   }
   return `<header class="topbar"><div class="title"><h2>My Trips</h2></div></header>
 <div class="screen">
@@ -1010,6 +1056,7 @@ SCREENS.post = () => {
   <div class="card preview" id="pt-preview"></div>
   <div class="card tips tint-sage" id="pt-tips"></div>
 </aside>
+<section class="pt-mine" id="pt-mine" aria-labelledby="pt-mine-h">${postedTripsSection()}</section>
 </div>${nav()}`;
 };
 // Live preview for the desktop Post a trip layout (display only; does not affect saving)
@@ -1017,7 +1064,7 @@ function postPreview(v){
   const d = D(v.dest), ph = t => `<span class="ph">${t}</span>`;
   const when = v.depart ? fDT(v.depart) : '';
   const seats = +v.seats;
-  return `<div class="dart${d ? '' : ' blank'}">${d ? art(d.art) : RIDGES}<span class="count pill ${v.ret ? 'accent' : 'neutral'}" style="background:var(--surface)">${v.ret ? 'Round trip' : 'One-way'}</span></div>
+  return `<div class="dart${d ? '' : ' blank'}">${d ? destArt(d) : RIDGES}<span class="count pill ${v.ret ? 'accent' : 'neutral'}" style="background:var(--surface)">${v.ret ? 'Round trip' : 'One-way'}</span></div>
   <div class="ttop"><div style="min-width:0"><h3>${d ? esc(d.name) : ph('Choose a destination')}</h3><div class="small muted tnum">${when ? esc(when) : 'Pick a date and time'}</div></div>
     <div class="tprice"><b class="tnum">${+v.price ? money(+v.price) : '$–'}</b><div>per seat</div></div></div>
   <div class="route"><span class="dot"></span><span>${v.pickup ? esc(v.pickup) : ph('Pickup location')}</span><span class="line"></span><span></span><span class="dot end"></span><span>${v.dropoff ? esc(v.dropoff) : ph('Drop-off location')}</span></div>
@@ -1033,6 +1080,12 @@ function postTips(v){
 BIND.post = () => {
   const $ = id => document.getElementById(id);
   const f = $('ptForm'); if (!f) return;
+  // Refresh "Your posted trips" from the database when the page opens (at most every 30 seconds).
+  if (DB.session && Date.now() - (S.postMineAt || 0) > 30000){
+    S.postMineAt = Date.now();
+    loadDbTrips().then(() => { const el = $('pt-mine'); if (el && S.screen === 'post') el.innerHTML = postedTripsSection(); })
+      .catch(error => console.warn('Could not load your trips:', error.message));
+  }
   const refresh = () => {
     if (!$('pt-preview')) return;
     const val = id => $(id).value.trim();
@@ -1134,7 +1187,9 @@ BIND.post = () => {
     if (saved){
       // Success only after the database confirms the row. Navigate with the database UUID.
       const id = typeof saved === 'string' ? saved.slice(6) : upsertTrip(fromRow(saved)).id;
-      go('manage', {id}); toast('Trip published');
+      S.published = id;
+      render(); // fresh empty form, and the new trip appears under "Your posted trips"
+      openPublishedDialog(TRIPS.find(t => t.id === id));
       return;
     }
     dbErr.hidden = false;
