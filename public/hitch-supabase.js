@@ -291,6 +291,15 @@ export async function getSession() {
   }
 }
 
+// Verified = a confirmed byu.edu email (see 20261108000100_driver_verification.sql).
+// Returns {userId: true|false} for up to 200 ids. No emails are returned.
+export async function loadVerification(accessToken, userIds) {
+  const ids = [...new Set(userIds)].slice(0, 200);
+  if (!ids.length) return {};
+  const rows = await request('rpc/verification_status', accessToken, { user_ids: ids });
+  return Object.fromEntries(rows.map(r => [r.user_id, r.is_verified === true]));
+}
+
 // Trip Detail: one trip by id, fresh from the database.
 export async function loadTrip(accessToken, tripId) {
   const rows = await request(`trips?select=*&id=eq.${encodeURIComponent(tripId)}`, accessToken);
