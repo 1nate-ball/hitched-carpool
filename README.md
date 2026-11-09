@@ -49,6 +49,26 @@ sqlite3 data/kr-test.sqlite3 "SELECT * FROM kr_seat_fill_rate; SELECT * FROM kr_
 
 Expected results: one trip at 0.75 (3 of 4 seats), one at 0.3333 (1 of 3 seats, plus a declined request), and an average of 0.5417. The future test trip isn't counted.
 
+**For real trips (Supabase):** the event that fills seats is a driver accepting a seat request on **Manage requests**. [The accept/decline migration](supabase/migrations/20261109000100_accept_decline_requests.sql) adds `kr_seat_fill_rate` and `kr_seat_fill_rate_summary` to Supabase with the same definition (one seat per request). They're private views; read them in the SQL Editor:
+
+```sql
+select * from public.kr_seat_fill_rate_summary;
+```
+
+`avg_fill_rate` is empty until at least one posted trip has departed.
+
+### Accepting and declining seat requests
+
+A driver opens **Manage requests** on their trip (from Trip details or My Trips) and sees each pending request with the rider's name and note. **Accept** or **Decline** saves `ride_requests.status` to Supabase. Accepting lowers the trip's seats left, and when no seats remain the trip drops out of Find Rides search (the `available_trips` view only lists trips with open seats). The rider sees **Seat confirmed** or **Request declined** on My Trips after their next refresh.
+
+The database enforces the rules, not just the buttons:
+
+- Only the trip's driver can change a request, and only its status (not the rider or note).
+- Only pending requests can be decided, once: a declined rider can't be accepted later, or the other way around.
+- A trip can't accept more riders than it has seats. The trip row is locked while checking, so two accepts for the last seat at the same moment can't both succeed.
+
+Locally, `python3 scripts/check_accept_decline_schema.py` runs 18 checks against a throwaway PostgreSQL, including two accepts racing for the last seat, and `node --test tests/test_accept_decline.cjs` checks the Manage requests screen. To check it live, run [the accept/decline check](database/checks/accept_decline_live.sql) in the SQL Editor; it rolls back everything it creates and should end with a `PASS` row.
+
 **Objective 2, Key Result: 50% of drivers post a second trip within 30 days of their first.**
 
 This one uses the Supabase `trips` table, where the Post a Trip form saves trips. Each driver's first and second trips are found by `trips.created_at`. A driver counts as a repeat driver if their second trip was posted no more than 30 days after their first. Only drivers whose first trip was at least 30 days ago are counted, so new drivers who haven't had a full 30 days yet don't pull the rate down.
@@ -67,6 +87,27 @@ select * from public.kr_driver_repeat_rate_summary;
 `repeat_rate` is empty until at least one driver's first trip is 30 days old.
 
 To check the math, paste [the repeat-rate check](database/checks/kr_driver_repeat_rate_seed.sql) into the SQL Editor and run it. It adds four test drivers inside a transaction, checks for 3 eligible drivers, 1 repeat driver, and 33.3%, and then rolls everything back. It should end with a `PASS` row.
+
+**Objective 1, Key Result 2: 100% of posted trips are linked to a signed-in driver account (no anonymous trips).**
+
+A trip is linked when `trips.driver_id` is set and points to a Supabase Auth account. The database guarantees this for every row:
+
+- `driver_id` is `NOT NULL` and is a foreign key to `auth.users`, so a trip can't be saved without a real account, even from the SQL Editor.
+- Signed-out visitors have no access to `trips`. Signed-in users can post only as themselves (`driver_id = auth.uid()`), which the app fills in from the session.
+- `driver_id` can't be changed after posting, and an account that has trips can't be deleted, so a trip never loses its driver.
+
+These rules come from the [Post a Trip](supabase/migrations/20261027000100_post_a_trip.sql) and [Sprint 2](supabase/migrations/20261106000100_trip_locations_search_ownership.sql) migrations. [The KR2 migration](supabase/migrations/20261108000200_kr_trips_linked_to_driver.sql) adds two private views to track it:
+
+- `kr_trip_driver_link` has one row per trip: `trip_id`, `driver_id`, `created_at`, and `is_linked`.
+- `kr_trip_driver_link_summary` has one row: `trips`, `linked_trips`, and `linked_rate` (a percent).
+
+To check the current number, run this in the Supabase SQL Editor:
+
+```sql
+select * from public.kr_trip_driver_link_summary;
+```
+
+To check the rules live, paste [the trip-driver check](database/checks/trip_driver_link_live.sql) into the SQL Editor. It tries to post anonymous, ownerless, and reassigned trips inside a transaction, expects each to be refused, and rolls everything back. It should end with a `PASS` row. Locally, `python3 scripts/check_trip_driver_link_schema.py` runs 17 checks against a throwaway PostgreSQL.
 
 ## Accounts: Sign Up, Log In, Log Out
 
@@ -152,7 +193,7 @@ To set it up (one time):
 1. Sign in at [render.com](https://render.com) with GitHub and choose **New → Web Service**.
 2. Connect the `1nate-ball/hitched-carpool` repository and choose the `main` branch.
 3. Use these settings:
-   - **Name:** `hitch-carpool`. If the name is taken, update the Live site link above to the URL Render gives you.
+   - **Name:** `hitched-carpool`. If the name is taken, update the Live site link above to the URL Render gives you.
    - **Language:** Python 3
    - **Build Command:** `python3 --version` (there is nothing to install)
    - **Start Command:** `python3 server.py`
@@ -173,3 +214,21 @@ If a network response is lost, we check for the saved trip. If we cannot confirm
 Run `node --test tests/test_post_trip.cjs` for the form regression checks. These use a simulated database API to check date/time conversion, validation, save confirmation, duplicate submission prevention, and account switching. They do not replace testing with two real Supabase test accounts.
 
 Run `python3 scripts/check_supabase_connection.py` to check the project connection and confirm signed-out access stays blocked. The connection file contains only a publishable key, never a database password or secret key.
+
+
+## Sprint 2: driver ownership, ride search, and map pins
+
+We added a starting city to posted trips. From/To searches now query saved future trips by city and destination; signed-in search results show database trips. The open-seat count includes all accepted requests without exposing other riders' names or notes. Drivers can update only their own trips, and the browser cannot change a trip's driver ID.
+
+Pickup and arrival each have a searchable list of 13 meeting places and a map. Choose a saved place, click the map, or pan with the keyboard and use the map center. Keep a clear meeting address in the text field. Selected coordinates are saved with the trip and can be opened from Trip Detail after reloading. Typed addresses still work when a map is unavailable. The arrival point is separate from the optional return date/time.
+
+We use [Leaflet 1.9.4](https://leafletjs.com/examples-v1/quick-start/) and [OpenStreetMap tiles](https://operations.osmfoundation.org/policies/tiles/) with visible attribution and normal browser caching. There is no map API key or new paid project. The starter places are approximate meeting areas; move the pin to the agreed pickup spot. This is a small class-demo catalog, not worldwide address autocomplete.
+
+The new schema is in `supabase/migrations/20261106000100_trip_locations_search_ownership.sql`. It and the previously merged seat-request migration were applied to the existing Hitch project through SQL Editor on November 6. Don't rerun either migration against these tables. Existing trips default to Provo because the original demo used BYU pickups; those older trips have no map coordinates.
+
+Checks: `node --test tests/*.cjs`, `python3 -m unittest discover -s tests -v`, and `python3 scripts/check_sprint2_schema.py` (local PostgreSQL 18). `database/checks/sprint2_live.sql` checks database permissions and constraints inside a rollback transaction.
+
+We also tested with two disposable accounts in a fresh local Supabase instance. Both accounts signed up and confirmed by email. The driver logged in, published a round trip with two pins and a one-way trip with typed addresses, and found the trips again after refreshing. The rider found the correct trip by starting city, destination, and date, and their pending seat request stayed in My Trips after refreshing. We checked the trip form and details at phone width, including opening the map picker from the keyboard.
+
+
+PR #12 now includes Robbie's signup/login flow. A signed-out visitor going to Post a Trip logs in (or signs up), then returns to that form with their account name. Background requests from a previous login are discarded after logout or account switching. The combined form/API tests are in `tests/test_auth_trip_integration.cjs`; they use a fake Auth/Data API, not real test accounts. GitHub runs all JavaScript and Python checks on pull requests as well as main. The demo recording is published to main only on main-branch runs.

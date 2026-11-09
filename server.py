@@ -57,11 +57,22 @@ class Handler(BaseHTTPRequestHandler):
             body=(ROOT/'public/index.html').read_bytes()
             self.send_response(200); self.send_header('Content-Type','text/html; charset=utf-8')
             self.send_header('Content-Length',str(len(body))); self.end_headers(); self.wfile.write(body)
-        elif self.path in ('/supabase-config.json', '/hitch-supabase.js', '/hitch.css'):
+        elif self.path in ('/supabase-config.json', '/hitch-supabase.js', '/hitch-locations.js', '/hitch.css'):
             body=(ROOT/'public'/self.path.lstrip('/')).read_bytes()
             content_type={'.json':'application/json','.css':'text/css; charset=utf-8'}.get(Path(self.path).suffix,'text/javascript')
             self.send_response(200); self.send_header('Content-Type',content_type)
             self.send_header('Cache-Control','no-store')
+            self.send_header('Content-Length',str(len(body))); self.end_headers(); self.wfile.write(body)
+        elif self.path.startswith('/images/'):
+            # Photos in public/images (jpg, png, webp). Only plain file names, so nothing outside the folder can be read.
+            name=self.path[len('/images/'):].split('?')[0]
+            types={'.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.webp':'image/webp'}
+            file=ROOT/'public'/'images'/name
+            if '/' in name or '\\' in name or name.startswith('.') or Path(name).suffix.lower() not in types or not file.is_file():
+                return self.send_json(404,{'error':'Not found'})
+            body=file.read_bytes()
+            self.send_response(200); self.send_header('Content-Type',types[Path(name).suffix.lower()])
+            self.send_header('Cache-Control','public, max-age=3600')
             self.send_header('Content-Length',str(len(body))); self.end_headers(); self.wfile.write(body)
         else: self.send_json(404,{'error':'Not found'})
 

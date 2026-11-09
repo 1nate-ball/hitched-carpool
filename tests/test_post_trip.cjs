@@ -25,7 +25,7 @@ function fixture() {
   });
   vm.runInContext(source, context); // also catches inline-script syntax errors
   const run = code => vm.runInContext(code, context);
-  run("S.me = {first:'Demo',last:'Driver',color:'#3B6EA8',verified:'verified'}; go = (screen,params) => {S.screen=screen; S.params=params;}; toast = msg => {S.notice=msg;};");
+  run("S.me = {first:'Demo',last:'Driver',color:'#3B6EA8',verified:'verified'}; go = (screen,params) => {S.screen=screen; S.params=params;}; toast = msg => {S.notice=msg;}; openPublishedDialog = t => {S.notice='Trip published'; S.dialogTrip=t.id;};");
   const session = {accessToken:'test-token',user:{id:'driver-a'}};
   const rows = [];
   context.api = {getSession:async()=>session, loadTrips:async()=>rows, publishTrip:async(token,payload)=>{
@@ -33,7 +33,7 @@ function fixture() {
     const row = {id:'saved-trip',driver_id:session.user.id,...payload}; rows.push(row); return row;
   },loadMyRequests:async()=>[],signOut(){}};
   run('DB.api = api;');
-  get('pt-dest').value='moab'; get('pt-depart').value='2099-11-06T16:00';
+  get('pt-origin').value='Provo'; get('pt-dest').value='moab'; get('pt-depart').value='2099-11-06T16:00';
   get('pt-pickup').value='Helaman Halls'; get('pt-dropoff').value='Moab Main Street';
   get('pt-seats').value='3'; get('pt-price').value='25';
   run('BIND.post();');
@@ -67,7 +67,7 @@ test('save waits for confirmation and suppresses concurrent submissions',async()
   const pending=f.submit(); await new Promise(r=>setImmediate(r));
   await f.submit(); assert.equal(calls,1); assert.notEqual(f.run('S.notice'),'Trip published');
   resolve(); await pending;
-  assert.equal(f.run('S.notice'),'Trip published'); assert.equal(f.run('S.params.id'),'saved-trip');
+  assert.equal(f.run('S.notice'),'Trip published'); assert.equal(f.run('S.published'),'saved-trip'); assert.equal(f.run('S.dialogTrip'),'saved-trip');
   assert.equal(f.rows[0].departure_at,'2099-11-06T16:00:00-07:00'); assert.equal(f.rows[0].return_at,null);
   await f.run('loadDbTrips()'); assert.equal(f.run("TRIPS.filter(t=>t.dbTrip).length"),1);
 });

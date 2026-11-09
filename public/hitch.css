@@ -125,6 +125,11 @@ a{color:var(--accent)}
 .ridge-hero > :not(svg){position:relative}
 .ridge-hero h1{font-size:2.1rem;line-height:1.06;max-width:14ch;letter-spacing:-.03em}
 .ridge-hero p{color:var(--hero-sub);font-size:1rem;max-width:30ch}
+/* Real photo behind the Explore banner (falls back to the drawn ridges if missing) */
+.hero-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 25%}
+.ridge-hero:has(.hero-photo)::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(10,16,14,.55) 0%,rgba(10,16,14,.2) 55%,rgba(10,16,14,.05) 100%)}
+.ridge-hero:has(.hero-photo) > h1,.ridge-hero:has(.hero-photo) > p{z-index:1;color:#fff;text-shadow:0 1px 12px rgba(0,0,0,.35)}
+.ridge-hero > .hero-photo{position:absolute}
 .ridge-hero + .searchcard{margin-top:-60px;position:relative;z-index:1;box-shadow:var(--shadow-lift)}
 .r-sun{fill:var(--sun)} .r-1{fill:var(--ridge-1)} .r-2{fill:var(--ridge-2)} .r-3{fill:var(--ridge-3)}
 
@@ -258,6 +263,10 @@ textarea{border-radius:16px}
 .dbody h3,.mcard h3,.tcard h3,.preview h3,.hero .cap h1{overflow-wrap:anywhere;hyphens:auto;text-wrap:balance}
 .dbody{flex:1}
 .dprice{margin-top:auto}
+/* Safari: never let the picture shrink (it was collapsing to zero height, so the
+   trip count sat on top of the destination name). */
+.dart{flex:none;width:100%;min-height:96px}
+.dcard{align-items:stretch}
 /* Trip detail banner grows with the name instead of letting it spill off the top */
 .hero{display:flex;align-items:flex-end;aspect-ratio:auto;min-height:clamp(180px,44vw,300px)}
 .hero .cap{position:relative;flex:1;padding-top:40px}
@@ -281,4 +290,80 @@ textarea{border-radius:16px}
   .filters{position:relative}
   .pfwrap{position:static}
   .pricefilter{left:0;right:0;width:auto}
+}
+
+/* Meeting-place selection */
+.location-picker{margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:12px}
+.location-picker summary{cursor:pointer;font-weight:650;padding:5px 0}
+.location-map{height:250px;border-radius:10px;background:#eef2ef;margin:10px 0;z-index:0}
+.place-options{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;max-height:170px;overflow:auto}
+.location-picker input{width:100%}
+.location-picker .leaflet-control-attribution{font-size:11px;color:#333}
+
+/* ---------- Results + Trip Detail fill the screen on desktop ---------- */
+.rlist{display:flex;flex-direction:column;gap:12px}
+.desk-nav,.booking{display:none}
+@media (min-width:960px){
+  .app[data-screen="results"] .screen,.app[data-screen="detail"] .screen{max-width:1440px}
+  .rlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:20px;align-items:start}
+  .desk-nav{display:contents}
+  .app[data-screen="detail"] .actionbar{display:none}
+  .screen.detail-layout{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:24px 40px;align-items:start}
+  .detail-layout > .hero,.detail-layout > .alert{grid-column:1/-1}
+  .detail-layout > .hero{min-height:300px}
+  .app[data-screen="results"] .screen > .row{flex-wrap:nowrap}
+  .app[data-screen="results"] .screen > .row > .btn{flex:0 0 auto;margin-left:auto}
+  .detail-layout > .hero .cap h1{font-size:2.6rem}
+  .dmain{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-content:start}
+  .dmain > .card:first-child{grid-column:1/-1}
+  .booking{display:flex;flex-direction:column;gap:14px;position:sticky;top:96px;padding:24px;box-shadow:var(--shadow-lift)}
+  .booking .bk-price{font-family:var(--f-display);font-size:1.8rem;font-weight:800}
+  .booking .btn{width:100%;min-height:52px}
+}
+@media (max-width:959px){ .dmain{display:flex;flex-direction:column;gap:18px} }
+
+/* ---------- Results banner, helper tile, Log in / Sign up picture panel ---------- */
+.rhero{display:none}
+.tile{border-radius:var(--r);padding:20px;display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+.tile svg{color:var(--accent)}
+.tile.tint-sage svg{color:var(--brand)}
+.tile p{margin:0;color:var(--ink)}
+.auth-art{display:none}
+@media (min-width:960px){
+  .app[data-screen="results"] > .topbar{display:none}
+  .rhero{display:flex;position:relative;min-height:240px;margin-bottom:4px}
+  .rhero > .iconbtn{position:absolute;top:16px;left:16px;z-index:2;background:var(--surface)}
+  .rhero .cap h1{font-size:2.6rem}
+  .rlist > :not(.tcard):not(.tile){grid-column:1/-1}
+  .tile{align-self:stretch;justify-content:center;padding:28px}
+
+  .app[data-screen="login"] .screen,.app[data-screen="signup"] .screen{max-width:1200px;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:56px;align-items:center;padding-top:40px}
+  .auth-art{display:flex;position:relative;overflow:hidden;min-height:560px;border-radius:28px;background:var(--sky);padding:48px}
+  .auth-art svg{position:absolute;inset:0;width:100%;height:100%}
+  .auth-art .rg-phone{display:none}
+  .auth-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 72%}
+  .auth-art:has(.auth-photo)::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,16,14,.62) 0%,rgba(10,16,14,.25) 45%,rgba(10,16,14,0) 70%)}
+  .auth-art:has(.auth-photo) .auth-copy{z-index:1}
+  .auth-art:has(.auth-photo) .auth-copy h2,.auth-art:has(.auth-photo) .auth-copy p{color:#fff;text-shadow:0 1px 12px rgba(0,0,0,.35)}
+  .auth-copy{position:relative;display:flex;flex-direction:column;gap:12px;max-width:30rem}
+  .auth-copy h2{font-size:2.8rem;line-height:1.05;letter-spacing:-.03em}
+  .auth-copy p{font-size:1.1rem;color:var(--hero-sub);margin:0}
+  .auth-form{display:flex;flex-direction:column;gap:18px;max-width:440px;width:100%}
+}
+
+/* ---------- Post a trip: your posted trips + "trip posted" window ---------- */
+.pt-mine{display:flex;flex-direction:column;gap:12px;border-top:1px solid var(--line);padding-top:20px}
+.pt-mine h2{font-size:1.3rem}
+.mine-grid{display:grid;grid-template-columns:1fr;gap:12px}
+.mcard.mini{gap:8px}
+.mcard.mini .row .btn{white-space:nowrap;flex:1 1 auto}
+.pt-mine > .link{align-self:flex-start}
+.sheet.published{gap:14px}
+.pd-icon{width:52px;height:52px;border-radius:50%;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center}
+.pd-icon svg{width:28px;height:28px}
+.pd-actions{display:flex;flex-wrap:wrap;gap:10px}
+.pd-actions .btn{flex:1 1 160px}
+@media (min-width:960px){
+  .post-layout > .pt-mine{grid-column:1}
+  .mine-grid{grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
 }
