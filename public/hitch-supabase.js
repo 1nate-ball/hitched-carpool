@@ -10,11 +10,11 @@ async function config() {
   return configuration;
 }
 
-async function request(path, accessToken, payload) {
+async function request(path, accessToken, payload, method) {
   if (!accessToken) throw new Error('Sign in before using the Hitch database.');
   const { url, publishableKey } = await config();
   const response = await fetch(`${url}/rest/v1/${path}`, {
-    method: payload ? 'POST' : 'GET',
+    method: method || (payload ? 'POST' : 'GET'),
     headers: {
       apikey: publishableKey,
       Authorization: `Bearer ${accessToken}`,
@@ -43,20 +43,26 @@ export function loadTrips(accessToken) {
 
 // Find Rides: the database does the filtering (destination, date window, max price).
 // Only future trips come back. `fromIso`/`toIso` are UTC ISO strings; `maxPrice` is whole dollars.
-export function searchTrips(accessToken, { destinationId, fromIso, toIso, maxPrice } = {}) {
+export function searchTrips(accessToken, { destinationId, fromCity, fromIso, toIso, maxPrice } = {}) {
   const q = ['select=*', 'order=departure_at', 'limit=100'];
   if (destinationId) q.push(`destination_id=eq.${encodeURIComponent(destinationId)}`);
   q.push(`departure_at=gte.${encodeURIComponent(fromIso || new Date().toISOString())}`);
   if (toIso) q.push(`departure_at=lt.${encodeURIComponent(toIso)}`);
+  if (fromCity) q.push(`origin_city=ilike.${encodeURIComponent(fromCity.trim().replace(/[\%_*]/g, ''))}`);
   if (maxPrice) q.push(`price_per_seat=lte.${Number(maxPrice)}`);
-  return request(`trips?${q.join('&')}`, accessToken);
+  return request(`available_trips?${q.join('&')}`, accessToken);
+}
+
+export function loadLocations(accessToken) {
+  return request('locations?select=id,name,city,latitude,longitude&order=name&limit=200', accessToken);
 }
 
 export async function publishTrip(accessToken, fields) {
   // Identity, UUID and creation timestamp come from the database.
   const payload = Object.fromEntries([
     'destination_id', 'departure_at', 'pickup_location', 'dropoff_location',
-    'total_seats', 'price_per_seat', 'return_at',
+    'total_seats', 'price_per_seat', 'return_at', 'origin_city',
+    'pickup_latitude', 'pickup_longitude', 'dropoff_latitude', 'dropoff_longitude',
   ].filter(key => fields[key] !== undefined).map(key => [key, fields[key]]));
   const rows = await request('trips?select=*', accessToken, payload);
   if (!Array.isArray(rows) || !rows[0]?.id) throw new Error('Could not confirm the saved trip.');
@@ -74,6 +80,38 @@ export async function requestSeat(accessToken, tripId, note = '') {
 // The signed-in rider's own requests (RLS also lets drivers read requests on their trips; filter those out).
 export function loadMyRequests(accessToken, riderId) {
   return request(`ride_requests?select=trip_id,status,note,created_at&rider_id=eq.${encodeURIComponent(riderId)}`, accessToken);
+}
+
+// ---------- Driver: accept or decline seat requests ----------
+const inList = ids => `(${[...new Set(ids)].map(encodeURIComponent).join(',')})`;
+
+// Every request on the given trips. RLS returns only trips the signed-in user drives.
+export function loadTripRequests(accessToken, tripIds) {
+  if (!tripIds.length) return Promise.resolve([]);
+  return request(`ride_requests?select=id,trip_id,rider_id,note,status,created_at&trip_id=in.${inList(tripIds)}&order=created_at`, accessToken);
+}
+
+// Names for riders/drivers. Emails are never readable through the API.
+export function loadProfiles(accessToken, userIds) {
+  if (!userIds.length) return Promise.resolve([]);
+  return request(`profiles?select=id,full_name&id=in.${inList(userIds)}`, accessToken);
+}
+
+// Seats left per trip, counting accepted requests. Full or departed trips aren't returned.
+export async function loadSeatsAvailable(accessToken, tripIds) {
+  if (!tripIds.length) return {};
+  const rows = await request(`available_trips?select=id,seats_available&id=in.${inList(tripIds)}`, accessToken);
+  return Object.fromEntries(rows.map(r => [r.id, r.seats_available]));
+}
+
+// status: 'accepted' or 'declined'. The database allows this only for the trip's driver, only on
+// pending requests, and refuses an accept when the trip is full (23514, "This trip is full.").
+export async function decideRequest(accessToken, requestId, status) {
+  const rows = await request(`ride_requests?id=eq.${encodeURIComponent(requestId)}&select=id,status`, accessToken, { status }, 'PATCH');
+  if (!Array.isArray(rows) || rows[0]?.status !== status) {
+    const error = new Error('Only the driver can respond to this request.'); error.code = '42501'; throw error;
+  }
+  return rows[0];
 }
 
 // ---------- Supabase Auth (email + password) ----------
@@ -192,6 +230,12 @@ export async function getSession() {
     if (error.status === 400 || error.status === 401) signOut();
     return null;
   }
+}
+
+// Trip Detail: one trip by id, fresh from the database.
+export async function loadTrip(accessToken, tripId) {
+  const rows = await request(`trips?select=*&id=eq.${encodeURIComponent(tripId)}`, accessToken);
+  return rows[0] || null;
 }
 
 // The signed-in user's row in public.profiles (created at sign-up).
