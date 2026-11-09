@@ -1,6 +1,8 @@
 <!doctype html>
 <html lang="en">
 <head>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
@@ -391,8 +393,10 @@ const S = {
   filters:{max:'', round:false}, dbSearch:{key:'', state:'idle', ids:[]}, dbBase:{key:'', ids:[]}, tripsTab:'rider', homeLoaded:false, loginNotice:'', loginUser:'', after:null,
 };
 
+let cleanupLocationPickers = () => {};
+
 // ---------- Supabase: Post a Trip ----------
-const DB = {session:null, api:null, profile:null};
+const DB = {session:null, api:null, profile:null, generation:0};
 const loadApi = async () => DB.api || (DB.api = await import('/hitch-supabase.js'));
 const DB_DRIVER = {first:'Hitch', last:'driver', hometown:'', bio:'', color:'#3B6EA8', verified:'pending'};
 function fromRow(r){ // Supabase trips row -> the trip shape the screens already use
@@ -401,7 +405,10 @@ function fromRow(r){ // Supabase trips row -> the trip shape the screens already
   return {id:r.id, dest:r.destination_id, driver, depart:denverWall(new Date(r.departure_at)),
     ret:r.return_at ? denverWall(new Date(r.return_at)) : null, seats:r.total_seats, price:r.price_per_seat,
     pickup:r.pickup_location, dropoff:r.dropoff_location, vehicle:null, // no vehicle column yet: hide the line
-    passengers:[], requests:[], departureAt:r.departure_at, dbTrip:true}; // passengers/requests stay empty until ride requests are real
+    passengers:[], requests:[], departureAt:r.departure_at, origin:r.origin_city || 'Provo',
+    pickupPin:r.pickup_latitude == null ? null : {lat:r.pickup_latitude,lng:r.pickup_longitude},
+    dropoffPin:r.dropoff_latitude == null ? null : {lat:r.dropoff_latitude,lng:r.dropoff_longitude},
+    available:r.seats_available, dbTrip:true}; // passengers/requests stay empty until ride requests are real
 }
 function upsertTrip(t){
   const i = TRIPS.findIndex(x => x.id === t.id);
@@ -410,19 +417,26 @@ function upsertTrip(t){
   return t;
 }
 async function loadDbTrips(){ // saved trips come back after a reload instead of resetting to the sample list
+  const generation = DB.generation;
   const api = await loadApi();
-  DB.session = await api.getSession();
+  const session = await api.getSession();
+  if (generation !== DB.generation) return [];
+  DB.session = session;
   clearDbTrips(); // never retain a prior account's "me" mapping after switching accounts
   if (!DB.session) return [];
   const rows = await api.loadTrips(DB.session.accessToken);
+  if (generation !== DB.generation) return [];
   const trips = rows.map(r => upsertTrip(fromRow(r)));
   await loadMyDbRequests(api);
   return trips;
 }
 async function loadMyDbRequests(api){ // attach the signed-in rider's saved requests so Trip Detail shows "Request sent"
+  const generation = DB.generation, session = DB.session;
+  if (!session) return;
   let rows;
-  try { rows = await api.loadMyRequests(DB.session.accessToken, DB.session.user.id); }
+  try { rows = await api.loadMyRequests(session.accessToken, session.user.id); }
   catch (error) { console.warn('Could not load seat requests:', error.message); return; } // the database still blocks duplicates
+  if (generation !== DB.generation) return;
   for (const r of rows){
     const t = TRIPS.find(x => x.dbTrip && x.id === r.trip_id); if (!t) continue;
     if (r.status === 'accepted'){ if (!t.passengers.includes('me')) t.passengers.push('me'); t.requests = []; }
@@ -457,6 +471,7 @@ async function sendSeatRequest(t, note){
   }
 }
 function clearDbTrips(){
+  S.dbSearch = {key:'',state:'idle',ids:[]}; S.dbBase = {key:'',ids:[]};
   for (let i = TRIPS.length - 1; i >= 0; i--) if (TRIPS[i].dbTrip){
     delete CHATS[TRIPS[i].id];
     TRIPS.splice(i, 1);
@@ -471,7 +486,7 @@ function dbErrorMessage(error){
 }
 const U = id => id === 'me' ? S.me : USERS[id];
 const fullName = u => `${u.first} ${u.last}`;
-const seatsLeft = t => t.seats - t.passengers.length;
+const seatsLeft = t => t.dbTrip && Number.isInteger(t.available) ? t.available : t.seats - t.passengers.length;
 function myStatus(t){
   if (t.driver === 'me') return 'driver';
   if (t.passengers.includes('me')) return 'confirmed';
@@ -547,9 +562,9 @@ SCREENS.home = () => {
 <div class="screen">
   <section class="ridge-hero">${RIDGES}<h1>Hitch a ride this weekend.</h1><p>Split the drive with BYU students already heading your way.</p></section>
   <form class="searchcard" id="searchForm" novalidate role="search">
+    <label class="sfield"><span class="tag">From</span><input id="s-from" type="text" maxlength="80" placeholder="e.g. Provo" value="${esc(S.search.from)}" aria-label="Starting city (optional)">${I.pin}</label>
     <label class="sfield"><span class="tag">To</span><input id="s-dest" type="text" list="destlist" placeholder="Search a destination" value="${esc(S.search.dest)}" aria-label="Destination">${I.search}</label>
     <datalist id="destlist">${DESTS.map(d=>`<option value="${esc(d.name)}">`).join('')}</datalist>
-    <label class="sfield"><span class="tag">From</span><input id="s-from" type="text" placeholder="${loc ? 'Current location' : 'Type your starting point'}" value="${esc(S.search.from)}" aria-label="Starting location (optional)">${I.pin}</label>
     <label class="sfield"><span class="tag">Date</span><input id="s-date" type="date" value="${esc(S.search.date)}" aria-label="Travel date (optional)"></label>
     <div class="err" id="s-err"></div>
     <button class="btn primary block" type="submit">${I.search.replace('<svg','<svg width="18" height="18"')}Search rides</button>
@@ -592,7 +607,7 @@ function tripCard(t){
 function resultsList(){
   const d = D(S.params.dest), {max, round} = S.filters, q = S.dbSearch;
   // Sample trips are filtered here; saved trips are filtered by the database (see searchDbTrips).
-  let list = openTrips(d.id).filter(t => !t.dbTrip);
+  let list = DB.session ? [] : openTrips(d.id).filter(t => !t.dbTrip && (!S.search.from || (t.origin || 'Provo').toLowerCase() === S.search.from.toLowerCase()));
   if (S.search.date) list = list.filter(t => t.depart.slice(0,10) === S.search.date);
   if (max) list = list.filter(t => t.price <= +max);
   const fromDb = q.state === 'done' ? q.ids.map(id => TRIPS.find(t => t.id === id)).filter(t => t && seatsLeft(t) > 0) : [];
@@ -600,15 +615,16 @@ function resultsList(){
   if (round) list = list.filter(t => !!t.ret);
   if (q.state === 'loading') return `<p class="small muted" role="status">Searching saved trips…</p>`;
   list.sort((a,b) => parse(a.depart) - parse(b.depart));
+  if (q.state === 'error') return `<div class="alert bad" role="alert">Could not load saved trips. <button class="btn sm" data-act="retrysearch">Try again</button></div>`;
   if (!list.length) return `<div class="empty">${I.road}<h2>No rides found</h2><p class="muted small">No trips to ${esc(d.name)}${S.search.date ? ` on ${fDate(S.search.date)}` : ''} match your search${max||round?' and filters':''}. Try a different date or destination${max||round?', or clear your filters':''}.</p><div class="row" style="width:100%">${max||round?'<button class="btn" data-act="clearf">Clear filters</button>':''}<button class="btn primary" data-act="change">Change search</button></div></div>`;
-  const note = q.state === 'error' ? `<div class="alert warn small" role="status">Couldn't reach the trip database, so only sample trips are shown. Try again in a moment.</div>`
-    : q.state === 'signedout' ? `<p class="small muted">Showing sample trips. <button class="link" data-act="needlogin">Log in</button> to include trips other students have posted.</p>` : '';
+  const note = q.state === 'signedout' ? `<p class="small muted">Showing sample trips. <button class="link" data-act="needlogin">Log in</button> to include trips other students have posted.</p>` : '';
   return note + `<p class="small muted" role="status">${list.length} trip${list.length>1?'s':''} · earliest departure first</p>` + list.map(tripCard).join('');
 }
 // Ask Supabase for this destination's trips matching the current date and max-price filters.
 async function searchDbTrips(){
+  const generation = DB.generation;
   const dest = S.params.dest, date = S.search.date, max = S.filters.max;
-  const key = [dest, date, max].join('|');
+  const key = [dest, date, max, S.search.from].join('|');
   S.dbSearch = {key, state:'loading', ids:[]};
   const show = () => {
     if (S.screen !== 'results' || S.dbSearch.key !== key) return;
@@ -625,23 +641,26 @@ async function searchDbTrips(){
   show();
   try {
     const api = await loadApi();
-    DB.session = await api.getSession();
-    if (!DB.session){ if (S.dbSearch.key === key) S.dbSearch = {key, state:'signedout', ids:[]}; return show(); }
+    const session = await api.getSession();
+    if (generation !== DB.generation) return;
+    DB.session = session;
+    if (!DB.session){ clearDbTrips(); S.dbSearch = {key, state:'signedout', ids:[]}; return show(); }
     let fromIso = new Date().toISOString(), toIso;
     if (date){
       const start = denverISO(`${date}T00:00`), next = new Date(`${date}T12:00:00Z`); next.setUTCDate(next.getUTCDate() + 1);
       const end = denverISO(`${next.toISOString().slice(0,10)}T00:00`);
-      if (!start.error && start.iso > fromIso) fromIso = start.iso;
+      if (!start.error && start.ms > new Date(fromIso).getTime()) fromIso = start.iso;
       if (!end.error) toIso = end.iso;
     }
-    const baseKey = [dest, date].join('|');
+    const identity = DB.session.user.id;
+    const baseKey = [dest, date, S.search.from].join('|');
     const [rows, base] = await Promise.all([
-      api.searchTrips(DB.session.accessToken, {destinationId:dest, fromIso, toIso, maxPrice:max}),
+      api.searchTrips(DB.session.accessToken, {destinationId:dest, fromCity:S.search.from, fromIso, toIso, maxPrice:max}),
       // Same search at any price, so the price slider can show a live count while dragging.
-      S.dbBase.key === baseKey ? null : api.searchTrips(DB.session.accessToken, {destinationId:dest, fromIso, toIso}),
+      S.dbBase.key === baseKey ? null : api.searchTrips(DB.session.accessToken, {destinationId:dest, fromCity:S.search.from, fromIso, toIso}),
     ]);
+    if (S.dbSearch.key !== key || DB.session?.user.id !== identity) return;
     if (base) S.dbBase = {key:baseKey, ids:base.map(r => upsertTrip(fromRow(r)).id)};
-    if (S.dbSearch.key !== key) return; // a newer search replaced this one
     S.dbSearch = {key, state:'done', ids:rows.map(r => upsertTrip(fromRow(r)).id)};
   } catch (error) {
     console.warn('Trip search failed:', error.message);
@@ -656,8 +675,8 @@ function priceCeiling(){
 }
 function priceSet(){ // trips for this destination + date at any price (sample trips + saved trips)
   const d = S.params.dest, date = S.search.date;
-  const samples = openTrips(d).filter(t => !t.dbTrip && (!date || t.depart.slice(0,10) === date));
-  const saved = S.dbBase.key === [d, date].join('|') ? S.dbBase.ids.map(id => TRIPS.find(t => t.id === id)).filter(t => t && seatsLeft(t) > 0) : [];
+  const samples = DB.session ? [] : openTrips(d).filter(t => !t.dbTrip && (!S.search.from || (t.origin || 'Provo').toLowerCase() === S.search.from.toLowerCase()) && (!date || t.depart.slice(0,10) === date));
+  const saved = S.dbBase.key === [d, date, S.search.from].join('|') ? S.dbBase.ids.map(id => TRIPS.find(t => t.id === id)).filter(t => t && seatsLeft(t) > 0) : [];
   return samples.concat(saved).filter(t => !S.filters.round || t.ret);
 }
 const priceLabel = v => v ? `Up to ${money(+v)}` : 'Any price';
@@ -720,7 +739,7 @@ BIND.results = () => {
     if (!panel.hidden && !e.target.closest('.pfwrap')) open(false);
   });
   document.getElementById('f-round').addEventListener('change', e => { S.filters.round = e.target.checked; keep('f-round'); });
-  const key = [S.params.dest, S.search.date, S.filters.max].join('|');
+  const key = [S.params.dest, S.search.date, S.filters.max, S.search.from].join('|');
   if (S.dbSearch.key !== key) searchDbTrips();
 };
 
@@ -740,13 +759,13 @@ SCREENS.detail = () => {
   else action = `<button class="btn primary" data-act="request">Request a seat</button>`;
   return `${topbar('Trip details')}
 <div class="screen">
-  <div class="hero">${art(d.art)}<div class="cap"><div class="small" style="opacity:.85">Provo → </div><h1>${esc(d.name)}</h1></div></div>
+  <div class="hero">${art(d.art)}<div class="cap"><div class="small" style="opacity:.85">${esc(t.origin || 'Provo')} → </div><h1>${esc(d.name)}</h1></div></div>
   ${!isVerified() && !st ? `<div class="alert warn">${I.lock.replace('<svg','<svg width="18" height="18"')}<span>You need a verified ID before you can request a seat. Verification is pending.</span></div>` : ''}
   <div class="card"><h3>Trip</h3>
     <dl class="kv tnum" style="margin:0">
       <dt>Leaves</dt><dd>${fDT(t.depart)}</dd>
-      <dt>Pickup</dt><dd>${esc(t.pickup)}</dd>
-      <dt>Drop-off</dt><dd>${esc(t.dropoff)}</dd>
+      <dt>Pickup</dt><dd>${esc(t.pickup)} ${pinLink(t.pickupPin, 'pickup')}</dd>
+      <dt>Drop-off at destination</dt><dd>${esc(t.dropoff)} ${pinLink(t.dropoffPin, 'arrival')}</dd>
       <dt>Return</dt><dd>${t.ret ? fDT(t.ret) : '<span class="pill neutral">One-way</span><div class="small muted" style="margin-top:4px">Riders arrange their own ride back.</div>'}</dd>
     </dl></div>
   <div class="card"><h3>Driver</h3>
@@ -766,7 +785,7 @@ function openRequestDialog(){
   wrap.className = 'scrim';
   wrap.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="rq-h">
     <h2 id="rq-h">Would you like to request a seat for this trip?</h2>
-    <dl class="kv tnum" style="margin:0"><dt>To</dt><dd>${esc(d.name)}</dd><dt>Leaves</dt><dd>${fDT(t.depart)}</dd><dt>Pickup</dt><dd>${esc(t.pickup)}</dd><dt>Return</dt><dd>${t.ret ? fDT(t.ret) : 'One-way. You arrange your own ride back.'}</dd><dt>Price</dt><dd><b>${money(t.price)}</b> per seat, ${t.ret?'round trip':'one way'}</dd></dl>
+    <dl class="kv tnum" style="margin:0"><dt>To</dt><dd>${esc(d.name)}</dd><dt>Leaves</dt><dd>${fDT(t.depart)}</dd><dt>Pickup</dt><dd>${esc(t.pickup)} ${pinLink(t.pickupPin, 'pickup')}</dd><dt>Return</dt><dd>${t.ret ? fDT(t.ret) : 'One-way. You arrange your own ride back.'}</dd><dt>Price</dt><dd><b>${money(t.price)}</b> per seat, ${t.ret?'round trip':'one way'}</dd></dl>
     <div class="field"><label for="rq-note">Note to ${esc(u.first)} <span class="muted">(optional)</span></label>
       <textarea id="rq-note" rows="3" maxlength="300" placeholder="Where you're headed, flexible times, luggage…"></textarea></div>
     <div class="alert info small">Your seat isn't reserved until ${esc(u.first)} accepts. We'll let you know as soon as they decide.</div>
@@ -818,7 +837,7 @@ SCREENS.mytrips = () => {
         <div class="row" style="justify-content:space-between"><div class="driver">${av(u,28)}<span class="small">${esc(fullName(u))}</span></div><span class="tnum small"><b>${money(t.price)}</b> · ${t.ret?'round trip':'one way'}</span></div>${acts}</div>`;
     }).join('') : `<div class="empty">${I.ticket}<h2>No trips yet</h2><p class="muted small">Seat requests and confirmed rides will show up here.</p><button class="btn primary" data-act="nav" data-to="home">Find a ride</button></div>`;
   } else {
-    const mine = TRIPS.filter(t => t.driver === 'me').sort((a,b) => parse(a.depart) - parse(b.depart));
+    const mine = TRIPS.filter(t => t.driver === 'me' && (!DB.session || t.dbTrip)).sort((a,b) => parse(a.depart) - parse(b.depart));
     body = mine.length ? mine.map(t => {
       const d = D(t.dest), pend = t.requests.filter(r => r.status === 'pending').length;
       return `<div class="mcard"><div class="mtop"><div><h3>${esc(d.name)}</h3><div class="small muted tnum">${fDT(t.depart)}</div></div>${pend ? `<span class="pill warn">${pend} pending</span>` : '<span class="pill neutral">No pending</span>'}</div>
@@ -833,6 +852,18 @@ SCREENS.mytrips = () => {
 </div>${nav()}`;
 };
 
+function locationPicker(kind){
+  return `<details id="pt-${kind}-picker" class="location-picker"><summary>Choose ${kind === 'pickup' ? 'pickup' : 'arrival'} map pin</summary>
+    <label for="pt-${kind}-search">Search saved ${kind} places</label><input id="pt-${kind}-search" type="search" placeholder="Search a place or city">
+    <div id="pt-${kind}-places" class="place-options" aria-live="polite">Loading saved places…</div>
+    <p class="small muted">Choose a saved place, tap the map, or move the map with arrow keys and use its center. Enter a clear meeting address above. No location permission is needed.</p>
+    <div id="pt-${kind}-map" class="location-map" aria-label="${kind} map"></div>
+    <button class="btn sm" type="button" id="pt-${kind}-center">Use map center for ${kind}</button>
+    <p id="pt-${kind}-status" class="small muted" role="status">No map pin selected. Typed addresses also work.</p></details>`;
+}
+function pinLink(pin, label){
+  return pin ? `<a class="link" target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat=${pin.lat}&mlon=${pin.lng}#map=17/${pin.lat}/${pin.lng}">View ${label} pin</a>` : '';
+}
 /* Screen 7: Post a trip */
 SCREENS.post = () => {
   if (!isVerified()) return `<header class="topbar"><div class="title"><h2>Post a trip</h2></div></header>
@@ -843,8 +874,9 @@ SCREENS.post = () => {
   <div class="fieldset"><div class="eyebrow">Where & when</div>
     <div class="field"><label for="pt-dest">Destination</label><select id="pt-dest" required><option value="">Choose a destination</option>${DESTS.map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select><div class="err" id="pe-dest"></div></div>
     <div class="field"><label for="pt-depart">Departure date & time</label><input id="pt-depart" type="datetime-local" required aria-describedby="pt-tzhint pe-depart"><div class="small muted" id="pt-tzhint">Utah time (Mountain Time). Use the calendar to choose a valid date.</div><div class="err" id="pe-depart"></div></div>
-    <div class="two-desk"><div class="field"><label for="pt-pickup">Pickup location</label><input id="pt-pickup" type="text" maxlength="120" placeholder="e.g. Helaman Halls parking" required><div class="err" id="pe-pickup"></div></div>
-    <div class="field"><label for="pt-dropoff">Drop-off location</label><input id="pt-dropoff" type="text" maxlength="120" placeholder="e.g. Moab Main Street" required><div class="err" id="pe-dropoff"></div></div></div>
+    <div class="field"><label for="pt-origin">Starting city</label><input id="pt-origin" type="text" maxlength="80" value="Provo" required aria-describedby="pe-origin"><div class="err" id="pe-origin"></div></div>
+    <div class="two-desk"><div class="field"><label for="pt-pickup">Pickup location</label><input id="pt-pickup" type="text" maxlength="120" placeholder="e.g. Helaman Halls parking" required><div class="err" id="pe-pickup"></div>${locationPicker('pickup')}</div>
+    <div class="field"><label for="pt-dropoff">Drop-off at destination</label><input id="pt-dropoff" type="text" maxlength="120" placeholder="e.g. Moab Main Street" required><div class="err" id="pe-dropoff"></div>${locationPicker('dropoff')}</div></div>
   </div>
   <div class="fieldset"><div class="eyebrow">Seats & price</div>
     <div class="two"><div class="field"><label for="pt-seats">Available seats</label><input id="pt-seats" type="number" min="1" max="7" step="1" inputmode="numeric" placeholder="1–7" required><div class="err" id="pe-seats"></div></div>
@@ -900,10 +932,18 @@ BIND.post = () => {
   $('pt-ret').addEventListener('change', () => { $('pt-retfields').hidden = !$('pt-ret').checked; covers(); });
   $('pt-depart').addEventListener('change', setMins);
   covers(); setMins();
+  let selectedPins = {pickup:null,dropoff:null};
+  if ($('pt-pickup-picker')) import('/hitch-locations.js').then(async module => {
+    const api = await loadApi();
+    if (!f.isConnected) return;
+    const picker = module.bindLocationPickers({api,session:DB.session,form:f,onChange:refresh});
+    selectedPins = picker.pins; cleanupLocationPickers = () => picker.destroy();
+  }).catch(() => { /* Address entry remains available when map code cannot load. */ });
 
-  const FIELDS = {dest:'pt-dest', depart:'pt-depart', pickup:'pt-pickup', dropoff:'pt-dropoff', seats:'pt-seats', price:'pt-price', return:'pt-return'};
+  const FIELDS = {origin:'pt-origin',dest:'pt-dest', depart:'pt-depart', pickup:'pt-pickup', dropoff:'pt-dropoff', seats:'pt-seats', price:'pt-price', return:'pt-return'};
   function validate(){
     const v = id => $(id).value.trim(), err = {}, out = {}, now = Date.now();
+    if (!v('pt-origin') || v('pt-origin').length > 80) err.origin = 'Enter a starting city, up to 80 characters.';
     if (!v('pt-dest')) err.dest = 'Choose a destination.';
     if ($('pt-depart').validity.badInput || !v('pt-depart')) err.depart = 'Enter a valid departure date and time. Check the month, day, and year, or use the calendar.';
     else {
@@ -931,7 +971,9 @@ BIND.post = () => {
     $('pt-sum').hidden = !Object.keys(err).length;
     if (Object.keys(err).length){ $(FIELDS[Object.keys(err)[0]]).focus(); return null; }
     return {
-      destination_id: v('pt-dest'), departure_at: out.dep.iso,
+      destination_id: v('pt-dest'), departure_at: out.dep.iso, origin_city:v('pt-origin'),
+      pickup_latitude:selectedPins.pickup?.lat ?? null, pickup_longitude:selectedPins.pickup?.lng ?? null,
+      dropoff_latitude:selectedPins.dropoff?.lat ?? null, dropoff_longitude:selectedPins.dropoff?.lng ?? null,
       pickup_location: v('pt-pickup'), dropoff_location: v('pt-dropoff'),
       total_seats: seats, price_per_seat: price, return_at: out.ret ? out.ret.iso : null,
     };
@@ -945,14 +987,18 @@ BIND.post = () => {
     dbErr.hidden = true;
     const payload = validate(); if (!payload) return;
     busy = true; btn.disabled = true; btn.setAttribute('aria-busy', 'true'); btn.textContent = 'Publishing…';
+    const generation = DB.generation;
     let saved = null, uncertain = false;
     const existingIds = new Set(TRIPS.filter(t => t.dbTrip).map(t => t.id));
     try {
       const api = await loadApi();
-      DB.session = await api.getSession();
+      const session = await api.getSession();
+      if (generation !== DB.generation) return;
+      DB.session = session;
       if (!DB.session){ const ex = new Error('Signed out'); ex.status = 401; throw ex; }
       saved = await api.publishTrip(DB.session.accessToken, payload);
     } catch (error) {
+      if (generation !== DB.generation) return;
       if (error.status === undefined){
         // No answer from the database (network dropped). The trip may or may not have saved,
         // so check before telling the driver to retry; otherwise a retry could post it twice.
@@ -970,6 +1016,7 @@ BIND.post = () => {
         if (error.status === 401){ (await loadApi()).signOut(); DB.session = null; clearDbTrips(); dbErr.innerHTML = esc(dbErrorMessage(error)) + ' <button class="link" type="button" data-act="expired">Log in again</button>'; }
       }
     }
+    if (generation !== DB.generation) return;
     if (saved){
       // Success only after the database confirms the row. Navigate with the database UUID.
       const id = typeof saved === 'string' ? saved.slice(6) : upsertTrip(fromRow(saved)).id;
@@ -988,6 +1035,7 @@ SCREENS.manage = () => {
   const pend = t.requests.filter(r => r.status === 'pending'), left = seatsLeft(t);
   return `${topbar('Manage requests', `${esc(d.name)} · ${fDate(t.depart)}`)}
 <div class="screen">
+  ${!demo ? '<button class="btn sm" data-act="viewmytrips">View My Trips</button>' : ''}
   ${demo ? `<div class="alert info small"><b>Prototype driver view.</b> You're seeing this trip as ${esc(fullName(drv))} so you can accept or decline your own request.</div>` : ''}
   <div class="card"><div class="mtop"><div><h3>${esc(d.name)}</h3><div class="small muted tnum">${fDT(t.depart)}</div></div><span class="tnum"><b>${money(t.price)}</b><span class="small muted"> / seat</span></span></div>
     <div class="small tnum"><b>${left}</b> of ${t.seats} seats left · ${t.ret ? `Returns ${fDT(t.ret)}` : 'One-way'}</div></div>
@@ -1055,8 +1103,14 @@ function passwordProblem(p){
 }
 // The signed-in user's public.profiles row. Its name replaces the sample name on screens that show "you".
 async function loadAccount(){
+  const generation = DB.generation, session = DB.session;
   DB.profile = null;
-  try { DB.profile = await (await loadApi()).loadMyProfile(DB.session.accessToken, DB.session.user.id); }
+  if (S.me){ S.me.first = 'Hitch'; S.me.last = 'student'; }
+  try {
+    const profile = await (await loadApi()).loadMyProfile(session.accessToken, session.user.id);
+    if (generation !== DB.generation) return;
+    DB.profile = profile;
+  }
   catch (error) { console.warn('Could not load your profile:', error.message); }
   applyAccountName();
 }
@@ -1066,15 +1120,20 @@ function applyAccountName(){
   S.me.first = parts[0]; S.me.last = parts.slice(1).join(' ');
 }
 async function afterSignIn(session, message){
+  const generation = ++DB.generation;
   DB.session = session;
   await loadAccount();
+  if (generation !== DB.generation) return;
   const to = S.after || {screen:'home', params:{}};
   S.after = null; S.loginNotice = ''; S.hist = [];
   go(to.screen, to.params, false);
   toast(message);
-  loadDbTrips().then(() => { if (!['post', 'edit', 'chat'].includes(S.screen)) render(); }) // don't wipe a half-typed form.catch(error => console.warn('Could not load saved trips:', error.message));
+  // Don't wipe a half-typed form when the initial trip load finishes.
+  loadDbTrips().then(() => { if (generation === DB.generation && !['post', 'edit', 'chat'].includes(S.screen)) render(); })
+    .catch(error => console.warn('Could not load saved trips:', error.message));
 }
 async function logOut(notice, returnTo = null){
+  DB.generation++;
   try { (await loadApi()).signOut(); } catch { /* still clear local state */ }
   DB.session = null; DB.profile = null; clearDbTrips();
   try { sessionStorage.removeItem(SCREEN_KEY); } catch { /* ignore */ }
@@ -1257,9 +1316,11 @@ async function boot(){
   if (confirmed) toast("Email confirmed. You're logged in.");
   if (!DB.session) return;
   // Load trips saved in Supabase. Sample trips still fill the other screens.
-  try { await loadDbTrips(); render(); } catch (error) { console.warn('Could not load saved trips:', error.message); }
+  const generation = DB.generation;
+  try { await loadDbTrips(); if (generation === DB.generation && !['post', 'edit', 'chat'].includes(S.screen)) render(); } catch (error) { console.warn('Could not load saved trips:', error.message); }
 }
 function render(){
+  cleanupLocationPickers(); cleanupLocationPickers = () => {};
   document.querySelectorAll('.scrim').forEach(x => x.remove());
   if (AUTH_SCREENS.has(S.screen) && !DB.session){ // signed out: send to Log in, then come back here
     S.after = {screen:S.screen, params:S.params}; S.screen = 'login'; S.params = {}; S.hist = [];
@@ -1279,6 +1340,8 @@ document.addEventListener('click', e => {
     case 'cat': S.cat = el.dataset.c; render(); break;
     case 'dest': S.miss = null; S.filters = {max:'', round:false}; go('results', {dest:id}); break;
     case 'change': S.hist = []; go('home', {}, false); setTimeout(() => document.getElementById('s-dest')?.focus(), 0); break;
+    case 'retrysearch': searchDbTrips(); break;
+    case 'viewmytrips': S.tripsTab = 'driver'; S.hist = []; go('mytrips',{},false); break;
     case 'clearf': S.filters = {max:'', round:false}; S.search.date = ''; render(); break;
     case 'trip': go('detail', {id}); break;
     case 'request': openRequestDialog(); break;
@@ -1292,7 +1355,7 @@ document.addEventListener('click', e => {
       else { r.status = 'declined'; if (r.uid !== 'me') t.requests = t.requests.filter(x => x !== r); toast(`Declined ${u.first}'s request`); }
       render(); break;
     }
-    case 'mymanage': { const mine = TRIPS.filter(t => t.driver === 'me'); if (mine.length === 1) go('manage', {id:mine[0].id}); else { S.tripsTab = 'driver'; S.hist = []; go('mytrips', {}, false); } break; }
+    case 'mymanage': { const mine = TRIPS.filter(t => t.driver === 'me' && (!DB.session || t.dbTrip)); if (mine.length === 1) go('manage', {id:mine[0].id}); else { S.tripsTab = 'driver'; S.hist = []; go('mytrips', {}, false); } break; }
     case 'approve': S.me.verified = 'verified'; render(); toast('ID verified. You can now request seats and post trips.'); break;
     case 'logout': logOut("You've been logged out."); break;
     case 'expired': logOut('Your session expired. Log in again to continue.', {screen:S.screen, params:S.params}); break;

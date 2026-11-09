@@ -282,3 +282,11 @@ textarea{border-radius:16px}
   .pfwrap{position:static}
   .pricefilter{left:0;right:0;width:auto}
 }
+
+/* Meeting-place selection */
+.location-picker{margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:12px}
+.location-picker summary{cursor:pointer;font-weight:650;padding:5px 0}
+.location-map{height:250px;border-radius:10px;background:#eef2ef;margin:10px 0;z-index:0}
+.place-options{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;max-height:170px;overflow:auto}
+.location-picker input{width:100%}
+.location-picker .leaflet-control-attribution{font-size:11px;color:#333}
