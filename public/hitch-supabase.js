@@ -142,10 +142,10 @@ function authError(response, data, fallback) {
   return error;
 }
 
-async function authFetch(path, body, accessToken) {
+async function authFetch(path, body, accessToken, method = 'POST') {
   const { url, publishableKey } = await config();
   const response = await fetch(`${url}/auth/v1/${path}`, {
-    method: 'POST',
+    method,
     headers: {
       apikey: publishableKey,
       'Content-Type': 'application/json',
@@ -157,14 +157,27 @@ async function authFetch(path, body, accessToken) {
   return { response, data };
 }
 
-async function tokenRequest(grantType, body) {
+async function tokenRequest(grantType, body, recovery = false) {
   const { response, data } = await authFetch(`token?grant_type=${grantType}`, body);
   if (!response.ok) throw authError(response, data, 'Sign-in failed.');
-  return saveSession(toSession(data));
+  const session = toSession(data);
+  if (recovery) session.recovery = true;
+  return saveSession(session);
 }
 
 export function signIn(email, password) {
   return tokenRequest('password', { email: email.trim().toLowerCase(), password });
+}
+
+export async function requestPasswordReset(email) {
+  const redirect = encodeURIComponent(location.origin);
+  const { response, data } = await authFetch(`recover?redirect_to=${redirect}`, { email: email.trim().toLowerCase() });
+  if (!response.ok) throw authError(response, data, 'Could not send a reset link.');
+}
+
+export async function updatePassword(accessToken, password) {
+  const { response, data } = await authFetch('user', { password }, accessToken, 'PUT');
+  if (!response.ok) throw authError(response, data, 'Could not update the password.');
 }
 
 // Sign Up. The full name goes into the user's metadata; a database trigger copies it
@@ -205,10 +218,12 @@ export async function sessionFromUrl() {
   });
   if (!response.ok) return null;
   const user = await response.json();
-  return saveSession(toSession({
+  const session = toSession({
     access_token: p.get('access_token'), refresh_token: p.get('refresh_token'),
     expires_at: Number(p.get('expires_at')) || undefined, expires_in: Number(p.get('expires_in')) || undefined, user,
-  }));
+  });
+  if (p.get('type') === 'recovery') session.recovery = true;
+  return saveSession(session);
 }
 
 export function signOut() {
@@ -225,7 +240,7 @@ export async function getSession() {
   if (!session) return null;
   if (session.expiresAt - 60 > Date.now() / 1000) return session;
   try {
-    return await tokenRequest('refresh_token', { refresh_token: session.refreshToken });
+    return await tokenRequest('refresh_token', { refresh_token: session.refreshToken }, session.recovery);
   } catch (error) {
     if (error.status === 400 || error.status === 401) signOut();
     return null;
