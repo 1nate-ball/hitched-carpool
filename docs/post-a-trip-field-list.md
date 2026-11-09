@@ -33,7 +33,7 @@ The applied setup SQL is `supabase/migrations/20261027000100_post_a_trip.sql`. I
 | Destination (`pt-dest`) | `dest` | `destination_id` | text | Required; one of the existing 8 destination IDs |
 | Departure date + time (`pt-date`, `pt-time`) | `depart` | `departure_at` | timestamptz | Required; after the real current time at insert |
 | Pickup (`pt-pickup`) | `pickup` | `pickup_location` | text | Required; whitespace-only rejected |
-| Drop-off (`pt-dropoff`) | `dropoff` | `dropoff_location` | text | Required; whitespace-only rejected |
+| Drop-off at destination (`pt-dropoff`, outbound arrival point) | `dropoff` | `dropoff_location` | text | Required; whitespace-only rejected |
 | Available seats (`pt-seats`) | `seats` | `total_seats` | integer | 1–7 passenger seats, excluding driver |
 | Price per seat (`pt-price`) | `price` | `price_per_seat` | integer | Whole US dollars, 1–150; matches current form |
 | Return date + time (`pt-rdate`, `pt-rtime`) | `ret` | `return_at` | nullable timestamptz | NULL for one-way; otherwise strictly after departure |

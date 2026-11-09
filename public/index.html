@@ -177,6 +177,9 @@ input[readonly]{background:var(--surface-2);color:var(--muted)}
 .kv{display:grid;grid-template-columns:96px 1fr;gap:10px;font-size:.92rem}
 .kv dt{color:var(--muted)}
 .kv dd{margin:0;font-weight:500;min-width:0}
+.kv.wide{grid-template-columns:minmax(96px,34%) 1fr;column-gap:16px}
+.route .lbl{display:block;font-size:.75rem;color:var(--muted);font-weight:500;line-height:1.2}
+.leg-return{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:.85rem;margin-top:8px}
 .actionbar{position:sticky;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));display:flex;gap:12px;align-items:center;z-index:4}
 .actionbar .p{flex:none}
 .actionbar .p b{font-family:var(--f-display);font-size:1.25rem}
@@ -687,7 +690,7 @@ function tripCard(t){
     <div class="ttop"><div><div class="twhen tnum">${fDate(t.depart)}</div><div class="small muted tnum">Leaves ${fTime(t.depart)}</div></div>
       <div class="tprice tnum"><b>${money(t.price)}</b><div>per rider · ${t.ret ? 'round trip' : 'one way'}</div></div></div>
     <div class="driver">${av(u,34)}<div style="min-width:0"><div class="nm">${esc(fullName(u))}${t.driver==='me'?' (you)':''}</div>${vBadge(u)}</div></div>
-    <div class="route"><span class="dot"></span><span>${esc(t.pickup)}</span><span class="line"></span><span></span><span class="dot end"></span><span>${esc(t.dropoff)}</span></div>
+    ${routeHTML(esc(t.pickup), esc(t.dropoff))}
     <div class="tfoot"><span class="tnum"><b>${seatsLeft(t)}</b> of ${t.seats} seats left</span>${t.ret ? `<span class="small tnum">Returns ${fDT(t.ret)}</span>` : '<span class="pill neutral">One-way</span>'}${tag}</div>
   </button>`;
 }
@@ -858,13 +861,14 @@ SCREENS.detail = () => {
   <div class="hero">${destArt(d)}<div class="cap"><div class="small" style="opacity:.85">${esc(t.origin || 'Provo')} → </div><h1>${esc(d.name)}</h1></div></div>
   ${!isVerified() && !st ? `<div class="alert warn">${I.lock.replace('<svg','<svg width="18" height="18"')}<span>You need a verified ID before you can request a seat. Verification is pending.</span></div>` : ''}
   <div class="dmain">
-  <div class="card"><h3>Trip</h3>
-    <dl class="kv tnum" style="margin:0">
+  <div class="card"><h3>Outbound trip</h3>
+    <dl class="kv wide tnum" style="margin:0">
       <dt>Leaves</dt><dd>${fDT(t.depart)}</dd>
       <dt>Pickup</dt><dd>${esc(t.pickup)} ${pinLink(t.pickupPin, 'pickup')}</dd>
-      <dt>Drop-off at destination</dt><dd>${esc(t.dropoff)} ${pinLink(t.dropoffPin, 'arrival')}</dd>
-      <dt>Return</dt><dd>${t.ret ? fDT(t.ret) : '<span class="pill neutral">One-way</span><div class="small muted" style="margin-top:4px">Riders arrange their own ride back.</div>'}</dd>
+      <dt>${DROP_LABEL}</dt><dd>${esc(t.dropoff)} ${pinLink(t.dropoffPin, 'arrival')}</dd>
     </dl></div>
+  <div class="card"><div class="section-head"><h3>Return trip</h3>${t.ret ? '<span class="pill accent">Included</span>' : '<span class="pill neutral">Not included</span>'}</div>
+    ${t.ret ? `<dl class="kv wide tnum" style="margin:0"><dt>Leaves</dt><dd>${fDT(t.ret)}</dd><dt>Route</dt><dd>${esc(d.name)} → ${esc(t.origin || 'Provo')}</dd></dl><p class="small muted" style="margin:8px 0 0">Confirm the return meeting spot with the driver.</p>` : '<p class="small muted" style="margin:0">One-way trip. Riders arrange their own ride back.</p>'}</div>
   <div class="card"><h3>Driver</h3>
     <div class="driver">${av(u,48)}<div style="min-width:0"><div class="nm">${esc(fullName(u))}${t.driver==='me'?' (you)':''}</div>${vBadge(u)}</div></div>
     ${t.dbTrip ? '' : `<p>${esc(u.bio || 'No bio yet.')}</p>`}
@@ -933,7 +937,7 @@ function openRequestDialog(){
   wrap.className = 'scrim';
   wrap.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="rq-h">
     <h2 id="rq-h">Would you like to request a seat for this trip?</h2>
-    <dl class="kv tnum" style="margin:0"><dt>To</dt><dd>${esc(d.name)}</dd><dt>Leaves</dt><dd>${fDT(t.depart)}</dd><dt>Pickup</dt><dd>${esc(t.pickup)} ${pinLink(t.pickupPin, 'pickup')}</dd><dt>Return</dt><dd>${t.ret ? fDT(t.ret) : 'One-way. You arrange your own ride back.'}</dd><dt>Price</dt><dd><b>${money(t.price)}</b> per seat, ${t.ret?'round trip':'one way'}</dd></dl>
+    <dl class="kv wide tnum" style="margin:0"><dt>To</dt><dd>${esc(d.name)}</dd><dt>Leaves</dt><dd>${fDT(t.depart)}</dd><dt>Pickup</dt><dd>${esc(t.pickup)} ${pinLink(t.pickupPin, 'pickup')}</dd><dt>${DROP_LABEL}</dt><dd>${esc(t.dropoff)} ${pinLink(t.dropoffPin, 'arrival')}</dd><dt>Return trip</dt><dd>${t.ret ? `Leaves ${esc(d.name)} ${fDT(t.ret)}` : 'Not included. You arrange your own ride back.'}</dd><dt>Price</dt><dd><b>${money(t.price)}</b> per seat, ${t.ret?'round trip':'one way'}</dd></dl>
     <div class="field"><label for="rq-note">Note to ${esc(u.first)} <span class="muted">(optional)</span></label>
       <textarea id="rq-note" rows="3" maxlength="300" placeholder="Where you're headed, flexible times, luggage…"></textarea></div>
     <div class="alert info small">Your seat isn't reserved until ${esc(u.first)} accepts. We'll let you know as soon as they decide.</div>
@@ -1012,6 +1016,12 @@ SCREENS.mytrips = () => {
 </div>${nav()}`;
 };
 
+// Outbound route with labelled stops. Same wording on cards, preview, details, and the request dialog.
+const DROP_LABEL = 'Drop-off at destination';
+function routeHTML(pickup, dropoff){
+  return `<div class="route" aria-label="Outbound trip"><span class="dot"></span><span><span class="lbl">Pickup</span>${pickup}</span><span class="line"></span><span></span><span class="dot end"></span><span><span class="lbl">${DROP_LABEL}</span>${dropoff}</span></div>`;
+}
+
 function locationPicker(kind){
   return `<details id="pt-${kind}-picker" class="location-picker"><summary>Choose ${kind === 'pickup' ? 'pickup' : 'arrival'} map pin</summary>
     <label for="pt-${kind}-search">Search saved ${kind} places</label><input id="pt-${kind}-search" type="search" placeholder="Search a place or city">
@@ -1031,19 +1041,19 @@ SCREENS.post = () => {
   return `<header class="topbar"><div class="title"><h2>Post a trip</h2><div class="small muted">Offer seats in your car · Posting as ${esc(DB.session?.user.email || '')} · <button class="link" type="button" data-act="logout">Log out</button></div></div></header>
 <div class="screen post-layout">
 <form id="ptForm" novalidate>
-  <div class="fieldset"><div class="eyebrow">Where & when</div>
+  <div class="fieldset"><div class="eyebrow">Outbound trip · where & when</div>
     <div class="field"><label for="pt-dest">Destination</label><select id="pt-dest" required><option value="">Choose a destination</option>${DESTS.map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select><div class="err" id="pe-dest"></div></div>
     <div class="field"><label for="pt-depart">Departure date & time</label><input id="pt-depart" type="datetime-local" required aria-describedby="pt-tzhint pe-depart"><div class="small muted" id="pt-tzhint">Utah time (Mountain Time). Use the calendar to choose a valid date.</div><div class="err" id="pe-depart"></div></div>
     <div class="field"><label for="pt-origin">Starting city</label><input id="pt-origin" type="text" maxlength="80" value="Provo" required aria-describedby="pe-origin"><div class="err" id="pe-origin"></div></div>
-    <div class="two-desk"><div class="field"><label for="pt-pickup">Pickup location</label><input id="pt-pickup" type="text" maxlength="120" placeholder="e.g. Helaman Halls parking" required><div class="err" id="pe-pickup"></div>${locationPicker('pickup')}</div>
-    <div class="field"><label for="pt-dropoff">Drop-off at destination</label><input id="pt-dropoff" type="text" maxlength="120" placeholder="e.g. Moab Main Street" required><div class="err" id="pe-dropoff"></div>${locationPicker('dropoff')}</div></div>
+    <div class="two-desk"><div class="field"><label for="pt-pickup">Pickup location</label><input id="pt-pickup" type="text" maxlength="120" placeholder="e.g. Helaman Halls parking" required aria-describedby="pt-pickhint pe-pickup"><div class="small muted" id="pt-pickhint">Where riders meet you before you leave.</div><div class="err" id="pe-pickup"></div>${locationPicker('pickup')}</div>
+    <div class="field"><label for="pt-dropoff">Drop-off at destination</label><input id="pt-dropoff" type="text" maxlength="120" placeholder="e.g. Moab Main Street" required aria-describedby="pt-drophint pe-dropoff"><div class="small muted" id="pt-drophint">Where riders get out when you arrive (outbound trip). Add a ride back under Return trip.</div><div class="err" id="pe-dropoff"></div>${locationPicker('dropoff')}</div></div>
   </div>
   <div class="fieldset"><div class="eyebrow">Seats & price</div>
     <div class="two"><div class="field"><label for="pt-seats">Available seats</label><input id="pt-seats" type="number" min="1" max="7" step="1" inputmode="numeric" placeholder="1–7" required><div class="err" id="pe-seats"></div></div>
     <div class="field"><label for="pt-price">Price per seat ($)</label><input id="pt-price" type="number" min="1" max="150" step="1" inputmode="numeric" placeholder="1–150" required><div class="err" id="pe-price"></div></div></div>
   </div>
-  <div class="fieldset"><div class="eyebrow">Return trip</div>
-    <label class="check"><input type="checkbox" id="pt-ret"><span><b>Include a return trip</b><br><span class="small muted">Riders come back with you.</span></span></label>
+  <div class="fieldset"><div class="eyebrow">Return trip (optional)</div>
+    <label class="check"><input type="checkbox" id="pt-ret" aria-describedby="pt-rethint"><span><b>Include a return trip</b><br><span class="small muted" id="pt-rethint">You drive riders back from your destination to your starting city. Leave unchecked for one-way.</span></span></label>
     <div id="pt-retfields" hidden><div class="field"><label for="pt-return">Return date & time</label><input id="pt-return" type="datetime-local" aria-describedby="pt-tzhint pe-return"><div class="err" id="pe-return"></div></div></div>
     <div class="alert info small" id="pt-covers"></div>
   </div>
@@ -1067,7 +1077,8 @@ function postPreview(v){
   return `<div class="dart${d ? '' : ' blank'}">${d ? destArt(d) : RIDGES}<span class="count pill ${v.ret ? 'accent' : 'neutral'}" style="background:var(--surface)">${v.ret ? 'Round trip' : 'One-way'}</span></div>
   <div class="ttop"><div style="min-width:0"><h3>${d ? esc(d.name) : ph('Choose a destination')}</h3><div class="small muted tnum">${when ? esc(when) : 'Pick a date and time'}</div></div>
     <div class="tprice"><b class="tnum">${+v.price ? money(+v.price) : '$–'}</b><div>per seat</div></div></div>
-  <div class="route"><span class="dot"></span><span>${v.pickup ? esc(v.pickup) : ph('Pickup location')}</span><span class="line"></span><span></span><span class="dot end"></span><span>${v.dropoff ? esc(v.dropoff) : ph('Drop-off location')}</span></div>
+  ${routeHTML(v.pickup ? esc(v.pickup) : ph('Pickup location'), v.dropoff ? esc(v.dropoff) : ph('Where riders get out'))}
+  <div class="leg-return">${v.ret ? `<span class="pill accent">Return trip</span><span class="tnum">${v.retAt ? `Leaves ${d ? esc(d.name) : 'destination'} ${esc(fDT(v.retAt))}` : ph('Pick a return date and time')}</span>` : `<span class="pill neutral">No return trip</span><span class="small muted">One-way</span>`}</div>
   <div class="tfoot"><div class="driver">${av(S.me,28)}<span class="small"><b>You</b></span>${vBadge(S.me)}</div><span class="pill ok">${seats ? `${seats} seat${seats > 1 ? 's' : ''} open` : 'Seats open'}</span></div>`;
 }
 function postTips(v){
@@ -1089,7 +1100,7 @@ BIND.post = () => {
   const refresh = () => {
     if (!$('pt-preview')) return;
     const val = id => $(id).value.trim();
-    const v = {dest:val('pt-dest'), depart:val('pt-depart'), pickup:val('pt-pickup'), dropoff:val('pt-dropoff'), seats:val('pt-seats'), price:val('pt-price'), ret:$('pt-ret').checked};
+    const v = {dest:val('pt-dest'), depart:val('pt-depart'), pickup:val('pt-pickup'), dropoff:val('pt-dropoff'), seats:val('pt-seats'), price:val('pt-price'), ret:$('pt-ret').checked, retAt:val('pt-return')};
     $('pt-preview').innerHTML = postPreview(v);
     $('pt-tips').innerHTML = postTips(v);
   };
@@ -1120,7 +1131,7 @@ BIND.post = () => {
       else out.dep = dep;
     }
     if (!v('pt-pickup')) err.pickup = 'Add a pickup location.';
-    if (!v('pt-dropoff')) err.dropoff = 'Add a drop-off location.';
+    if (!v('pt-dropoff')) err.dropoff = 'Add a drop-off at your destination.';
     const seats = Number(v('pt-seats')), price = Number(v('pt-price'));
     if (!v('pt-seats')) err.seats = 'Enter how many seats are open.'; else if (!Number.isInteger(seats) || seats < 1 || seats > 7) err.seats = 'Seats must be a whole number from 1 to 7.';
     if (!v('pt-price')) err.price = 'Enter a price per seat.'; else if (!Number.isInteger(price) || price < 1 || price > 150) err.price = 'Price must be a whole dollar amount from $1 to $150.';
