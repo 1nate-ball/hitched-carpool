@@ -172,7 +172,7 @@ If port 8000 is already in use, run `PORT=8001 python3 server.py` on macOS/Linux
 
 When Save changes is clicked, JavaScript sends the edited fields to the Python backend. The backend updates the Users table in SQLite and returns the saved profile. The page displays that response, and refreshing loads the profile from the database again.
 
-The [35-second demo video](https://github.com/1nate-ball/hitched-carpool/raw/refs/heads/main/docs/demo.mp4) shows this process. It is an automated recording of the app running in a real browser. The checks also confirm that profile changes survive a server restart.
+The [35-second demo video](https://github.com/1nate-ball/hitched-carpool/raw/refs/heads/main/docs/demo.mp4) shows this process in a real browser. To record it again, run `node scripts/record-demo.cjs` locally with Playwright and Chromium installed. The checks also confirm that profile changes survive a server restart.
 
 To run the database and API tests:
 
@@ -186,7 +186,7 @@ On Windows, use `py -m unittest discover -s tests -v`.
 
 The live site runs on a free [Render](https://render.com) web service that redeploys whenever `main` changes. The same Python server that runs locally serves both the pages and the profile API, so the frontend and backend share one address and no CORS settings are needed. Trips and destinations use the existing Supabase project (see below), so no separate database host is needed.
 
-**Limitation:** On Render's free plan the server's files reset on every redeploy or restart, so saved profile changes go back to the sample data. That includes the automatic demo-video commit after each push to `main`. Free services also go to sleep when unused, so the first visit can take about a minute.
+**Limitation:** On Render's free plan the server's files reset on every redeploy or restart, so saved profile changes go back to the sample data. Free services also go to sleep when unused, so the first visit can take about a minute.
 
 To set it up (one time):
 
@@ -231,4 +231,4 @@ Checks: `node --test tests/*.cjs`, `python3 -m unittest discover -s tests -v`, a
 We also tested with two disposable accounts in a fresh local Supabase instance. Both accounts signed up and confirmed by email. The driver logged in, published a round trip with two pins and a one-way trip with typed addresses, and found the trips again after refreshing. The rider found the correct trip by starting city, destination, and date, and their pending seat request stayed in My Trips after refreshing. We checked the trip form and details at phone width, including opening the map picker from the keyboard.
 
 
-PR #12 now includes Robbie's signup/login flow. A signed-out visitor going to Post a Trip logs in (or signs up), then returns to that form with their account name. Background requests from a previous login are discarded after logout or account switching. The combined form/API tests are in `tests/test_auth_trip_integration.cjs`; they use a fake Auth/Data API, not real test accounts. GitHub runs all JavaScript and Python checks on pull requests as well as main. The demo recording is published to main only on main-branch runs.
+PR #12 now includes Robbie's signup/login flow. A signed-out visitor going to Post a Trip logs in (or signs up), then returns to that form with their account name. Background requests from a previous login are discarded after logout or account switching. The combined form/API tests are in `tests/test_auth_trip_integration.cjs`; they use a fake Auth/Data API, not real test accounts. GitHub runs all JavaScript and Python checks on pull requests as well as main.
