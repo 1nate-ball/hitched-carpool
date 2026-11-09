@@ -408,7 +408,7 @@ function fromRow(r){ // Supabase trips row -> the trip shape the screens already
     passengers:[], requests:[], departureAt:r.departure_at, origin:r.origin_city || 'Provo',
     pickupPin:r.pickup_latitude == null ? null : {lat:r.pickup_latitude,lng:r.pickup_longitude},
     dropoffPin:r.dropoff_latitude == null ? null : {lat:r.dropoff_latitude,lng:r.dropoff_longitude},
-    available:r.seats_available, dbTrip:true}; // passengers/requests stay empty until ride requests are real
+    available:r.seats_available, dbTrip:true}; // requests, passengers and seats left are filled in by loadDbTrips
 }
 function upsertTrip(t){
   const i = TRIPS.findIndex(x => x.id === t.id);
@@ -427,8 +427,66 @@ async function loadDbTrips(){ // saved trips come back after a reload instead of
   const rows = await api.loadTrips(DB.session.accessToken);
   if (generation !== DB.generation) return [];
   const trips = rows.map(r => upsertTrip(fromRow(r)));
-  await loadMyDbRequests(api);
+  await Promise.all([loadMyDbRequests(api), loadDriverDbRequests(api, trips), loadDbSeats(api, trips)]);
   return trips;
+}
+async function loadDriverDbRequests(api, trips){ // requests on the signed-in driver's own trips, with rider names
+  const generation = DB.generation, session = DB.session;
+  const mine = trips.filter(t => t.driver === 'me');
+  if (!session || !mine.length) return;
+  let rows, profiles = [];
+  try { rows = await api.loadTripRequests(session.accessToken, mine.map(t => t.id)); }
+  catch (error) { console.warn('Could not load requests on your trips:', error.message); return; }
+  try { profiles = await api.loadProfiles(session.accessToken, rows.map(r => r.rider_id)); }
+  catch (error) { console.warn('Could not load rider names:', error.message); } // fall back to "Hitch rider"
+  if (generation !== DB.generation) return;
+  const names = Object.fromEntries(profiles.map(p => [p.id, p.full_name]));
+  for (const r of rows){
+    const parts = (names[r.rider_id] || 'Hitch rider').trim().split(/\s+/);
+    USERS[r.rider_id] = {...DB_DRIVER, ...USERS[r.rider_id], first:parts[0], last:parts.slice(1).join(' ')};
+  }
+  for (const t of mine){
+    const own = rows.filter(r => r.trip_id === t.id);
+    t.passengers = own.filter(r => r.status === 'accepted').map(r => r.rider_id);
+    t.requests = own.filter(r => r.status !== 'accepted').map(r => ({id:r.id, uid:r.rider_id, status:r.status, note:r.note}));
+  }
+}
+async function loadDbSeats(api, trips){ // seats left counting accepted requests (riders can't see each other's requests)
+  const generation = DB.generation, session = DB.session;
+  if (!session || !trips.length) return;
+  let left;
+  try { left = await api.loadSeatsAvailable(session.accessToken, trips.map(t => t.id)); }
+  catch (error) { console.warn('Could not load seats left:', error.message); return; }
+  if (generation !== DB.generation) return;
+  for (const t of trips) t.available = left[t.id] ?? 0; // missing = full or already departed
+}
+// Driver's Accept/Decline on a saved trip. The database checks driver, pending status and free seats.
+async function decideDbRequest(t, requestId, decision){
+  const r = t.requests.find(x => x.id === requestId); if (!r || S.deciding) return;
+  const u = U(r.uid);
+  S.deciding = requestId; render();
+  try {
+    const api = await loadApi();
+    DB.session = await api.getSession();
+    if (!DB.session){ const ex = new Error('Signed out'); ex.status = 401; throw ex; }
+    await api.decideRequest(DB.session.accessToken, requestId, decision);
+    if (decision === 'accepted'){
+      t.passengers.push(r.uid); t.requests = t.requests.filter(x => x !== r);
+      if (Number.isInteger(t.available)) t.available = Math.max(0, t.available - 1);
+      toast(`${u.first} is confirmed. ${seatsLeft(t)} of ${t.seats} seats left.`);
+    } else { r.status = 'declined'; toast(`Declined ${u.first}'s request`); }
+  } catch (error) {
+    toast(decideErrorMessage(error));
+    if (error.status !== 401) await loadDbTrips().catch(() => {}); // show what the database actually has now
+  } finally { S.deciding = null; if (S.screen === 'manage') render(); }
+}
+function decideErrorMessage(error){
+  if (error.status === 401) return 'Your sign-in expired. Log in again, then respond.';
+  if (/full/i.test(error.message)) return 'This trip is full. Decline the request or keep it until a seat opens.';
+  if (/already/i.test(error.message)) return 'Someone already responded to this request. Showing the latest status.';
+  if (error.code === '42501' || error.status === 403) return 'Only the driver of this trip can respond to its requests.';
+  if (error.status === undefined) return "We couldn't reach the database. Nothing changed. Try again.";
+  return 'Something went wrong. Nothing changed. Try again.';
 }
 async function loadMyDbRequests(api){ // attach the signed-in rider's saved requests so Trip Detail shows "Request sent"
   const generation = DB.generation, session = DB.session;
@@ -1042,7 +1100,7 @@ SCREENS.manage = () => {
   <div class="section"><div class="section-head"><h2>Pending requests</h2><span class="small muted">${pend.length}</span></div>
     ${pend.length ? pend.map(r => { const u = U(r.uid); return `<div class="rq"><div class="driver">${av(u,44)}<div style="min-width:0"><div class="nm">${esc(fullName(u))}${r.uid==='me'?' (you)':''}</div><div class="small muted">${esc(u.hometown || '')}</div></div><span style="margin-left:auto">${vBadge(u)}</span></div>
       ${u.bio ? `<p class="small">${esc(u.bio)}</p>` : ''}${r.note ? `<div class="note">"${esc(r.note)}"</div>` : ''}
-      <div class="row"><button class="btn sm" data-act="decide" data-uid="${r.uid}" data-v="declined">Decline</button><button class="btn sm primary" data-act="decide" data-uid="${r.uid}" data-v="accepted" ${left?'':'disabled'}>Accept</button></div>
+      <div class="row"><button class="btn sm" data-act="decide" data-uid="${r.uid}" data-rid="${r.id || ''}" data-v="declined" ${S.deciding?'disabled':''}>Decline</button><button class="btn sm primary" data-act="decide" data-uid="${r.uid}" data-rid="${r.id || ''}" data-v="accepted" ${left && !S.deciding?'':'disabled'} ${S.deciding===r.id?'aria-busy="true"':''}>${S.deciding===r.id?'Saving…':'Accept'}</button></div>
       ${left ? '' : '<p class="small muted">No seats left. Decline or keep this request until a seat opens.</p>'}</div>`; }).join('') : `<div class="empty"><p class="muted">No pending requests.</p></div>`}
   </div>
   <div class="section"><div class="section-head"><h2>Confirmed passengers</h2><span class="small muted">${t.passengers.length}</span></div>
@@ -1350,7 +1408,9 @@ document.addEventListener('click', e => {
     case 'manage': go('manage', {id, demo: !!el.dataset.demo}); break;
     case 'chat': go('chat', {id}); break;
     case 'decide': {
-      const t = TRIPS.find(x => x.id === S.params.id), r = t.requests.find(x => x.uid === el.dataset.uid), u = U(r.uid);
+      const t = TRIPS.find(x => x.id === S.params.id);
+      if (t.dbTrip){ decideDbRequest(t, el.dataset.rid, el.dataset.v); break; }
+      const r = t.requests.find(x => x.uid === el.dataset.uid), u = U(r.uid);
       if (el.dataset.v === 'accepted'){ if (!seatsLeft(t)) return; t.passengers.push(r.uid); t.requests = t.requests.filter(x => x !== r); toast(`${u.first} is confirmed and added to the group chat`); }
       else { r.status = 'declined'; if (r.uid !== 'me') t.requests = t.requests.filter(x => x !== r); toast(`Declined ${u.first}'s request`); }
       render(); break;

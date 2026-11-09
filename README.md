@@ -49,6 +49,26 @@ sqlite3 data/kr-test.sqlite3 "SELECT * FROM kr_seat_fill_rate; SELECT * FROM kr_
 
 Expected results: one trip at 0.75 (3 of 4 seats), one at 0.3333 (1 of 3 seats, plus a declined request), and an average of 0.5417. The future test trip isn't counted.
 
+**For real trips (Supabase):** the event that fills seats is a driver accepting a seat request on **Manage requests**. [The accept/decline migration](supabase/migrations/20261109000100_accept_decline_requests.sql) adds `kr_seat_fill_rate` and `kr_seat_fill_rate_summary` to Supabase with the same definition (one seat per request). They're private views; read them in the SQL Editor:
+
+```sql
+select * from public.kr_seat_fill_rate_summary;
+```
+
+`avg_fill_rate` is empty until at least one posted trip has departed.
+
+### Accepting and declining seat requests
+
+A driver opens **Manage requests** on their trip (from Trip details or My Trips) and sees each pending request with the rider's name and note. **Accept** or **Decline** saves `ride_requests.status` to Supabase. Accepting lowers the trip's seats left, and when no seats remain the trip drops out of Find Rides search (the `available_trips` view only lists trips with open seats). The rider sees **Seat confirmed** or **Request declined** on My Trips after their next refresh.
+
+The database enforces the rules, not just the buttons:
+
+- Only the trip's driver can change a request, and only its status (not the rider or note).
+- Only pending requests can be decided, once: a declined rider can't be accepted later, or the other way around.
+- A trip can't accept more riders than it has seats. The trip row is locked while checking, so two accepts for the last seat at the same moment can't both succeed.
+
+Locally, `python3 scripts/check_accept_decline_schema.py` runs 18 checks against a throwaway PostgreSQL, including two accepts racing for the last seat, and `node --test tests/test_accept_decline.cjs` checks the Manage requests screen. To check it live, run [the accept/decline check](database/checks/accept_decline_live.sql) in the SQL Editor; it rolls back everything it creates and should end with a `PASS` row.
+
 **Objective 2, Key Result: 50% of drivers post a second trip within 30 days of their first.**
 
 This one uses the Supabase `trips` table, where the Post a Trip form saves trips. Each driver's first and second trips are found by `trips.created_at`. A driver counts as a repeat driver if their second trip was posted no more than 30 days after their first. Only drivers whose first trip was at least 30 days ago are counted, so new drivers who haven't had a full 30 days yet don't pull the rate down.

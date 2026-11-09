@@ -10,11 +10,11 @@ async function config() {
   return configuration;
 }
 
-async function request(path, accessToken, payload) {
+async function request(path, accessToken, payload, method) {
   if (!accessToken) throw new Error('Sign in before using the Hitch database.');
   const { url, publishableKey } = await config();
   const response = await fetch(`${url}/rest/v1/${path}`, {
-    method: payload ? 'POST' : 'GET',
+    method: method || (payload ? 'POST' : 'GET'),
     headers: {
       apikey: publishableKey,
       Authorization: `Bearer ${accessToken}`,
@@ -80,6 +80,38 @@ export async function requestSeat(accessToken, tripId, note = '') {
 // The signed-in rider's own requests (RLS also lets drivers read requests on their trips; filter those out).
 export function loadMyRequests(accessToken, riderId) {
   return request(`ride_requests?select=trip_id,status,note,created_at&rider_id=eq.${encodeURIComponent(riderId)}`, accessToken);
+}
+
+// ---------- Driver: accept or decline seat requests ----------
+const inList = ids => `(${[...new Set(ids)].map(encodeURIComponent).join(',')})`;
+
+// Every request on the given trips. RLS returns only trips the signed-in user drives.
+export function loadTripRequests(accessToken, tripIds) {
+  if (!tripIds.length) return Promise.resolve([]);
+  return request(`ride_requests?select=id,trip_id,rider_id,note,status,created_at&trip_id=in.${inList(tripIds)}&order=created_at`, accessToken);
+}
+
+// Names for riders/drivers. Emails are never readable through the API.
+export function loadProfiles(accessToken, userIds) {
+  if (!userIds.length) return Promise.resolve([]);
+  return request(`profiles?select=id,full_name&id=in.${inList(userIds)}`, accessToken);
+}
+
+// Seats left per trip, counting accepted requests. Full or departed trips aren't returned.
+export async function loadSeatsAvailable(accessToken, tripIds) {
+  if (!tripIds.length) return {};
+  const rows = await request(`available_trips?select=id,seats_available&id=in.${inList(tripIds)}`, accessToken);
+  return Object.fromEntries(rows.map(r => [r.id, r.seats_available]));
+}
+
+// status: 'accepted' or 'declined'. The database allows this only for the trip's driver, only on
+// pending requests, and refuses an accept when the trip is full (23514, "This trip is full.").
+export async function decideRequest(accessToken, requestId, status) {
+  const rows = await request(`ride_requests?id=eq.${encodeURIComponent(requestId)}&select=id,status`, accessToken, { status }, 'PATCH');
+  if (!Array.isArray(rows) || rows[0]?.status !== status) {
+    const error = new Error('Only the driver can respond to this request.'); error.code = '42501'; throw error;
+  }
+  return rows[0];
 }
 
 // ---------- Supabase Auth (email + password) ----------
