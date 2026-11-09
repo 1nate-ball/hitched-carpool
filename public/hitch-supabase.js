@@ -232,6 +232,12 @@ export async function getSession() {
   }
 }
 
+// Trip Detail: one trip by id, fresh from the database.
+export async function loadTrip(accessToken, tripId) {
+  const rows = await request(`trips?select=*&id=eq.${encodeURIComponent(tripId)}`, accessToken);
+  return rows[0] || null;
+}
+
 // The signed-in user's row in public.profiles (created at sign-up).
 export async function loadMyProfile(accessToken, userId) {
   const rows = await request(`profiles?select=id,full_name&id=eq.${encodeURIComponent(userId)}`, accessToken);

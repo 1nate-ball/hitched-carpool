@@ -399,9 +399,11 @@ let cleanupLocationPickers = () => {};
 const DB = {session:null, api:null, profile:null, generation:0};
 const loadApi = async () => DB.api || (DB.api = await import('/hitch-supabase.js'));
 const DB_DRIVER = {first:'Hitch', last:'driver', hometown:'', bio:'', color:'#3B6EA8', verified:'pending'};
+const AV_COLORS = ['#3B6E5F','#36608F','#8A4B2A','#5B4A8C','#2E6B6B','#7A5300','#9E2E25','#4A5A2E'];
+const avColor = id => AV_COLORS[[...String(id)].reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 7) % AV_COLORS.length];
 function fromRow(r){ // Supabase trips row -> the trip shape the screens already use
   const driver = DB.session && r.driver_id === DB.session.user.id ? 'me' : r.driver_id;
-  if (driver !== 'me' && !USERS[driver]) USERS[driver] = {...DB_DRIVER};
+  if (driver !== 'me' && !USERS[driver]) USERS[driver] = {...DB_DRIVER, color:avColor(driver)};
   return {id:r.id, dest:r.destination_id, driver, depart:denverWall(new Date(r.departure_at)),
     ret:r.return_at ? denverWall(new Date(r.return_at)) : null, seats:r.total_seats, price:r.price_per_seat,
     pickup:r.pickup_location, dropoff:r.dropoff_location, vehicle:null, // no vehicle column yet: hide the line
@@ -427,7 +429,7 @@ async function loadDbTrips(){ // saved trips come back after a reload instead of
   const rows = await api.loadTrips(DB.session.accessToken);
   if (generation !== DB.generation) return [];
   const trips = rows.map(r => upsertTrip(fromRow(r)));
-  await Promise.all([loadMyDbRequests(api), loadDriverDbRequests(api, trips), loadDbSeats(api, trips)]);
+  await Promise.all([loadMyDbRequests(api), loadDriverDbRequests(api, trips), loadDbSeats(api, trips), nameDrivers(api, trips)]);
   return trips;
 }
 async function loadDriverDbRequests(api, trips){ // requests on the signed-in driver's own trips, with rider names
@@ -487,6 +489,30 @@ function decideErrorMessage(error){
   if (error.code === '42501' || error.status === 403) return 'Only the driver of this trip can respond to its requests.';
   if (error.status === undefined) return "We couldn't reach the database. Nothing changed. Try again.";
   return 'Something went wrong. Nothing changed. Try again.';
+}
+// Put real driver names (public.profiles) on saved trips. Drivers without a profile keep "Hitch driver".
+async function nameDrivers(api, trips){
+  const ids = trips.map(t => t.driver).filter(id => id !== 'me' && USERS[id] && !USERS[id].named);
+  if (!ids.length) return;
+  try {
+    for (const p of await api.loadProfiles(DB.session.accessToken, ids)){
+      const parts = (p.full_name || '').trim().split(/\s+/);
+      if (USERS[p.id] && parts[0]) Object.assign(USERS[p.id], {first:parts[0], last:parts.slice(1).join(' '), named:true});
+    }
+  } catch (error) { console.warn('Could not load driver names:', error.message); }
+}
+// Trip Detail: re-read this trip and its driver from the database.
+async function refreshTripDetail(id){
+  const api = await loadApi();
+  DB.session = await api.getSession();
+  if (!DB.session) throw new Error('Sign in to see saved trips.');
+  const row = await api.loadTrip(DB.session.accessToken, id);
+  if (!row) return null;
+  const old = TRIPS.find(t => t.id === id), t = fromRow(row);
+  if (old){ t.passengers = old.passengers; t.requests = old.requests; t.available = old.available; } // keep request status
+  upsertTrip(t);
+  await Promise.all([nameDrivers(api, [t]), loadDbSeats(api, [t])]); // real seats left counts accepted riders
+  return t;
 }
 async function loadMyDbRequests(api){ // attach the signed-in rider's saved requests so Trip Detail shows "Request sent"
   const generation = DB.generation, session = DB.session;
@@ -675,8 +701,11 @@ function resultsList(){
   list.sort((a,b) => parse(a.depart) - parse(b.depart));
   if (q.state === 'error') return `<div class="alert bad" role="alert">Could not load saved trips. <button class="btn sm" data-act="retrysearch">Try again</button></div>`;
   if (!list.length) return `<div class="empty">${I.road}<h2>No rides found</h2><p class="muted small">No trips to ${esc(d.name)}${S.search.date ? ` on ${fDate(S.search.date)}` : ''} match your search${max||round?' and filters':''}. Try a different date or destination${max||round?', or clear your filters':''}.</p><div class="row" style="width:100%">${max||round?'<button class="btn" data-act="clearf">Clear filters</button>':''}<button class="btn primary" data-act="change">Change search</button></div></div>`;
-  const note = q.state === 'signedout' ? `<p class="small muted">Showing sample trips. <button class="link" data-act="needlogin">Log in</button> to include trips other students have posted.</p>` : '';
-  return note + `<p class="small muted" role="status">${list.length} trip${list.length>1?'s':''} · earliest departure first</p>` + list.map(tripCard).join('');
+  // A helpful tile after the trips: log in to see more, or offer to post a trip.
+  const tile = q.state === 'signedout'
+    ? `<div class="tile tint-sky">${I.lock.replace('<svg','<svg width="28" height="28" aria-hidden="true"')}<h3>More rides are waiting</h3><p class="small">You're seeing sample trips. Log in to see trips other BYU students have posted to ${esc(d.name)}.</p><button class="btn primary sm" data-act="needlogin">Log in</button></div>`
+    : `<div class="tile tint-sage">${I.car.replace('<svg','<svg width="28" height="28" aria-hidden="true"')}<h3>Driving to ${esc(d.name)}?</h3><p class="small">Post your trip and split the gas with students heading the same way.</p><button class="btn primary sm" data-act="nav" data-to="post">Post a trip</button></div>`;
+  return `<p class="small muted" role="status">${list.length} trip${list.length>1?'s':''} · earliest departure first</p>` + list.map(tripCard).join('') + tile;
 }
 // Ask Supabase for this destination's trips matching the current date and max-price filters.
 async function searchDbTrips(){
@@ -719,6 +748,7 @@ async function searchDbTrips(){
     ]);
     if (S.dbSearch.key !== key || DB.session?.user.id !== identity) return;
     if (base) S.dbBase = {key:baseKey, ids:base.map(r => upsertTrip(fromRow(r)).id)};
+    await nameDrivers(api, rows.concat(base || []).map(r => TRIPS.find(t => t.id === r.id)).filter(Boolean));
     S.dbSearch = {key, state:'done', ids:rows.map(r => upsertTrip(fromRow(r)).id)};
   } catch (error) {
     console.warn('Trip search failed:', error.message);
@@ -757,6 +787,7 @@ SCREENS.results = () => {
   const from = S.search.from || (S.me.location === 'allowed' ? 'Current location' : 'Provo');
   return `${topbar(d.name, `${esc(from)} → ${esc(d.name)} · ${S.search.date ? fDate(S.search.date) : 'Any date'}`)}
 <div class="screen">
+  <div class="hero rhero">${art(d.art)}<button class="iconbtn" data-act="back" aria-label="Back">${I.back}</button><div class="cap"><div class="small" style="opacity:.9">${esc(from)} →</div><h1>${esc(d.name)}</h1><div class="small" style="opacity:.9">${S.search.date ? fDate(S.search.date) : 'Any date'}</div></div></div>
   <div class="row" style="justify-content:space-between"><div class="filters">
     <label class="fdate"><span class="sr-only">Travel date</span><input id="f-date" type="date" value="${esc(S.search.date)}" aria-label="Travel date"></label>
     ${priceSlider()}
@@ -764,7 +795,7 @@ SCREENS.results = () => {
     ${S.search.date || S.filters.max || S.filters.round ? '<button class="btn sm" data-act="clearf">Clear filters</button>' : ''}
   </div><button class="btn sm" data-act="change">Change search</button></div>
   <p class="small muted">Prices are per rider. Round-trip prices cover there and back; one-way prices cover the drive there only.</p>
-  <div id="rlist" style="display:flex;flex-direction:column;gap:12px">${resultsList()}</div>
+  <div id="rlist" class="rlist">${resultsList()}</div>
 </div>${nav()}`;
 };
 BIND.results = () => {
@@ -803,7 +834,11 @@ BIND.results = () => {
 
 /* Screen 5: Trip details / request a seat */
 SCREENS.detail = () => {
-  const t = TRIPS.find(x => x.id === S.params.id), d = D(t.dest), u = U(t.driver), st = myStatus(t), left = seatsLeft(t);
+  const t = TRIPS.find(x => x.id === S.params.id), load = S.detailLoad || {};
+  if (!t) return `${topbar('Trip details')}<div class="screen">${load.state === 'error'
+    ? `<div class="empty">${I.road}<h2>Trip not found</h2><p class="muted small">${esc(load.message || 'This trip may have been removed.')}</p><button class="btn primary" data-act="go" data-to="home">Back to Explore</button></div>`
+    : `<p class="muted" role="status">Loading trip…</p>`}</div>`;
+  const d = D(t.dest), u = U(t.driver), st = myStatus(t), left = seatsLeft(t);
   const passengers = t.passengers.map(U);
   const covers = t.ret ? `Covers your seat there and back. The driver set this price to split gas for the round trip.` : `Covers your seat for the drive there only. This is a one-way trip, so you'll need to arrange your own ride back.`;
   let action;
@@ -816,9 +851,10 @@ SCREENS.detail = () => {
   else if (!isVerified()) action = `<button class="btn" disabled>Verify your ID to request</button>`;
   else action = `<button class="btn primary" data-act="request">Request a seat</button>`;
   return `${topbar('Trip details')}
-<div class="screen">
+<div class="screen detail-layout">
   <div class="hero">${art(d.art)}<div class="cap"><div class="small" style="opacity:.85">${esc(t.origin || 'Provo')} → </div><h1>${esc(d.name)}</h1></div></div>
   ${!isVerified() && !st ? `<div class="alert warn">${I.lock.replace('<svg','<svg width="18" height="18"')}<span>You need a verified ID before you can request a seat. Verification is pending.</span></div>` : ''}
+  <div class="dmain">
   <div class="card"><h3>Trip</h3>
     <dl class="kv tnum" style="margin:0">
       <dt>Leaves</dt><dd>${fDT(t.depart)}</dd>
@@ -828,15 +864,35 @@ SCREENS.detail = () => {
     </dl></div>
   <div class="card"><h3>Driver</h3>
     <div class="driver">${av(u,48)}<div style="min-width:0"><div class="nm">${esc(fullName(u))}${t.driver==='me'?' (you)':''}</div>${vBadge(u)}</div></div>
-    <p>${esc(u.bio || 'No bio yet.')}</p>
+    ${t.dbTrip ? '' : `<p>${esc(u.bio || 'No bio yet.')}</p>`}
     ${t.vehicle ? `<div class="small muted">${I.car.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px"')} ${esc(t.vehicle)}</div>` : ''}</div>
   <div class="card"><div class="section-head"><h3>Who's going</h3><span class="small tnum"><b>${left}</b> of ${t.seats} seats left</span></div>
     ${passengers.length ? `<div class="plist">${passengers.map(p => `<div class="driver">${av(p,34)}<div><div class="nm">${esc(fullName(p))}${p===S.me?' (you)':''}</div>${vBadge(p)}</div></div>`).join('')}</div>` : '<p class="muted small">No confirmed riders yet. Be the first.</p>'}</div>
   <div class="card"><div class="section-head"><h3>Price</h3><span class="tnum"><b>${money(t.price)}</b> per seat</span></div><p class="small muted">${covers} No payment is collected in the app.</p></div>
+  </div>
+  <aside class="booking card" aria-label="Book this trip">
+    <div><b class="tnum bk-price">${money(t.price)}</b> <span class="muted">per seat · ${t.ret ? 'round trip' : 'one way'}</span></div>
+    <dl class="kv tnum small" style="margin:0"><dt>Leaves</dt><dd>${fDT(t.depart)}</dd><dt>Seats left</dt><dd>${left} of ${t.seats}</dd></dl>
+    ${action}
+    <p class="small muted" style="margin:0">Your seat is held once the driver accepts. No payment in the app.</p>
+  </aside>
 </div>
+<div class="desk-nav">${nav()}</div>
 <div class="actionbar"><div class="p tnum"><b>${money(t.price)}</b><div>${t.ret ? 'round trip' : 'one way'}</div></div>${action}</div>`;
 };
 
+// Trip Detail loads the trip (and its driver's name) from the database each time it opens.
+BIND.detail = () => {
+  const id = S.params.id, t = TRIPS.find(x => x.id === id);
+  if ((t && !t.dbTrip) || S.detailLoad?.id === id) return; // sample trip, or already loaded this visit
+  S.detailLoad = {id, state:'loading'};
+  refreshTripDetail(id).then(found => {
+    S.detailLoad = found ? {id, state:'done'} : {id, state:'error', message:'This trip may have been removed.'};
+  }).catch(error => {
+    console.warn('Could not load trip:', error.message);
+    S.detailLoad = TRIPS.some(x => x.id === id) ? {id, state:'done'} : {id, state:'error', message:error.message};
+  }).finally(() => { if (S.screen === 'detail' && S.params.id === id) render(); });
+};
 function openRequestDialog(){
   const t = TRIPS.find(x => x.id === S.params.id), d = D(t.dest), u = U(t.driver);
   const wrap = document.createElement('div');
@@ -1198,11 +1254,19 @@ async function logOut(notice, returnTo = null){
   S.hist = []; S.after = returnTo; S.loginNotice = notice; S.screen = 'login'; S.params = {};
   render(); window.scrollTo(0,0);
 }
+// Desktop only: a picture panel beside the Log in / Sign up form. Uses public/images/login.jpg
+// when it exists (the dark fade keeps the white text readable); otherwise the mountain drawing.
+function authArt(kind){
+  const [title, sub] = kind === 'signup'
+    ? ['Find your crew.', 'Make an account to ride with BYU students and split the gas.']
+    : ['Your next road trip starts here.', 'Log in to find rides, post trips, and split the gas.'];
+  return `<div class="auth-art" aria-hidden="true">${RIDGES}<img class="auth-photo" src="images/login.jpg" alt="" onerror="this.remove()"><div class="auth-copy"><h2>${title}</h2><p>${sub}</p></div></div>`;
+}
 function authHeader(sub){
   return `<div class="brandrow"><span class="logo">${LOGO}</span><div><div class="brand-name">Hitch</div><div class="brand-sub">${sub}</div></div></div>`;
 }
 
-SCREENS.login = () => `<div class="screen">
+SCREENS.login = () => `<div class="screen auth-layout">${authArt('login')}<div class="auth-form">
   ${authHeader('Rides with BYU students')}
   <h1>Log in</h1>
   ${S.loginNotice ? `<div class="alert ok small" role="status">${esc(S.loginNotice)}</div>` : ''}
@@ -1215,7 +1279,7 @@ SCREENS.login = () => `<div class="screen">
   </form>
   <p class="small" style="text-align:center">New to Hitch? <button class="link" data-act="auth" data-to="signup">Create an account</button></p>
   <p class="small" style="text-align:center"><button class="link" data-act="auth" data-to="home">Browse trips without logging in</button></p>
-</div>`;
+</div></div>`;
 BIND.login = () => {
   const $ = id => document.getElementById(id);
   $(S.loginUser ? 'li-pass' : 'li-email').focus();
@@ -1238,7 +1302,7 @@ BIND.login = () => {
   });
 };
 
-SCREENS.signup = () => `<div class="screen">
+SCREENS.signup = () => `<div class="screen auth-layout">${authArt('signup')}<div class="auth-form">
   ${authHeader('Rides with BYU students')}
   <h1>Create your account</h1>
   <form id="suForm" class="fieldset" novalidate>
@@ -1249,7 +1313,7 @@ SCREENS.signup = () => `<div class="screen">
     <button class="btn primary block" type="submit" id="su-btn">Create account</button>
   </form>
   <p class="small" style="text-align:center">Already have an account? <button class="link" data-act="auth" data-to="login">Log in</button></p>
-</div>`;
+</div></div>`;
 BIND.signup = () => {
   const $ = id => document.getElementById(id);
   const FIELDS = {name:'su-name', email:'su-email', pass:'su-pass'};
@@ -1401,7 +1465,7 @@ document.addEventListener('click', e => {
     case 'retrysearch': searchDbTrips(); break;
     case 'viewmytrips': S.tripsTab = 'driver'; S.hist = []; go('mytrips',{},false); break;
     case 'clearf': S.filters = {max:'', round:false}; S.search.date = ''; render(); break;
-    case 'trip': go('detail', {id}); break;
+    case 'trip': S.detailLoad = null; go('detail', {id}); break;
     case 'request': openRequestDialog(); break;
     case 'tab': S.tripsTab = el.dataset.t; render(); break;
     case 'withdraw': { const t = TRIPS.find(x => x.id === id); t.requests = t.requests.filter(r => r.uid !== 'me'); render(); toast('Request withdrawn'); break; }
