@@ -125,6 +125,11 @@ a{color:var(--accent)}
 .ridge-hero > :not(svg){position:relative}
 .ridge-hero h1{font-size:2.1rem;line-height:1.06;max-width:14ch;letter-spacing:-.03em}
 .ridge-hero p{color:var(--hero-sub);font-size:1rem;max-width:30ch}
+/* Real photo behind the Explore banner (falls back to the drawn ridges if missing) */
+.hero-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 25%}
+.ridge-hero:has(.hero-photo)::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(10,16,14,.55) 0%,rgba(10,16,14,.2) 55%,rgba(10,16,14,.05) 100%)}
+.ridge-hero:has(.hero-photo) > h1,.ridge-hero:has(.hero-photo) > p{z-index:1;color:#fff;text-shadow:0 1px 12px rgba(0,0,0,.35)}
+.ridge-hero > .hero-photo{position:absolute}
 .ridge-hero + .searchcard{margin-top:-60px;position:relative;z-index:1;box-shadow:var(--shadow-lift)}
 .r-sun{fill:var(--sun)} .r-1{fill:var(--ridge-1)} .r-2{fill:var(--ridge-2)} .r-3{fill:var(--ridge-3)}
 

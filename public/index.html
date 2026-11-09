@@ -647,7 +647,7 @@ SCREENS.home = () => {
 <header class="topbar"><div class="brandrow" style="flex:1"><span class="logo">${LOGO}</span><div class="brand-name">Hitch</div></div>
   <button class="iconbtn" aria-label="Account (not available in prototype)" title="Account">${S.me ? av(S.me, 38) : I.user}</button></header>
 <div class="screen">
-  <section class="ridge-hero">${RIDGES}<h1>Hitch a ride this weekend.</h1><p>Split the drive with BYU students already heading your way.</p></section>
+  <section class="ridge-hero">${RIDGES}<img class="hero-photo" src="images/explore-hero.jpg" alt="" onerror="this.remove()"><h1>Hitch a ride this weekend.</h1><p>Split the drive with BYU students already heading your way.</p></section>
   <form class="searchcard" id="searchForm" novalidate role="search">
     <label class="sfield"><span class="tag">From</span><input id="s-from" type="text" maxlength="80" placeholder="e.g. Provo" value="${esc(S.search.from)}" aria-label="Starting city (optional)">${I.pin}</label>
     <label class="sfield"><span class="tag">To</span><input id="s-dest" type="text" list="destlist" placeholder="Search a destination" value="${esc(S.search.dest)}" aria-label="Destination">${I.search}</label>
