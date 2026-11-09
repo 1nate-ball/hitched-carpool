@@ -427,8 +427,18 @@ async function loadDbTrips(){ // saved trips come back after a reload instead of
   const rows = await api.loadTrips(DB.session.accessToken);
   if (generation !== DB.generation) return [];
   const trips = rows.map(r => upsertTrip(fromRow(r)));
-  await loadMyDbRequests(api);
+  await Promise.all([loadMyDbRequests(api), loadDriverVerification(api, trips)]);
   return trips;
+}
+async function loadDriverVerification(api, trips){ // real badges for drivers of saved trips
+  const generation = DB.generation, session = DB.session;
+  const ids = [...new Set(trips.map(t => t.driver).filter(d => d !== 'me'))];
+  if (!session || !ids.length) return;
+  let status;
+  try { status = await api.loadVerification(session.accessToken, ids); }
+  catch (error) { console.warn('Could not load driver verification:', error.message); return; } // badges stay "pending"
+  if (generation !== DB.generation) return;
+  for (const id of ids) if (USERS[id]) USERS[id].verified = status[id] ? 'verified' : 'pending';
 }
 async function loadMyDbRequests(api){ // attach the signed-in rider's saved requests so Trip Detail shows "Request sent"
   const generation = DB.generation, session = DB.session;
@@ -479,7 +489,7 @@ function clearDbTrips(){
 }
 function dbErrorMessage(error){
   if (error.status === 401) return 'Your sign-in expired. Sign in again, then publish.';
-  if (error.code === '42501' || error.status === 403) return "The database didn't allow this post. Sign out, sign back in, and try again.";
+  if (error.code === '42501' || error.status === 403) return "The database didn't allow this post. Only verified drivers (a confirmed BYU email) can post trips. If you just confirmed your email, log out, log back in, and try again.";
   if (/Departure must be in the future/.test(error.message)) return 'Departure must be in the future. Pick a later time.';
   if (error.code === '23514' || error.code === '23503' || error.status === 400) return "The database rejected one of the values. Check the trip details and try again.";
   return 'Something went wrong saving your trip. Your trip was not published. Please try again.';
@@ -524,9 +534,12 @@ function nav(){
 function topbar(title, sub=''){
   return `<header class="topbar"><button class="iconbtn" data-act="back" aria-label="Back">${I.back}</button><div class="title"><h2>${esc(title)}</h2>${sub?`<div class="small muted">${sub}</div>`:''}</div></header>`;
 }
+// What "Verified" means. Keep in sync with the README and 20261108000100_driver_verification.sql.
+const VERIFY_INFO = "Verified means this person signed up with a BYU email address (ending in byu.edu) and confirmed it by clicking the link we sent to that inbox, so they have a working BYU account. Every driver must be verified before they can post a trip. Verification does not check a student ID, driver's license, driving record, or insurance. Student ID review is planned for a later version.";
+const verifyInfo = () => `<details class="vinfo small"><summary>What does Verified mean?</summary><p class="muted">${VERIFY_INFO}</p></details>`;
 function pendingBanner(){
   if (!S.me || S.me.verified !== 'pending') return '';
-  return `<div class="banner" role="status">${I.clock}<div><b>ID verification pending.</b> We're reviewing your student ID or license, usually within one business day. You can browse trips now. Requesting seats and posting trips unlock once you're verified.<div style="margin-top:6px"><button class="link" data-act="approve">Prototype: mark me verified</button></div></div></div>`;
+  return `<div class="banner" role="status">${I.clock}<div><b>Your account isn't verified yet.</b> Posting trips and requesting seats need a confirmed BYU email. Sign up with your byu.edu address and click the confirmation link we email you. You can browse trips now.${verifyInfo()}${DB.session ? '' : '<div style="margin-top:6px"><button class="link" data-act="approve">Prototype: mark me verified</button></div>'}</div></div>`;
 }
 
 // ---------- screens ----------
@@ -755,12 +768,12 @@ SCREENS.detail = () => {
   else if (st === 'declined') action = `<button class="btn" data-act="go" data-to="mytrips">Request declined · View status</button>`;
   else if (!left) action = `<button class="btn" disabled>Trip is full</button>`;
   else if (!DB.session) action = `<button class="btn primary" data-act="needlogin">Log in to request a seat</button>`;
-  else if (!isVerified()) action = `<button class="btn" disabled>Verify your ID to request</button>`;
+  else if (!isVerified()) action = `<button class="btn" disabled>Verify your BYU email to request</button>`;
   else action = `<button class="btn primary" data-act="request">Request a seat</button>`;
   return `${topbar('Trip details')}
 <div class="screen">
   <div class="hero">${art(d.art)}<div class="cap"><div class="small" style="opacity:.85">${esc(t.origin || 'Provo')} → </div><h1>${esc(d.name)}</h1></div></div>
-  ${!isVerified() && !st ? `<div class="alert warn">${I.lock.replace('<svg','<svg width="18" height="18"')}<span>You need a verified ID before you can request a seat. Verification is pending.</span></div>` : ''}
+  ${!isVerified() && !st ? `<div class="alert warn">${I.lock.replace('<svg','<svg width="18" height="18"')}<span>You need a confirmed BYU email before you can request a seat.</span></div>` : ''}
   <div class="card"><h3>Trip</h3>
     <dl class="kv tnum" style="margin:0">
       <dt>Leaves</dt><dd>${fDT(t.depart)}</dd>
@@ -770,6 +783,7 @@ SCREENS.detail = () => {
     </dl></div>
   <div class="card"><h3>Driver</h3>
     <div class="driver">${av(u,48)}<div style="min-width:0"><div class="nm">${esc(fullName(u))}${t.driver==='me'?' (you)':''}</div>${vBadge(u)}</div></div>
+    ${verifyInfo()}
     <p>${esc(u.bio || 'No bio yet.')}</p>
     ${t.vehicle ? `<div class="small muted">${I.car.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px"')} ${esc(t.vehicle)}</div>` : ''}</div>
   <div class="card"><div class="section-head"><h3>Who's going</h3><span class="small tnum"><b>${left}</b> of ${t.seats} seats left</span></div>
@@ -867,7 +881,7 @@ function pinLink(pin, label){
 /* Screen 7: Post a trip */
 SCREENS.post = () => {
   if (!isVerified()) return `<header class="topbar"><div class="title"><h2>Post a trip</h2></div></header>
-<div class="screen">${pendingBanner()}<div class="empty">${I.lock}<h2>Verify your ID to post trips</h2><p class="muted small">Only verified students can offer rides. We'll unlock posting as soon as your ID is approved.</p><button class="btn" data-act="nav" data-to="home">Browse trips instead</button></div></div>${nav()}`;
+<div class="screen">${pendingBanner()}<div class="empty">${I.lock}<h2>Verify your BYU email to post trips</h2><p class="muted small">Only verified drivers can offer rides. Posting unlocks once your account has a confirmed byu.edu email.</p><button class="btn" data-act="nav" data-to="home">Browse trips instead</button></div></div>${nav()}`;
   return `<header class="topbar"><div class="title"><h2>Post a trip</h2><div class="small muted">Offer seats in your car · Posting as ${esc(DB.session?.user.email || '')} · <button class="link" type="button" data-act="logout">Log out</button></div></div></header>
 <div class="screen post-layout">
 <form id="ptForm" novalidate>
@@ -1106,12 +1120,16 @@ async function loadAccount(){
   const generation = DB.generation, session = DB.session;
   DB.profile = null;
   if (S.me){ S.me.first = 'Hitch'; S.me.last = 'student'; }
-  try {
-    const profile = await (await loadApi()).loadMyProfile(session.accessToken, session.user.id);
-    if (generation !== DB.generation) return;
-    DB.profile = profile;
-  }
-  catch (error) { console.warn('Could not load your profile:', error.message); }
+  const api = await loadApi();
+  const [profile, status] = await Promise.all([
+    api.loadMyProfile(session.accessToken, session.user.id).catch(error => { console.warn('Could not load your profile:', error.message); return null; }),
+    api.loadVerification(session.accessToken, [session.user.id]).catch(error => { console.warn('Could not load your verification:', error.message); return null; }),
+  ]);
+  if (generation !== DB.generation) return;
+  DB.profile = profile;
+  // Real status from the database replaces the demo profile's badge. If it can't load, keep the
+  // demo value: the database still refuses trips from unverified drivers.
+  if (S.me && status) S.me.verified = status[session.user.id] ? 'verified' : 'pending';
   applyAccountName();
 }
 function applyAccountName(){
@@ -1236,13 +1254,14 @@ SCREENS.profile = () => {
   return `<header class="topbar"><div class="title"><h2>Profile</h2></div><span class="pill">Demo account</span></header>
 <div class="screen">
   ${pendingBanner()}
-  <div class="phead">${av(m,96)}<h1>${esc(fullName(m))}</h1>${m.verified === 'verified' ? `<span class="pill ok">${I.check.replace('<svg','<svg width="14" height="14"')}ID verified</span>` : '<span class="pill warn">Verification pending</span>'}</div>
+  <div class="phead">${av(m,96)}<h1>${esc(fullName(m))}</h1>${m.verified === 'verified' ? `<span class="pill ok">${I.check.replace('<svg','<svg width="14" height="14"')}BYU email verified</span>` : '<span class="pill warn">Not verified</span>'}</div>
+  ${verifyInfo()}
   <div class="card"><dl class="kv" style="margin:0"><dt>Hometown</dt><dd>${m.hometown ? esc(m.hometown) : '<span class="muted">Not added yet</span>'}</dd><dt>Bio</dt><dd>${m.bio ? esc(m.bio) : '<span class="muted">Not added yet</span>'}</dd></dl></div>
   <div style="display:flex;flex-direction:column;gap:10px">
     <button class="btn block" data-act="go" data-to="edit">Edit profile</button>
     <button class="btn primary block" data-act="nav" data-to="post" ${isVerified()?'':'disabled'}>Post a trip</button>
     <button class="btn primary block" data-act="mymanage">Manage my trip</button>
-    ${isVerified() ? '' : '<p class="small muted" style="text-align:center">Posting a trip unlocks once your ID is verified.</p>'}
+    ${isVerified() ? '' : '<p class="small muted" style="text-align:center">Posting a trip unlocks once your BYU email is verified.</p>'}
     <button class="btn block danger" data-act="logout">Log out</button>
     ${DB.session ? `<p class="small muted" style="text-align:center">Signed in as ${esc(DB.session.user.email)}</p>` : ''}
   </div>

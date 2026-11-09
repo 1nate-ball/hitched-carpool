@@ -163,6 +163,7 @@ textarea{border-radius:16px}
 .alert.info{background:var(--accent-soft)}
 .banner{border-radius:var(--r-sm)}
 .verified{color:var(--ok)}
+.vinfo{margin-top:8px}.vinfo summary{cursor:pointer;color:var(--accent);font-weight:600}.vinfo p{margin:6px 0 0}
 
 /* ---------- Soft tints ---------- */
 .tint-sage{background:var(--brand-soft)}

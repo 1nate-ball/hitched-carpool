@@ -1,10 +1,11 @@
 -- Live role/RLS regression only; all synthetic users, trips and requests are rolled back.
 -- Does not prove password sign-in or browser persistence.
 begin;
-insert into auth.users(id,email) values
- ('b81e5a01-1111-4111-8111-111111111111','hitch-check-a@example.invalid'),
- ('b81e5a01-2222-4222-8222-222222222222','hitch-check-b@example.invalid'),
- ('b81e5a01-3333-4333-8333-333333333333','hitch-check-c@example.invalid');
+-- Drivers must be verified (confirmed byu.edu email) since 20261108000100_driver_verification.sql.
+insert into auth.users(id,email,email_confirmed_at) values
+ ('b81e5a01-1111-4111-8111-111111111111','hitch-check-a@byu.edu', now()),
+ ('b81e5a01-2222-4222-8222-222222222222','hitch-check-b@byu.edu', now()),
+ ('b81e5a01-3333-4333-8333-333333333333','hitch-check-c@byu.edu', now());
 set local role authenticated;
 select set_config('request.jwt.claim.sub','b81e5a01-1111-4111-8111-111111111111',true);
 insert into public.trips(destination_id,departure_at,pickup_location,dropoff_location,total_seats,price_per_seat,origin_city,pickup_latitude,pickup_longitude,dropoff_latitude,dropoff_longitude)

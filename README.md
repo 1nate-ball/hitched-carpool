@@ -24,6 +24,27 @@ The table definitions are in [schema.sql](database/schema.sql), and the sample r
 
 ## Key Results
 
+**Objective 1, Key Result 1: 100% of drivers are verified.**
+
+**What "verified" means:** the person signed up with a BYU email address (ending in `byu.edu`) and confirmed it by clicking the link Supabase emailed to that inbox, so they have a working BYU account. It does not check a student ID, driver's license, driving record, or insurance. Student ID review is planned as a later level of verification. The app shows this same explanation under **What does Verified mean?** on Trip details and Profile.
+
+The database enforces it. [The driver verification migration](supabase/migrations/20261108000100_driver_verification.sql) changes the `trips` insert policy so only verified users can post a trip, which means every trip posted since the migration has a verified driver. The BYU email rule is checked in the database as well as on the sign-up form, so going around the form doesn't help. Badges for drivers of saved trips and the signed-in user's own status come from the same check (`verification_status`), which returns only yes/no and never emails.
+
+Two private views measure it, including any trips posted before the rule existed:
+
+- `kr_driver_verification` has one row per driver who has posted a trip: `driver_id`, `is_verified`, `trips_posted`, and `first_trip_at`.
+- `kr_driver_verification_summary` has one row: `drivers`, `verified_drivers`, and `verified_rate` (a percent).
+
+To check the current number, run this in the Supabase SQL Editor:
+
+```sql
+select * from public.kr_driver_verification_summary;
+```
+
+If it's under 100%, `select * from public.kr_driver_verification where not is_verified;` lists the drivers whose trips predate the rule (for example dashboard test accounts without a BYU email).
+
+To check the rule live, paste [the verification check](database/checks/driver_verification_live.sql) into the SQL Editor. It creates three test users inside a transaction, confirms only the one with a confirmed BYU email can post, and rolls everything back. It should end with a `PASS` row. Locally, `python3 scripts/check_driver_verification_schema.py` runs 23 checks against a throwaway PostgreSQL, and `node --test tests/test_driver_verification.cjs` checks the badges and gates in the app.
+
 **Objective 2, Key Result: posted trips average 70% of seats filled.**
 
 For each trip, the fill rate is the number of seats on accepted ride requests (`RideRequests.RequestedSeats`) divided by `Trips.TotalSeats`, capped at 100%. The Key Result is the average of those per-trip rates. Only trips whose `DepartureDateTime` has passed are counted, so new trips that haven't had time to collect requests don't pull the average down.
