@@ -104,7 +104,11 @@ test('logout cancels an older trip/profile response instead of restoring the old
 test('Robbie signup returns a new account to the requested post screen',async()=>{
   const f=await fixture(); f.run("go('post',{},false); go('signup',{},false);");
   f.get('su-name').value='New Student';f.get('su-email').value='new-driver@byu.edu';f.get('su-pass').value='fake-password1';
-  f.get('su-home').value=' Orem, UT '; f.get('su-bio').value='I like hiking.';
+  f.get('su-home').value='orem ut'; f.get('su-bio').value='I like hiking.';
+  await f.submit('suForm');
+  assert.match(f.get('su-home-error').textContent,/Choose a city/);
+  assert.equal(f.calls.some(call=>call.url.includes('/signup')),false);
+  f.get('su-home').value='Orem, UT'; f.get('su-home-value').value='Orem, UT';
   await f.submit('suForm');await tick();
   assert.equal(f.run('S.screen'),'post');assert.equal(f.run('DB.session.user.id'),'new-driver');
   assert.equal(f.run('fullName(S.me)'),'New Student');

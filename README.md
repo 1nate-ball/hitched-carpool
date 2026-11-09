@@ -120,7 +120,7 @@ The app opens to a **Log in** screen. New users choose **Create an account** and
 - **Log out** (on Profile and Post a trip) clears the session and returns to the Log in screen.
 - **Protected pages:** My Trips, Manage requests, Post a trip, Profile, Edit profile, and Group chat send signed-out users to Log in, then back to the page they wanted. Explore, search results, and trip details stay public; requesting a seat asks you to log in.
 
-The profile page shows the logged-in user's name from `profiles`. Hometown, bio, and avatar color still use the shared SQLite demo profile until the profile page moves to Supabase.
+Signup also offers an optional hometown and short bio. On signup and under **Edit profile**, search for a U.S. hometown and choose a result to save it as `City, ST`. The list comes from the [2025 U.S. Census Gazetteer](https://www.census.gov/geographies/reference-files/time-series/geo/gazetteer-files.2025.html). Profile details are saved to the signed-in account. An existing hometown stays as entered until you replace or clear it.
 
 To verify: create an account, refresh (still logged in), log out (back to Log in), then try opening My Trips while logged out (sent to Log in). In Supabase, check **Authentication → Users** and the `profiles` table for the new row. Run `node --test tests/test_auth.cjs` for the automated checks; they use a fake Supabase API and create no real accounts.
 
@@ -165,7 +165,7 @@ If port 8000 is already in use, run `PORT=8001 python3 server.py` on macOS/Linux
 ## Verifying the Vertical Slice
 
 1. Click **Edit profile**.
-2. Change the hometown to `Boise, ID` and the bio to `Ready for our next road trip!`. You can also choose a different avatar color.
+2. Search for and select `Boise, ID` as the hometown, and change the bio to `Ready for our next road trip!`. You can also choose a different avatar color.
 3. Click **Save changes**.
 4. Check that the profile shows the new information and the message **Profile saved**.
 5. Refresh the page. The same hometown, bio, and avatar color should still be there.
