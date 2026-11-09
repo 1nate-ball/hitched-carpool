@@ -1465,6 +1465,35 @@ BIND.reset = () => {
   });
 };
 
+function hometownField(id, label, value = ''){
+  return `<div class="field">
+    <label for="${id}">${label}</label>
+    <input id="${id}" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="${id}-options"
+      aria-describedby="${id}-hint ${id}-error" autocomplete="off" maxlength="100" placeholder="Search city or state" value="${esc(value)}">
+    <input id="${id}-value" type="hidden" value="${esc(value)}">
+    <div id="${id}-options" class="place-suggestions" role="listbox" aria-label="Hometown suggestions" hidden></div>
+    <div id="${id}-status" class="small muted" role="status"></div>
+    <div id="${id}-hint" class="hint">Choose a U.S. city and state, or leave this blank.</div>
+    <div id="${id}-error" class="err" role="alert"></div>
+  </div>`;
+}
+function bindHometown(id){
+  const input = document.getElementById(id);
+  import('/hitch-cities.js').then(module => {
+    if (input.isConnected) module.bindCityPicker(input);
+  }).catch(() => {
+    if (input.isConnected) document.getElementById(`${id}-status`).textContent = 'City search could not load. You can leave hometown blank.';
+  });
+}
+function hometownValue(id){
+  const input = document.getElementById(id), selected = document.getElementById(`${id}-value`).value;
+  const value = input.value.trim();
+  const valid = !value || value === selected;
+  document.getElementById(`${id}-error`).textContent = valid ? '' : 'Choose a city from the suggestions or leave hometown blank.';
+  input.setAttribute('aria-invalid', String(!valid));
+  return valid ? value : null;
+}
+
 SCREENS.signup = () => `<div class="screen auth-layout">${authArt('signup')}<div class="auth-form">
   ${authHeader('Rides with BYU students')}
   <h1>Create your account</h1>
@@ -1472,7 +1501,7 @@ SCREENS.signup = () => `<div class="screen auth-layout">${authArt('signup')}<div
     <div class="field"><label for="su-name">Full name</label><input id="su-name" type="text" autocomplete="name" maxlength="80" required aria-describedby="se-name"><div class="err" id="se-name"></div></div>
     <div class="field"><label for="su-email">BYU email</label><input id="su-email" type="email" autocomplete="email" placeholder="you@byu.edu" required aria-describedby="se-email"><div class="err" id="se-email"></div></div>
     <div class="field"><label for="su-pass">Password</label><input id="su-pass" type="password" autocomplete="new-password" required aria-describedby="su-passhint se-pass"><div class="hint" id="su-passhint">At least 8 characters, with a letter and a number.</div><div class="err" id="se-pass"></div></div>
-    <div class="field"><label for="su-home">Hometown (optional)</label><input id="su-home" type="text" maxlength="100" placeholder="e.g. Boise, ID"></div>
+    ${hometownField('su-home', 'Hometown (optional)')}
     <div class="field"><label for="su-bio">Short bio (optional)</label><textarea id="su-bio" maxlength="160" rows="2" aria-describedby="su-biohint"></textarea><div class="hint" id="su-biohint">Up to 160 characters. You can add or edit this later.</div></div>
     <div class="alert bad small" id="su-err" role="alert" hidden></div>
     <button class="btn primary block" type="submit" id="su-btn">Create account</button>
@@ -1481,6 +1510,7 @@ SCREENS.signup = () => `<div class="screen auth-layout">${authArt('signup')}<div
 </div></div>`;
 BIND.signup = () => {
   const $ = id => document.getElementById(id);
+  bindHometown('su-home');
   const FIELDS = {name:'su-name', email:'su-email', pass:'su-pass'};
   const show = err => {
     Object.keys(FIELDS).forEach(k => { $('se-'+k).innerHTML = err[k] || ''; $(FIELDS[k]).closest('.field').classList.toggle('invalid', !!err[k]); $(FIELDS[k]).setAttribute('aria-invalid', err[k] ? 'true' : 'false'); });
@@ -1495,11 +1525,13 @@ BIND.signup = () => {
     if (!name) err.name = 'Enter your name.';
     if (!email) err.email = 'Enter your BYU email.'; else if (!SCHOOL_EMAIL.test(email)) err.email = 'Use your BYU email address (ending in @byu.edu).';
     const weak = passwordProblem(pass); if (weak) err.pass = weak;
+    const hometown = hometownValue('su-home');
     box.hidden = true; show(err);
     if (Object.keys(err).length) return;
+    if (hometown === null) { $('su-home').focus(); return; }
     btn.disabled = true; btn.textContent = 'Creating account…';
     try {
-      const result = await (await loadApi()).signUp(name, email, pass, {hometown:$('su-home').value, bio:$('su-bio').value});
+      const result = await (await loadApi()).signUp(name, email, pass, {hometown, bio:$('su-bio').value});
       if (result.session) return afterSignIn(result.session, `Welcome to Hitch, ${name.split(/\s+/)[0]}!`);
       S.loginUser = email; S.loginNotice = `Account created. Check ${email} for a confirmation link, then log in.`;
       go('login', {}, false);
@@ -1548,7 +1580,7 @@ SCREENS.edit = () => {
   </div>
   <div class="fieldset"><div class="eyebrow">Profile details</div>
     <div class="field"><label for="ed-name">Name</label><input id="ed-name" type="text" value="${esc(fullName(m))}" readonly><div class="hint">Your name comes from your Hitch account.</div></div>
-    <div class="field"><label for="ed-home">Hometown</label><input id="ed-home" type="text" maxlength="100" value="${esc(m.hometown)}" placeholder="e.g. Boise, ID"></div>
+    ${hometownField('ed-home', 'Hometown', m.hometown)}
     <div class="field"><label for="ed-bio">Short bio</label><textarea id="ed-bio" maxlength="160" placeholder="Major, where you usually travel, what you're like on a road trip">${esc(m.bio)}</textarea><div class="hint" id="ed-count"></div></div>
   </div>
   <div class="privacy">${I.lock}<span>Hometown and bio are saved to your Hitch account.</span></div>
@@ -1559,6 +1591,7 @@ SCREENS.edit = () => {
 };
 BIND.edit = () => {
   if (!hasProfileDetails()) return;
+  bindHometown('ed-home');
   let color = S.me.color;
   const bio = document.getElementById('ed-bio'), cnt = document.getElementById('ed-count');
   const c = () => cnt.textContent = `${bio.value.length} / 160`; bio.addEventListener('input', c); c();
@@ -1568,7 +1601,9 @@ BIND.edit = () => {
     const button = e.target.querySelector('[type="submit"]');
     const box = document.getElementById('ed-error'), generation = DB.generation, userId = DB.session?.user.id;
     if (button.disabled || !hasProfileDetails()) return;
-    const fields = {hometown:document.getElementById('ed-home').value.trim(), bio:bio.value.trim(), color};
+    const hometown = hometownValue('ed-home');
+    if (hometown === null) { document.getElementById('ed-home').focus(); return; }
+    const fields = {hometown, bio:bio.value.trim(), color};
     box.hidden = true;
     button.disabled = true; button.textContent = 'Saving…';
     try {

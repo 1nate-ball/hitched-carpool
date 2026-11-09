@@ -302,6 +302,7 @@ textarea{border-radius:16px}
 .place-suggestion{display:block;width:100%;padding:10px 12px;text-align:left;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer}
 .place-suggestion + .place-suggestion{border-top:1px solid var(--line)}
 .place-suggestion:hover,.place-suggestion:focus-visible{background:var(--brand-soft)}
+.place-suggestion[aria-selected="true"]{background:var(--brand-soft)}
 .place-suggestion strong,.place-suggestion span{display:block;overflow-wrap:anywhere}
 .place-suggestion span{font-size:.83em;color:var(--muted)}
 .location-picker input{width:100%}
