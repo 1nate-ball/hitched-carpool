@@ -152,7 +152,7 @@ To set it up (one time):
 1. Sign in at [render.com](https://render.com) with GitHub and choose **New → Web Service**.
 2. Connect the `1nate-ball/hitched-carpool` repository and choose the `main` branch.
 3. Use these settings:
-   - **Name:** `hitch-carpool`. If the name is taken, update the Live site link above to the URL Render gives you.
+   - **Name:** `hitched-carpool`. If the name is taken, update the Live site link above to the URL Render gives you.
    - **Language:** Python 3
    - **Build Command:** `python3 --version` (there is nothing to install)
    - **Start Command:** `python3 server.py`
