@@ -402,7 +402,7 @@ const S = {
 let cleanupLocationPickers = () => {};
 
 // ---------- Supabase: Post a Trip ----------
-const DB = {session:null, api:null, profile:null, generation:0};
+const DB = {session:null, api:null, profile:null, profileDetails:null, generation:0};
 const loadApi = async () => DB.api || (DB.api = await import('/hitch-supabase.js'));
 const DB_DRIVER = {first:'Hitch', last:'driver', hometown:'', bio:'', color:'#3B6EA8', verified:'pending'};
 const AV_COLORS = ['#3B6E5F','#36608F','#8A4B2A','#5B4A8C','#2E6B6B','#7A5300','#9E2E25','#4A5A2E'];
@@ -1023,7 +1023,9 @@ function routeHTML(pickup, dropoff){
 }
 
 function locationPicker(kind){
-  return `<details id="pt-${kind}-picker" class="location-picker"><summary>Choose ${kind === 'pickup' ? 'pickup' : 'arrival'} map pin</summary>
+  return `<div id="pt-${kind}-suggestions" class="place-suggestions" hidden></div>
+    <span id="pt-${kind}-search-status" class="sr-only" role="status"></span>
+    <details id="pt-${kind}-picker" class="location-picker"><summary>Choose ${kind === 'pickup' ? 'pickup' : 'arrival'} map pin</summary>
     <label for="pt-${kind}-search">Search saved ${kind} places</label><input id="pt-${kind}-search" type="search" placeholder="Search a place or city">
     <div id="pt-${kind}-places" class="place-options" aria-live="polite">Loading saved places…</div>
     <p class="small muted">Choose a saved place, tap the map, or move the map with arrow keys and use its center. Enter a clear meeting address above. No location permission is needed.</p>
@@ -1045,8 +1047,9 @@ SCREENS.post = () => {
     <div class="field"><label for="pt-dest">Destination</label><select id="pt-dest" required><option value="">Choose a destination</option>${DESTS.map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select><div class="err" id="pe-dest"></div></div>
     <div class="field"><label for="pt-depart">Departure date & time</label><input id="pt-depart" type="datetime-local" required aria-describedby="pt-tzhint pe-depart"><div class="small muted" id="pt-tzhint">Utah time (Mountain Time). Use the calendar to choose a valid date.</div><div class="err" id="pe-depart"></div></div>
     <div class="field"><label for="pt-origin">Starting city</label><input id="pt-origin" type="text" maxlength="80" value="Provo" required aria-describedby="pe-origin"><div class="err" id="pe-origin"></div></div>
-    <div class="two-desk"><div class="field"><label for="pt-pickup">Pickup location</label><input id="pt-pickup" type="text" maxlength="120" placeholder="e.g. Helaman Halls parking" required aria-describedby="pt-pickhint pe-pickup"><div class="small muted" id="pt-pickhint">Where riders meet you before you leave.</div><div class="err" id="pe-pickup"></div>${locationPicker('pickup')}</div>
-    <div class="field"><label for="pt-dropoff">Drop-off at destination</label><input id="pt-dropoff" type="text" maxlength="120" placeholder="e.g. Moab Main Street" required aria-describedby="pt-drophint pe-dropoff"><div class="small muted" id="pt-drophint">Where riders get out when you arrive (outbound trip). Add a ride back under Return trip.</div><div class="err" id="pe-dropoff"></div>${locationPicker('dropoff')}</div></div>
+    <div class="two-desk"><div class="field"><label for="pt-pickup">Pickup location</label><input id="pt-pickup" type="text" maxlength="120" autocomplete="off" placeholder="Search an address or place" required aria-describedby="pt-pickhint pe-pickup"><div class="small muted" id="pt-pickhint">Where riders meet you before you leave.</div><div class="err" id="pe-pickup"></div>${locationPicker('pickup')}</div>
+    <div class="field"><label for="pt-dropoff">Drop-off at destination</label><input id="pt-dropoff" type="text" maxlength="120" autocomplete="off" placeholder="Search an address or place" required aria-describedby="pt-drophint pe-dropoff"><div class="small muted" id="pt-drophint">Where riders get out when you arrive (outbound trip). Add a ride back under Return trip.</div><div class="err" id="pe-dropoff"></div>${locationPicker('dropoff')}</div></div>
+    <div class="small muted">Address data © <a class="link" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></div>
   </div>
   <div class="fieldset"><div class="eyebrow">Seats & price</div>
     <div class="two"><div class="field"><label for="pt-seats">Available seats</label><input id="pt-seats" type="number" min="1" max="7" step="1" inputmode="numeric" placeholder="1–7" required><div class="err" id="pe-seats"></div></div>
@@ -1281,18 +1284,32 @@ function passwordProblem(p){
   if (!/[a-z]/i.test(p) || !/\d/.test(p)) return 'Include at least one letter and one number.';
   return '';
 }
-// The signed-in user's public.profiles row. Its name replaces the sample name on screens that show "you".
+const SAMPLE_COLORS = ['#2F6B5E','#3B6EA8','#B0562F','#7B4FA0','#A8456B','#4F6B2E'];
+function clearAccountDetails(){
+  DB.profile = null; DB.profileDetails = null;
+  if (S.me) Object.assign(S.me, {first:'Hitch', last:'student', hometown:'', bio:'', color:SAMPLE_COLORS[0], photo:null});
+}
+function applyProfileDetails(details){
+  Object.assign(S.me, {hometown:details.hometown, bio:details.bio, color:SAMPLE_COLORS.includes(details.color) ? details.color : SAMPLE_COLORS[0]});
+  DB.profileDetails = DB.session.user.id;
+}
+const hasProfileDetails = () => !!DB.session && DB.profileDetails === DB.session.user.id;
+// The public profile has the name. Personal profile fields come from the signed-in account.
 async function loadAccount(){
   const generation = DB.generation, session = DB.session;
-  DB.profile = null;
-  if (S.me){ S.me.first = 'Hitch'; S.me.last = 'student'; }
+  clearAccountDetails();
   try {
-    const profile = await (await loadApi()).loadMyProfile(session.accessToken, session.user.id);
-    if (generation !== DB.generation) return;
-    DB.profile = profile;
+    const api = await loadApi();
+    const [profile, details] = await Promise.allSettled([
+      api.loadMyProfile(session.accessToken, session.user.id),
+      api.loadProfileDetails(session.accessToken),
+    ]);
+    if (generation !== DB.generation || session.user.id !== DB.session?.user.id) return;
+    if (profile.status === 'fulfilled') DB.profile = profile.value;
+    if (details.status === 'fulfilled') applyProfileDetails(details.value);
+    applyAccountName();
   }
   catch (error) { console.warn('Could not load your profile:', error.message); }
-  applyAccountName();
 }
 function applyAccountName(){
   if (!S.me || !DB.profile) return;
@@ -1315,7 +1332,7 @@ async function afterSignIn(session, message){
 async function logOut(notice, returnTo = null){
   DB.generation++;
   try { (await loadApi()).signOut(); } catch { /* still clear local state */ }
-  DB.session = null; DB.profile = null; clearDbTrips();
+  DB.session = null; clearAccountDetails(); clearDbTrips();
   try { sessionStorage.removeItem(SCREEN_KEY); } catch { /* ignore */ }
   S.hist = []; S.after = returnTo; S.loginNotice = notice; S.screen = 'login'; S.params = {};
   render(); window.scrollTo(0,0);
@@ -1455,6 +1472,8 @@ SCREENS.signup = () => `<div class="screen auth-layout">${authArt('signup')}<div
     <div class="field"><label for="su-name">Full name</label><input id="su-name" type="text" autocomplete="name" maxlength="80" required aria-describedby="se-name"><div class="err" id="se-name"></div></div>
     <div class="field"><label for="su-email">BYU email</label><input id="su-email" type="email" autocomplete="email" placeholder="you@byu.edu" required aria-describedby="se-email"><div class="err" id="se-email"></div></div>
     <div class="field"><label for="su-pass">Password</label><input id="su-pass" type="password" autocomplete="new-password" required aria-describedby="su-passhint se-pass"><div class="hint" id="su-passhint">At least 8 characters, with a letter and a number.</div><div class="err" id="se-pass"></div></div>
+    <div class="field"><label for="su-home">Hometown (optional)</label><input id="su-home" type="text" maxlength="100" placeholder="e.g. Boise, ID"></div>
+    <div class="field"><label for="su-bio">Short bio (optional)</label><textarea id="su-bio" maxlength="160" rows="2" aria-describedby="su-biohint"></textarea><div class="hint" id="su-biohint">Up to 160 characters. You can add or edit this later.</div></div>
     <div class="alert bad small" id="su-err" role="alert" hidden></div>
     <button class="btn primary block" type="submit" id="su-btn">Create account</button>
   </form>
@@ -1480,7 +1499,7 @@ BIND.signup = () => {
     if (Object.keys(err).length) return;
     btn.disabled = true; btn.textContent = 'Creating account…';
     try {
-      const result = await (await loadApi()).signUp(name, email, pass);
+      const result = await (await loadApi()).signUp(name, email, pass, {hometown:$('su-home').value, bio:$('su-bio').value});
       if (result.session) return afterSignIn(result.session, `Welcome to Hitch, ${name.split(/\s+/)[0]}!`);
       S.loginUser = email; S.loginNotice = `Account created. Check ${email} for a confirmation link, then log in.`;
       go('login', {}, false);
@@ -1501,24 +1520,24 @@ BIND.signup = () => {
 /* Screen 10: Profile / edit profile */
 SCREENS.profile = () => {
   const m = S.me;
-  return `<header class="topbar"><div class="title"><h2>Profile</h2></div><span class="pill">Demo account</span></header>
+  return `<header class="topbar"><div class="title"><h2>Profile</h2></div><span class="pill">Demo verification</span></header>
 <div class="screen">
   ${pendingBanner()}
   <div class="phead">${av(m,96)}<h1>${esc(fullName(m))}</h1>${m.verified === 'verified' ? `<span class="pill ok">${I.check.replace('<svg','<svg width="14" height="14"')}ID verified</span>` : '<span class="pill warn">Verification pending</span>'}</div>
-  <div class="card"><dl class="kv" style="margin:0"><dt>Hometown</dt><dd>${m.hometown ? esc(m.hometown) : '<span class="muted">Not added yet</span>'}</dd><dt>Bio</dt><dd>${m.bio ? esc(m.bio) : '<span class="muted">Not added yet</span>'}</dd></dl></div>
+  ${hasProfileDetails() ? `<div class="card"><dl class="kv" style="margin:0"><dt>Hometown</dt><dd>${m.hometown ? esc(m.hometown) : '<span class="muted">Not added yet</span>'}</dd><dt>Bio</dt><dd>${m.bio ? esc(m.bio) : '<span class="muted">Not added yet</span>'}</dd></dl></div>` : '<div class="alert bad small" role="alert">Could not load your profile details. Refresh to try again.</div>'}
   <div style="display:flex;flex-direction:column;gap:10px">
-    <button class="btn block" data-act="go" data-to="edit">Edit profile</button>
+    <button class="btn block" data-act="go" data-to="edit" ${hasProfileDetails() ? '' : 'disabled'}>Edit profile</button>
     <button class="btn primary block" data-act="nav" data-to="post" ${isVerified()?'':'disabled'}>Post a trip</button>
     <button class="btn primary block" data-act="mymanage">Manage my trip</button>
     ${isVerified() ? '' : '<p class="small muted" style="text-align:center">Posting a trip unlocks once your ID is verified.</p>'}
     <button class="btn block danger" data-act="logout">Log out</button>
     ${DB.session ? `<p class="small muted" style="text-align:center">Signed in as ${esc(DB.session.user.email)}</p>` : ''}
   </div>
-  <div class="privacy">${I.lock}<span>Demo profile: no student ID or date of birth is collected in this version.</span></div>
+  <div class="privacy">${I.lock}<span>Hitch does not collect student IDs or dates of birth in this version.</span></div>
 </div>${nav()}`;
 };
-const SAMPLE_COLORS = ['#2F6B5E','#3B6EA8','#B0562F','#7B4FA0','#A8456B','#4F6B2E'];
 SCREENS.edit = () => {
+  if (!hasProfileDetails()) return `${topbar('Edit profile')}<div class="screen"><div class="alert bad" role="alert">Could not load your profile details. Refresh and try again.</div></div>${nav()}`;
   const m = S.me;
   return `${topbar('Edit profile')}
 <div class="screen">
@@ -1527,36 +1546,43 @@ SCREENS.edit = () => {
     <div class="avpick" role="group" aria-label="Sample avatars">${SAMPLE_COLORS.map(c => `<button type="button" data-c="${c}" aria-label="Avatar color ${c}" aria-pressed="${!m.photo && m.color===c}">${av({...m, photo:null, color:c},48)}</button>`).join('')}</div>
     <p class="small muted">Prototype uses sample avatars.</p>
   </div>
-  <div class="fieldset"><div class="eyebrow">Public info</div>
-    <div class="field"><label for="ed-name">Name</label><input id="ed-name" type="text" value="${esc(fullName(m))}" readonly><div class="hint">${DB.profile ? 'Your name comes from your Hitch account.' : "This classroom demo uses Jordan Hale's sample account."}</div></div>
+  <div class="fieldset"><div class="eyebrow">Profile details</div>
+    <div class="field"><label for="ed-name">Name</label><input id="ed-name" type="text" value="${esc(fullName(m))}" readonly><div class="hint">Your name comes from your Hitch account.</div></div>
     <div class="field"><label for="ed-home">Hometown</label><input id="ed-home" type="text" maxlength="100" value="${esc(m.hometown)}" placeholder="e.g. Boise, ID"></div>
     <div class="field"><label for="ed-bio">Short bio</label><textarea id="ed-bio" maxlength="160" placeholder="Major, where you usually travel, what you're like on a road trip">${esc(m.bio)}</textarea><div class="hint" id="ed-count"></div></div>
   </div>
-  <div class="privacy">${I.lock}<span>Hometown and bio are public profile fields in the planned app.</span></div>
+  <div class="privacy">${I.lock}<span>Hometown and bio are saved to your Hitch account.</span></div>
+  <div id="ed-error" class="alert bad small" role="alert" hidden></div>
   <div class="row"><button type="button" class="btn" data-act="back">Cancel</button><button type="submit" class="btn primary">Save changes</button></div>
 </form>
 </div>${nav()}`;
 };
 BIND.edit = () => {
-  let color = S.me.color, photoCleared = false;
+  if (!hasProfileDetails()) return;
+  let color = S.me.color;
   const bio = document.getElementById('ed-bio'), cnt = document.getElementById('ed-count');
   const c = () => cnt.textContent = `${bio.value.length} / 160`; bio.addEventListener('input', c); c();
-  document.querySelectorAll('.avpick button').forEach(b => b.addEventListener('click', () => { color = b.dataset.c; photoCleared = true; document.querySelectorAll('.avpick button').forEach(x => x.setAttribute('aria-pressed', x === b)); }));
+  document.querySelectorAll('.avpick button').forEach(b => b.addEventListener('click', () => { color = b.dataset.c; document.querySelectorAll('.avpick button').forEach(x => x.setAttribute('aria-pressed', x === b)); }));
   document.getElementById('edForm').addEventListener('submit', async e => {
     e.preventDefault();
     const button = e.target.querySelector('[type="submit"]');
+    const box = document.getElementById('ed-error'), generation = DB.generation, userId = DB.session?.user.id;
+    if (button.disabled || !hasProfileDetails()) return;
+    const fields = {hometown:document.getElementById('ed-home').value.trim(), bio:bio.value.trim(), color};
+    box.hidden = true;
     button.disabled = true; button.textContent = 'Saving…';
     try {
-      const response = await fetch('/api/profile', {
-        method:'PATCH', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({hometown:document.getElementById('ed-home').value.trim(), bio:bio.value.trim(), color})
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Save failed');
-      S.me = result; applyAccountName(); S.hist.pop(); S.screen = 'profile'; S.params = {};
-      render(); toast('Profile saved to database');
+      const api = await loadApi(), session = await api.getSession();
+      if (generation !== DB.generation) return;
+      if (!session || session.user.id !== userId) throw new Error('Your session changed. Sign in again before saving.');
+      const details = await api.saveProfileDetails(session.accessToken, fields);
+      if (generation !== DB.generation || DB.session?.user.id !== userId) return;
+      applyProfileDetails(details);
+      if (S.screen !== 'edit' || !e.target.isConnected) return;
+      S.hist.pop(); go('profile', {}, false); toast('Profile saved');
     } catch (error) {
-      toast(error.message); button.disabled = false; button.textContent = 'Save changes';
+      if (generation !== DB.generation) return;
+      box.textContent = error.message; box.hidden = false; button.disabled = false; button.textContent = 'Save changes';
     }
   });
 };

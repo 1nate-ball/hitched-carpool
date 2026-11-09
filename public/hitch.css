@@ -297,6 +297,13 @@ textarea{border-radius:16px}
 .location-picker summary{cursor:pointer;font-weight:650;padding:5px 0}
 .location-map{height:250px;border-radius:10px;background:#eef2ef;margin:10px 0;z-index:0}
 .place-options{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;max-height:170px;overflow:auto}
+.place-suggestions{border:1px solid var(--line);border-radius:12px;max-height:250px;overflow:auto}
+.place-suggestions p{padding:10px 12px;margin:0}
+.place-suggestion{display:block;width:100%;padding:10px 12px;text-align:left;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer}
+.place-suggestion + .place-suggestion{border-top:1px solid var(--line)}
+.place-suggestion:hover,.place-suggestion:focus-visible{background:var(--brand-soft)}
+.place-suggestion strong,.place-suggestion span{display:block;overflow-wrap:anywhere}
+.place-suggestion span{font-size:.83em;color:var(--muted)}
 .location-picker input{width:100%}
 .location-picker .leaflet-control-attribution{font-size:11px;color:#333}
 

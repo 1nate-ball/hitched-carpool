@@ -4,7 +4,7 @@
 
 ## App Summary
 
-BYU students often travel to the same places on weekends and school breaks, but finding a ride usually means asking around or checking several group chats. Our app, Hitch, is meant to bring those trips into one place. Students can browse the prototype by destination and date and see who is driving, how many seats are available, and what the ride costs. The prototype also includes screens for requesting a seat, managing requests, and chatting with the people on a trip. For this assignment, we focused on getting the **Save changes** button on the profile page working with a real database. Users can edit their hometown, bio, and avatar color, and their changes are still there after refreshing the page. The other screens use sample data, and real BYU sign-in is not connected in this version.
+BYU students often travel to the same places on weekends and school breaks, but finding a ride usually means asking around or checking several group chats. Our app, Hitch, is meant to bring those trips into one place. Students can browse the prototype by destination and date and see who is driving, how many seats are available, and what the ride costs. The prototype also includes screens for requesting a seat, managing requests, and chatting with the people on a trip. For this assignment, we focused on getting the **Save changes** button on the profile page working with a real database. Users can edit their hometown, bio, and avatar color, and their changes are still there after refreshing the page. The current app also supports signup with a BYU email and saves posted trips to Supabase.
 
 ## ERD
 
@@ -130,7 +130,7 @@ To verify: create an account, refresh (still logged in), log out (back to Log in
 |---|---|
 | Frontend | HTML, CSS, and JavaScript |
 | Backend | Python's built-in HTTP server |
-| Database | SQLite for profiles; Supabase for posted trips |
+| Database | Supabase for accounts and posted trips; SQLite for the local classroom demo |
 | Version control | GitHub |
 
 We chose this stack because we could keep our existing screens and use Python to connect them to a database. SQLite stores the data in a file on the computer running the app, so there is no paid service or cloud account to set up. Everyone can run the same version and inspect the tables locally. No extra Python packages or API keys are needed, and `.env` files are included in `.gitignore`.
@@ -167,10 +167,10 @@ If port 8000 is already in use, run `PORT=8001 python3 server.py` on macOS/Linux
 1. Click **Edit profile**.
 2. Change the hometown to `Boise, ID` and the bio to `Ready for our next road trip!`. You can also choose a different avatar color.
 3. Click **Save changes**.
-4. Check that the profile shows the new information and the message **Profile saved to database**.
+4. Check that the profile shows the new information and the message **Profile saved**.
 5. Refresh the page. The same hometown, bio, and avatar color should still be there.
 
-When Save changes is clicked, JavaScript sends the edited fields to the Python backend. The backend updates the Users table in SQLite and returns the saved profile. The page displays that response, and refreshing loads the profile from the database again.
+When you click Save changes, Hitch updates the signed-in account in Supabase. Refreshing reloads the same profile details. The original classroom recording uses a temporary SQLite demo database.
 
 The [35-second demo video](https://github.com/1nate-ball/hitched-carpool/raw/refs/heads/main/docs/demo.mp4) shows this process in a real browser. To record it again, run `node scripts/record-demo.cjs` locally with Playwright and Chromium installed. The checks also confirm that profile changes survive a server restart.
 
@@ -186,7 +186,7 @@ On Windows, use `py -m unittest discover -s tests -v`.
 
 The live site runs on a free [Render](https://render.com) web service that redeploys whenever `main` changes. The same Python server that runs locally serves both the pages and the profile API, so the frontend and backend share one address and no CORS settings are needed. Trips and destinations use the existing Supabase project (see below), so no separate database host is needed.
 
-**Limitation:** On Render's free plan the server's files reset on every redeploy or restart, so saved profile changes go back to the sample data. Free services also go to sleep when unused, so the first visit can take about a minute.
+**Limitation:** On Render's free plan the server's files reset on every redeploy or restart, so the local SQLite demo data resets. Free services also go to sleep when unused, so the first visit can take about a minute.
 
 To set it up (one time):
 
@@ -207,7 +207,7 @@ The database tables don't need any extra setup. The server creates the SQLite ta
 
 We created a separate **Free** Supabase project for Hitch. The `destinations` and `trips` tables are set up with validation and row-level security. Our [field list and setup status](docs/post-a-trip-field-list.md) explains the exact columns and the remaining form work. The applied SQL is saved in [the initial migration file](supabase/migrations/20261027000100_post_a_trip.sql); do not run it again against the existing project.
 
-The local server serves the public connection settings and a [client helper](public/hitch-supabase.js) for loading destinations/trips and publishing a trip with a signed-in session. The Post a Trip form now saves to the Supabase `trips` table: log in (or create an account), open Post a trip, fill in the form, and publish. Departure and return each use one date + time input, entered as Utah time. The form, preview, trip details, and seat request all use the same wording: **Pickup** and **Drop-off at destination** describe the outbound trip only, and the optional **Return trip** (destination → Provo) is shown separately, or marked "not included" for one-way trips. The form validates required fields, future dates, seats (1–7), price ($1–150), and return-after-departure, shows a confirmation only after the database saves, and shows a retryable error if the save fails. Saved trips load again after a refresh. Our working profile-save feature still uses SQLite.
+The local server serves the public connection settings and a [client helper](public/hitch-supabase.js) for loading destinations/trips and publishing a trip with a signed-in session. The Post a Trip form now saves to the Supabase `trips` table: log in (or create an account), open Post a trip, fill in the form, and publish. Departure and return each use one date + time input, entered as Utah time. The form, preview, trip details, and seat request all use the same wording: **Pickup** and **Drop-off at destination** describe the outbound trip only, and the optional **Return trip** (destination → Provo) is shown separately, or marked "not included" for one-way trips. The form validates required fields, future dates, seats (1–7), price ($1–150), and return-after-departure, shows a confirmation only after the database saves, and shows a retryable error if the save fails. Saved trips load again after a refresh.
 
 If a network response is lost, we check for the saved trip. If we cannot confirm the result, publishing stays disabled until you reconnect, refresh, and check My Trips before posting again. This avoids encouraging a duplicate post. Real BYU ID verification remains future work; sample riders are still demo data.
 
@@ -220,9 +220,9 @@ Run `python3 scripts/check_supabase_connection.py` to check the project connecti
 
 We added a starting city to posted trips. From/To searches now query saved future trips by city and destination; signed-in search results show database trips. The open-seat count includes all accepted requests without exposing other riders' names or notes. Drivers can update only their own trips, and the browser cannot change a trip's driver ID.
 
-Pickup and arrival each have a searchable list of 13 meeting places and a map. Choose a saved place, click the map, or pan with the keyboard and use the map center. Keep a clear meeting address in the text field. Selected coordinates are saved with the trip and can be opened from Trip Detail after reloading. Typed addresses still work when a map is unavailable. The arrival point is separate from the optional return date/time.
+Start typing a place or street address in either location field to see suggestions from Photon and Hitch’s saved meeting places. Select a result to fill the address and attach its pin. You can also choose a saved place in the map panel, click the map, or pan with the keyboard and use the map center. Keep a clear meeting address in the text field. Selected coordinates are saved with the trip and can be opened from Trip Detail after reloading. Typed addresses still work when a map is unavailable. The arrival point is separate from the optional return date/time.
 
-We use [Leaflet 1.9.4](https://leafletjs.com/examples-v1/quick-start/) and [OpenStreetMap tiles](https://operations.osmfoundation.org/policies/tiles/) with visible attribution and normal browser caching. There is no map API key or new paid project. The starter places are approximate meeting areas; move the pin to the agreed pickup spot. This is a small class-demo catalog, not worldwide address autocomplete.
+We use [Leaflet 1.9.4](https://leafletjs.com/examples-v1/quick-start/) and [OpenStreetMap tiles](https://operations.osmfoundation.org/policies/tiles/) with visible attribution and normal browser caching. There is no map API key or new paid project. Address suggestions use the [Photon demo service](https://github.com/komoot/photon) and favor the starting city or selected destination. Check the pin against the agreed meeting spot. If the suggestion service is unavailable, type the address or choose the pin on the map.
 
 The new schema is in `supabase/migrations/20261106000100_trip_locations_search_ownership.sql`. It and the previously merged seat-request migration were applied to the existing Hitch project through SQL Editor on November 6. Don't rerun either migration against these tables. Existing trips default to Provo because the original demo used BYU pickups; those older trips have no map coordinates.
 
