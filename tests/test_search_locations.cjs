@@ -63,21 +63,24 @@ test('saved-place selection attaches separate pins, updates starting city, and c
   const {bindLocationPickers}=await import(moduleURL('public/hitch-locations.js'));
   const fields=new Map();
   function element(){return {value:'',textContent:'',innerHTML:'',children:[],listeners:{},isConnected:true,open:true,
-    focus(){},addEventListener(name,fn){this.listeners[name]=fn;},replaceChildren(){this.children=[];},append(...children){this.children.push(...children);}};}
+    focus(){},showModal(){this.open=true;},close(){this.open=false;},contains(){return false;},querySelector(){return this.children.find(c=>c.type==='button');},addEventListener(name,fn){this.listeners[name]=fn;},replaceChildren(){this.children=[];},append(...children){this.children.push(...children);}};}
   const get=id=>{if(!fields.has(id)) fields.set(id,element());return fields.get(id);};
   const originalDocument=global.document, originalFetch=global.fetch;
   global.document={createElement:element};
   let changes=0;
   const api={loadLocations:async()=>[{name:'Campus meeting point',city:'Orem',latitude:40.2786,longitude:-111.7187}]};
   try {
-    const picker=bindLocationPickers({api,session:{accessToken:'test'},form:{querySelector:selector=>get(selector.slice(1))},onChange(){changes++;}});
-    await get('pt-pickup-picker').listeners.toggle();
+    const picker=bindLocationPickers({api,session:{accessToken:'test'},form:{querySelector:selector=>get(selector.slice(1)),addEventListener(){},removeEventListener(){}},onChange(){changes++;}});
+    await get('pt-pickup-open').listeners.click();
     get('pt-pickup-places').children[0].listeners.click();
+    assert.equal(picker.pins.pickup,null, 'choosing in the dialog is only a draft');
+    get('pt-pickup-confirm').listeners.click();
     assert.equal(picker.pins.pickup.lat,40.2786); assert.equal(picker.pins.dropoff,null);
-    assert.equal(get('pt-origin').value,'Orem'); assert.equal(get('pt-pickup').value,'Campus meeting point');
+    assert.equal(get('pt-origin').value,'Orem'); assert.equal(get('pt-pickup').value,'Campus meeting point, Orem');
     assert.equal(get('pt-pickup-center').disabled,true); // Address/list fallback works without the map library.
-    await get('pt-dropoff-picker').listeners.toggle();
+    await get('pt-dropoff-open').listeners.click();
     get('pt-dropoff-places').children[0].listeners.click();
+    get('pt-dropoff-confirm').listeners.click();
     assert.ok(picker.pins.dropoff); assert.equal(changes,2);
     get('pt-pickup').value='A changed address'; get('pt-pickup').listeners.input();
     assert.equal(picker.pins.pickup,null); assert.ok(picker.pins.dropoff);
@@ -96,6 +99,11 @@ test('saved-place selection attaches separate pins, updates starting city, and c
     assert.equal(get('pt-pickup').value,'Library, Main Street, Provo');
     assert.equal(get('pt-origin').value,'Provo');
     assert.equal(get('pt-pickup-suggestions').hidden,true);
+    await get('pt-pickup-open').listeners.click();
+    get('pt-pickup-search').value='Unsaved change'; get('pt-pickup-search').listeners.input();
+    get('pt-pickup-cancel').listeners.click();
+    assert.equal(get('pt-pickup').value,'Library, Main Street, Provo');
+    assert.deepEqual(picker.pins.pickup,{lat:40.2,lng:-111.6});
     picker.destroy();
   } finally {global.document=originalDocument;global.fetch=originalFetch;}
 });

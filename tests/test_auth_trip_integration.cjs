@@ -66,7 +66,7 @@ test('protected post -> Robbie login -> account name -> publish -> logout -> ano
   const f=await fixture();
   f.run("go('post',{},false)");assert.equal(f.run('S.screen'),'login');assert.equal(f.run('S.after.screen'),'post');
   await f.login('driver');assert.equal(f.run('S.screen'),'post');assert.equal(f.run('fullName(S.me)'),'Driver One');
-  const values={'pt-origin':'Orem','pt-dest':'moab','pt-depart':'2099-11-06T16:00','pt-pickup':'UVU','pt-dropoff':'Moab','pt-seats':'3','pt-price':'25'};
+  const values={'pt-origin':'Orem','pt-dest':'moab','pt-depart':'2099-11-06','pt-time':'16:00','pt-pickup':'UVU','pt-dropoff':'Moab','pt-seats':'3','pt-price':'25'};
   for(const [id,value] of Object.entries(values)) f.get(id).value=value;
   await f.submit('ptForm');assert.equal(f.run('S.screen'),'post');assert.equal(f.run('S.dialogTrip'),f.rows[0].id);
   assert.equal(f.rows[0].driver_id,'driver');assert.equal(f.rows[0].origin_city,'Orem');
@@ -112,7 +112,7 @@ test('Robbie signup returns a new account to the requested post screen',async()=
   await f.submit('suForm');await tick();
   assert.equal(f.run('S.screen'),'post');assert.equal(f.run('DB.session.user.id'),'new-driver');
   assert.equal(f.run('fullName(S.me)'),'New Student');
-  assert.match(f.get('app').innerHTML,/Choose pickup map pin/);
+  assert.match(f.get('app').innerHTML,/Choose pickup on map/);
   f.run("go('profile',{},false)");
   assert.match(f.get('app').innerHTML,/Orem, UT/);
   assert.match(f.get('app').innerHTML,/I like hiking/);
@@ -145,7 +145,7 @@ test('a publish response received after logout does not restore the old driver s
   f.run('DB.api={...api};');let finish;
   const pending=new Promise(resolve=>finish=resolve);
   f.run('(hooks)=>Object.assign(DB.api,hooks)')({publishTrip:()=>pending});
-  for(const [id,value] of Object.entries({'pt-origin':'Orem','pt-dest':'moab','pt-depart':'2099-11-06T16:00','pt-pickup':'UVU','pt-dropoff':'Moab','pt-seats':'3','pt-price':'25'})) f.get(id).value=value;
+  for(const [id,value] of Object.entries({'pt-origin':'Orem','pt-dest':'moab','pt-depart':'2099-11-06','pt-time':'16:00','pt-pickup':'UVU','pt-dropoff':'Moab','pt-seats':'3','pt-price':'25'})) f.get(id).value=value;
   const saving=f.submit('ptForm');await tick();await f.run("logOut('bye')");
   finish({id:'late-save',driver_id:'driver',destination_id:'moab',departure_at:'2099-11-06T23:00:00Z',total_seats:3,price_per_seat:25});await saving;
   assert.equal(f.run('S.screen'),'login');assert.equal(f.run('DB.session'),null);

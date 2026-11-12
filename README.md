@@ -232,3 +232,7 @@ We also tested with two disposable accounts in a fresh local Supabase instance. 
 
 
 PR #12 now includes Robbie's signup/login flow. A signed-out visitor going to Post a Trip logs in (or signs up), then returns to that form with their account name. Background requests from a previous login are discarded after logout or account switching. The combined form/API tests are in `tests/test_auth_trip_integration.cjs`; they use a fake Auth/Data API, not real test accounts. GitHub runs all JavaScript and Python checks on pull requests as well as main.
+
+### Profile photos
+
+Edit profile supports uploading, replacing, and removing a photo. Images are resized before saving to the private Supabase Storage bucket. The photo setup in `supabase/migrations/20261112000100_profile_photos.sql` was already applied to the Hitch project on November 12, 2026. Do not rerun it.
