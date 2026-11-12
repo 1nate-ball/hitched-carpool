@@ -399,7 +399,7 @@ const CHATS = {
 const S = {
   me:null, screen:'login', params:{}, hist:[], visit:0, refreshedVisit:null,
   accounts:{}, taken:['jhale','kbrooks','mtanaka','hortiz','admin'],
-  search:{dest:'', from:'', date:''}, cat:'All', miss:null,
+  search:{dest:'', from:'', date:''}, cat:'All', miss:null, discoveryOpen:false,
   filters:{max:'', round:false}, dbSearch:{key:'', state:'idle', ids:[]}, dbBase:{key:'', ids:[]}, tripsTab:'rider', homeLoaded:false, ridesState:'idle', homeUpdatedAt:0, loginNotice:'', loginUser:'', after:null,
 };
 
@@ -671,10 +671,12 @@ SCREENS.home = () => {
     <div class="err" id="s-err" role="alert"></div><button class="btn primary block" type="submit">Find a ride ${I.arrow.replace('<svg','<svg width="18" height="18"')}</button>
   </form>${miss}${pendingBanner()}</section>
   <section class="home-rides"><div class="section-head"><h2>${DB.session?'Upcoming rides':'Sample rides'}</h2>${!DB.session?'<button class="link small" data-act="auth" data-to="login">Log in</button>':''}</div><div class="home-ride-list">${homeRideList()}</div></section>
-  <details class="destination-discovery"><summary>Explore destinations</summary><div class="chips" role="group" aria-label="Categories">${cats.map(c=>`<button class="chip" data-act="cat" data-c="${c}" aria-pressed="${S.cat===c}">${c}</button>`).join('')}</div><div class="dgrid">${(S.cat==='All'?DESTS:DESTS.filter(d=>d.cat===S.cat)).map(destCard).join('')}</div><p class="small muted">Destination prices are estimates. Posted rides show the driver's actual price.</p></details>
+  <details id="home-discovery" class="destination-discovery" ${S.discoveryOpen?'open':''}><summary>Explore destinations</summary><div class="chips" role="group" aria-label="Categories">${cats.map(c=>`<button class="chip" data-act="cat" data-c="${c}" aria-pressed="${S.cat===c}">${c}</button>`).join('')}</div><div class="dgrid">${(S.cat==='All'?DESTS:DESTS.filter(d=>d.cat===S.cat)).map(destCard).join('')}</div><p class="small muted">Destination prices are estimates. Posted rides show the driver's actual price.</p></details>
 </div>${nav()}`;
 };
 BIND.home = () => {
+  const discovery = document.getElementById('home-discovery');
+  discovery?.addEventListener('toggle', () => { S.discoveryOpen = discovery.open; });
   if (DB.session && (S.ridesState==='idle' || Date.now()-S.homeUpdatedAt>30000) && S.ridesState!=='loading' && S.ridesState!=='error') {
     loadDbTrips().then(()=>{if(S.screen==='home')render();}).catch(()=>{if(S.screen==='home')render();});
   }
@@ -1721,7 +1723,7 @@ document.addEventListener('click', e => {
     case 'go': go(el.dataset.to, {}, !['login','signup','forgot'].includes(S.screen)); break;
     case 'back': back(); break;
     case 'nav': S.hist = []; if (el.dataset.to === 'home'){ S.miss = null; } go(el.dataset.to, {}, false); break;
-    case 'cat': S.cat = el.dataset.c; render(); break;
+    case 'cat': S.cat = el.dataset.c; S.discoveryOpen = true; render(); break;
     case 'retryhome': S.ridesState='idle'; render(); break;
     case 'dest': S.miss = null; S.filters = {max:'', round:false}; go('results', {dest:id}); break;
     case 'change': S.hist = []; go('home', {}, false); setTimeout(() => document.getElementById('s-dest')?.focus(), 0); break;
