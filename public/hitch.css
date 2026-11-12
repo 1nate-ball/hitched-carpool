@@ -145,6 +145,10 @@ a{color:var(--accent)}
 
 /* ---------- Inputs ---------- */
 .input,input[type=text],input[type=password],input[type=email],input[type=tel],input[type=date],input[type=time],input[type=datetime-local],input[type=number],select,textarea{border-color:var(--line-strong);border-radius:var(--r-sm);min-height:48px;padding:10px 14px}
+input[type=datetime-local]{min-width:0;max-width:100%;line-height:1.5;appearance:none;-webkit-appearance:none}
+input[type=datetime-local]::-webkit-date-and-time-value{text-align:left}
+select:not([multiple]){appearance:none;-webkit-appearance:none;padding-right:44px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' fill='none' stroke='%235C6660' stroke-width='1.75' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;background-size:20px}
+.filters select:not([multiple]){padding-right:38px;background-position:right 10px center}
 textarea{border-radius:16px}
 .sfield{border-color:var(--line-strong);border-radius:var(--r-pill);padding:0 16px;background:var(--bg)}
 .filebox{border-radius:var(--r-sm)}
@@ -180,6 +184,11 @@ textarea{border-radius:16px}
 .seg{border-radius:var(--r-pill)}
 .seg button{border-radius:var(--r-pill)}
 .avpick button[aria-pressed="true"]{border-color:var(--brand)}
+.av{position:relative}
+.av img{position:absolute;inset:0}
+.photo-editor{display:flex;align-items:center;gap:20px}
+.photo-actions{display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+.photo-actions label{cursor:pointer}
 
 /* ---------- Chat, sheets, toast ---------- */
 .msg .bub{border-radius:16px 16px 16px 4px}
@@ -293,9 +302,20 @@ textarea{border-radius:16px}
 }
 
 /* Meeting-place selection */
-.location-picker{margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:12px}
-.location-picker summary{cursor:pointer;font-weight:650;padding:5px 0}
-.location-map{height:250px;border-radius:10px;background:#eef2ef;margin:10px 0;z-index:0}
+.location-field{position:relative;min-width:0}
+.location-input{position:relative}
+.location-input input{padding-right:52px}
+.location-input .iconbtn{position:absolute;right:4px;top:4px;width:40px;height:40px;min-height:40px;border:0;background:var(--surface);color:var(--brand)}
+.location-status:empty{display:none}
+.location-status{margin-top:6px;color:var(--brand)}
+.location-dialog{width:min(680px,calc(100% - 24px));max-height:calc(100dvh - 32px);overflow:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);color:var(--ink);padding:24px;box-shadow:var(--shadow-lift)}
+.location-dialog::backdrop{background:var(--scrim)}
+.location-dialog label{display:block;margin-bottom:8px;font-weight:600}
+.location-dialog .section-head{margin-bottom:16px}
+.location-dialog .place-suggestions{margin-top:8px;max-height:160px}
+.location-map{height:280px;border-radius:var(--r-sm);background:var(--surface-2);margin:16px 0 10px;z-index:0}
+.location-map-actions{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+@media(max-width:499px){.location-dialog{padding:16px}.location-map{height:220px}.location-map-actions{align-items:flex-start;flex-direction:column}}
 .place-options{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;max-height:170px;overflow:auto}
 .place-suggestions{border:1px solid var(--line);border-radius:12px;max-height:250px;overflow:auto}
 .place-suggestions p{padding:10px 12px;margin:0}
@@ -305,8 +325,8 @@ textarea{border-radius:16px}
 .place-suggestion[aria-selected="true"]{background:var(--brand-soft)}
 .place-suggestion strong,.place-suggestion span{display:block;overflow-wrap:anywhere}
 .place-suggestion span{font-size:.83em;color:var(--muted)}
-.location-picker input{width:100%}
-.location-picker .leaflet-control-attribution{font-size:11px;color:#333}
+.location-dialog input{width:100%}
+.location-dialog .leaflet-control-attribution{font-size:11px;color:var(--ink)}
 
 /* ---------- Results + Trip Detail fill the screen on desktop ---------- */
 .rlist{display:flex;flex-direction:column;gap:12px}

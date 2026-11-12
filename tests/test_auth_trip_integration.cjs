@@ -112,7 +112,7 @@ test('Robbie signup returns a new account to the requested post screen',async()=
   await f.submit('suForm');await tick();
   assert.equal(f.run('S.screen'),'post');assert.equal(f.run('DB.session.user.id'),'new-driver');
   assert.equal(f.run('fullName(S.me)'),'New Student');
-  assert.match(f.get('app').innerHTML,/Choose pickup map pin/);
+  assert.match(f.get('app').innerHTML,/Choose pickup on map/);
   f.run("go('profile',{},false)");
   assert.match(f.get('app').innerHTML,/Orem, UT/);
   assert.match(f.get('app').innerHTML,/I like hiking/);

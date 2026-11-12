@@ -59,12 +59,11 @@ async function stop(){
     await page.waitForTimeout(6000);
     await page.getByRole('button',{name:'Edit profile',exact:true}).click();
     await page.waitForTimeout(3000);
-    await page.getByLabel('Hometown',{exact:true}).fill('');
-    await page.getByLabel('Hometown',{exact:true}).pressSequentially('Boise, ID',{delay:130});
+    await page.getByLabel('Hometown (optional)',{exact:true}).fill('');
+    await page.getByLabel('Hometown (optional)',{exact:true}).pressSequentially('Boise, ID',{delay:130});
     await page.getByRole('option',{name:'Boise, ID',exact:true}).click();
     await page.getByLabel('Short bio',{exact:true}).fill('');
     await page.getByLabel('Short bio',{exact:true}).pressSequentially('Ready for our next road trip!',{delay:100});
-    await page.getByRole('button',{name:'Avatar color #3B6EA8',exact:true}).click();
     await page.waitForTimeout(4000);
     const saved=page.waitForResponse(r=>r.url().endsWith('/auth/v1/user')&&r.request().method()==='PUT');
     await page.getByRole('button',{name:'Save changes',exact:true}).click();
