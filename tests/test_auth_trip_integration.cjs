@@ -103,7 +103,7 @@ test('logout cancels an older trip/profile response instead of restoring the old
 
 test('Robbie signup returns a new account to the requested post screen',async()=>{
   const f=await fixture(); f.run("go('post',{},false); go('signup',{},false);");
-  f.get('su-name').value='New Student';f.get('su-email').value='new-driver@byu.edu';f.get('su-pass').value='fake-password1';
+  f.get('su-name').value='New Student';f.get('su-email').value='new-driver@byu.edu';f.get('su-pass').value='fake-password1';f.get('su-pass2').value='fake-password1';
   f.get('su-home').value='orem ut'; f.get('su-bio').value='I like hiking.';
   await f.submit('suForm');
   assert.match(f.get('su-home-error').textContent,/Choose a city/);
@@ -124,7 +124,7 @@ test('Robbie signup returns a new account to the requested post screen',async()=
 
 test('signup needing email confirmation stays signed out and preserves the return route',async()=>{
   const f=await fixture({confirmation:true});f.run("go('post',{},false); go('signup',{},false);");
-  f.get('su-name').value='New Student';f.get('su-email').value='new-driver@byu.edu';f.get('su-pass').value='fake-password1';
+  f.get('su-name').value='New Student';f.get('su-email').value='new-driver@byu.edu';f.get('su-pass').value='fake-password1';f.get('su-pass2').value='fake-password1';
   await f.submit('suForm');
   assert.equal(f.run('S.screen'),'login');assert.equal(f.run('DB.session'),null);
   assert.equal(f.run('S.after.screen'),'post');assert.match(f.run('S.loginNotice'),/confirmation link/);
