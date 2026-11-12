@@ -33,7 +33,7 @@ function fixture() {
     const row = {id:'saved-trip',driver_id:session.user.id,...payload}; rows.push(row); return row;
   },loadMyRequests:async()=>[],signOut(){}};
   run('DB.api = api;');
-  get('pt-origin').value='Provo'; get('pt-dest').value='moab'; get('pt-depart').value='2099-11-06T16:00';
+  get('pt-origin').value='Provo'; get('pt-dest').value='moab'; get('pt-depart').value='2099-11-06'; get('pt-time').value='16:00';
   get('pt-pickup').value='Helaman Halls'; get('pt-dropoff').value='Moab Main Street';
   get('pt-seats').value='3'; get('pt-price').value='25';
   run('BIND.post();');
@@ -54,10 +54,28 @@ test('invalid native date input and return before departure never write',async()
   const f=fixture(); let calls=0; f.api.publishTrip=async()=>{calls++;};
   f.get('pt-depart').value=''; f.get('pt-depart').validity.badInput=true;
   await f.submit(); assert.match(f.get('pe-depart').textContent,/valid departure/);
-  f.get('pt-depart').value='2099-11-06T16:00'; f.get('pt-depart').validity.badInput=false;
-  f.get('pt-ret').checked=true; f.get('pt-return').value='2099-11-06T15:00';
+  f.get('pt-depart').value='2099-11-06'; f.get('pt-time').value='16:00'; f.get('pt-depart').validity.badInput=false;
+  f.get('pt-ret').checked=true; f.get('pt-return').value='2099-11-06'; f.get('pt-return-time').value='15:00';
   await f.submit(); assert.match(f.get('pe-return').textContent,/after departure/);
   assert.equal(calls,0);
+});
+
+test('a missing departure or return time keeps the form open without writing',async()=>{
+  const f=fixture(); let calls=0; f.api.publishTrip=async()=>{calls++;};
+  f.get('pt-time').value='';
+  await f.submit(); assert.match(f.get('pe-time').textContent,/departure time/);
+  f.get('pt-time').value='16:00'; f.get('pt-ret').checked=true;
+  f.get('pt-return').value='2099-11-07'; f.get('pt-return-time').value='';
+  await f.submit(); assert.match(f.get('pe-returnTime').textContent,/return time/);
+  assert.equal(calls,0);
+});
+
+test('separate date and time fields preserve Mountain Time and the return timestamp',async()=>{
+  const f=fixture();
+  f.get('pt-ret').checked=true; f.get('pt-return').value='2099-11-07'; f.get('pt-return-time').value='18:30';
+  await f.submit();
+  assert.equal(f.rows[0].departure_at,'2099-11-06T16:00:00-07:00');
+  assert.equal(f.rows[0].return_at,'2099-11-07T18:30:00-07:00');
 });
 
 test('save waits for confirmation and suppresses concurrent submissions',async()=>{
