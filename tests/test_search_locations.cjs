@@ -107,3 +107,15 @@ test('saved-place selection attaches separate pins, updates starting city, and c
     picker.destroy();
   } finally {global.document=originalDocument;global.fetch=originalFetch;}
 });
+
+test('signed-in home shows saved future rides and excludes samples, past rides and full rides',()=>{
+  const source=fs.readFileSync('public/index.html','utf8').match(/<script>([\s\S]*?)<\/script>/)[1].replace(/\nboot\(\);/,'');
+  const c=vm.createContext({console,Date,Intl,setTimeout,clearTimeout,document:{getElementById(){return null;},addEventListener(){}},window:{}});
+  vm.runInContext(source,c);
+  const output=vm.runInContext(`S.me={first:'Test',last:'Student',color:'#214b3b'};DB.session={user:{id:'me'}};S.ridesState='done';
+    for(const [id,departure,dest,seats] of [['future','2099-11-20T23:00:00Z','moab',2],['past','2000-01-01T23:00:00Z','slc',3],['full','2099-11-21T23:00:00Z','jackson',0]])
+      upsertTrip(fromRow({id,driver_id:'driver',departure_at:departure,destination_id:dest,total_seats:3,seats_available:seats,price_per_seat:22,pickup_location:'Saved meeting point',dropoff_location:'Arrival'}));
+    homeRideList();`,c);
+  assert.match(output,/Moab/);assert.match(output,/Saved meeting point/);
+  assert.doesNotMatch(output,/Sample ride|Salt Lake City|Jackson Hole|Kaylee|Marcus/);
+});

@@ -66,7 +66,7 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path.startswith('/images/'):
             # Photos in public/images (jpg, png, webp). Only plain file names, so nothing outside the folder can be read.
             name=self.path[len('/images/'):].split('?')[0]
-            types={'.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.webp':'image/webp'}
+            types={'.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.webp':'image/webp','.svg':'image/svg+xml'}
             file=ROOT/'public'/'images'/name
             if '/' in name or '\\' in name or name.startswith('.') or Path(name).suffix.lower() not in types or not file.is_file():
                 return self.send_json(404,{'error':'Not found'})

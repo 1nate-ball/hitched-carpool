@@ -235,4 +235,8 @@ PR #12 now includes Robbie's signup/login flow. A signed-out visitor going to Po
 
 ### Profile photo setup
 
-Apply `supabase/migrations/20261112000100_profile_photos.sql` once before deploying this branch. It adds the profile photo path and a private `profile-photos` bucket. Signed-in users can view photos; uploads and removal are limited to the owner’s folder. This migration has been tested on the isolated local Hitch review database and has not been applied to the hosted project.
+Apply `supabase/migrations/20261112000100_profile_photos.sql` once before deploying this branch. It adds the profile photo path and a private `profile-photos` bucket. Signed-in users can view photos; uploads and removal are limited to the owner’s folder. This migration was tested on the isolated local Hitch database and applied once to the hosted Hitch project on November 12, 2026. Do not rerun it.
+
+### Mobile design
+
+Hitch starts with a compact route search and upcoming ride cards. Signed-in pages use saved trips; signed-out examples are labeled as sample rides. My Trips separates confirmed, pending, and past rides. Posting uses Route, Time & seats, and Review steps, with the same database validation and confirmation after saving. The wordmark has a small forward arrow, with a short entrance movement and a hover/tap response. Reduced-motion preferences disable that movement.

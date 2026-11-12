@@ -81,7 +81,7 @@ export function bindLocationPickers({api, session, form, onChange}) {
           title.textContent = place.name; subtitle.textContent = place.subtitle || place.city;
           button.append(title,subtitle);
           button.addEventListener('mousedown', e => e.preventDefault());
-          button.addEventListener('click', () => { hide(); onSelect(place, label); refocus(); });
+          button.addEventListener('click', () => { hide(); onSelect(place, label); if(isDialog) $(`pt-${kind}-confirm`).focus(); else refocus(); });
           list.append(button);
         }
         if (message) { const p = document.createElement('p'); p.className='small muted'; p.textContent=message; list.append(p); }
