@@ -15,7 +15,7 @@ async function fixture({confirmation=false}={}){
   const get=id=>{
     if(!fields.has(id)) fields.set(id,{value:'',checked:false,hidden:true,disabled:false,validity:{badInput:false},dataset:{},innerHTML:'',textContent:'',listeners:{},
       focus(){},addEventListener(event,fn){this.listeners[event]=fn;},setAttribute(){},removeAttribute(){},
-      closest(){return {classList:{toggle(){}}};},querySelectorAll(){return [];}});
+      querySelector(){return {focus(){}};},closest(){return {classList:{toggle(){}}};},querySelectorAll(){return [];}});
     return fields.get(id);
   };
   const names=new Map([['driver','Driver One'],['rider','Rider Two']]), profileDetails=new Map();
@@ -57,7 +57,7 @@ async function fixture({confirmation=false}={}){
   vm.runInContext(source,context);context.api=api;
   const run=code=>vm.runInContext(code,context);
   run("DB.api=api; S.me={first:'Jordan',last:'Hale',color:'#3B6EA8',verified:'verified',hometown:'',bio:''}; openPublishedDialog=t=>{S.dialogTrip=t.id;};");
-  const submit=id=>get(id).listeners.submit({preventDefault(){}});
+  const submit=id=>{if(id==='ptForm'){for(let i=0;i<2&&get(id).dataset.step!=='2';i++)get('pt-next').listeners.click();}return get(id).listeners.submit({preventDefault(){}});};
   async function login(id){get('li-email').value=`${id}@byu.edu`;get('li-pass').value='fake-password1';await submit('liForm');await tick();}
   return {run,get,login,submit,api,calls,rows,warnings};
 }
@@ -112,7 +112,7 @@ test('Robbie signup returns a new account to the requested post screen',async()=
   await f.submit('suForm');await tick();
   assert.equal(f.run('S.screen'),'post');assert.equal(f.run('DB.session.user.id'),'new-driver');
   assert.equal(f.run('fullName(S.me)'),'New Student');
-  assert.match(f.get('app').innerHTML,/Choose pickup map pin/);
+  assert.match(f.get('app').innerHTML,/Choose pickup on map/);
   f.run("go('profile',{},false)");
   assert.match(f.get('app').innerHTML,/Orem, UT/);
   assert.match(f.get('app').innerHTML,/I like hiking/);
@@ -150,4 +150,14 @@ test('a publish response received after logout does not restore the old driver s
   finish({id:'late-save',driver_id:'driver',destination_id:'moab',departure_at:'2099-11-06T23:00:00Z',total_seats:3,price_per_seat:25});await saving;
   assert.equal(f.run('S.screen'),'login');assert.equal(f.run('DB.session'),null);
   assert.equal(f.run('TRIPS.filter(t=>t.dbTrip).length'),0);
+});
+
+test('My Trips refreshes once per visit and preserves the driver tab on reload',async()=>{
+  const f=await fixture();f.run("go('login',{},false)");await f.login('driver');await tick();
+  f.run("DB.api={...api,loadTrips:async()=>{S.testLoads=(S.testLoads||0)+1;return[];}};S.tripsTab='driver';go('mytrips',{},false);");
+  await tick();await tick();
+  assert.equal(f.run('S.testLoads'),1);
+  f.run('render()');await tick();assert.equal(f.run('S.testLoads'),1);
+  f.run("S.tripsTab='rider';lastScreen()");assert.equal(f.run('S.tripsTab'),'driver');
+  f.run("go('mytrips',{},false)");await tick();await tick();assert.equal(f.run('S.testLoads'),2);
 });

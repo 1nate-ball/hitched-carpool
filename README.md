@@ -4,7 +4,7 @@
 
 ## App Summary
 
-BYU students often travel to the same places on weekends and school breaks, but finding a ride usually means asking around or checking several group chats. Our app, Hitch, is meant to bring those trips into one place. Students can browse the prototype by destination and date and see who is driving, how many seats are available, and what the ride costs. The prototype also includes screens for requesting a seat, managing requests, and chatting with the people on a trip. For this assignment, we focused on getting the **Save changes** button on the profile page working with a real database. Users can edit their hometown, bio, and avatar color, and their changes are still there after refreshing the page. The current app also supports signup with a BYU email and saves posted trips to Supabase.
+BYU students often travel to the same places on weekends and school breaks, but finding a ride usually means asking around or checking several group chats. Our app, Hitch, is meant to bring those trips into one place. Students can browse the prototype by destination and date and see who is driving, how many seats are available, and what the ride costs. The prototype also includes screens for requesting a seat, managing requests, and chatting with the people on a trip. For this assignment, we focused on getting the **Save changes** button on the profile page working with a real database. Users can edit their hometown, bio, and profile photo, and their changes are still there after refreshing the page. The current app also supports signup with a BYU email and saves posted trips to Supabase.
 
 ## ERD
 
@@ -165,12 +165,12 @@ If port 8000 is already in use, run `PORT=8001 python3 server.py` on macOS/Linux
 ## Verifying the Vertical Slice
 
 1. Click **Edit profile**.
-2. Search for and select `Boise, ID` as the hometown, and change the bio to `Ready for our next road trip!`. You can also choose a different avatar color.
+2. Search for and select `Boise, ID` as the hometown, and change the bio to `Ready for our next road trip!`. You can also upload a profile photo.
 3. Click **Save changes**.
 4. Check that the profile shows the new information and the message **Profile saved**.
-5. Refresh the page. The same hometown, bio, and avatar color should still be there.
+5. Refresh the page. The same hometown, bio, and photo should still be there.
 
-When you click Save changes, Hitch updates the signed-in account in Supabase. Refreshing reloads the same profile details. The original classroom recording uses a temporary SQLite demo database.
+When you click Save changes, Hitch updates the signed-in account in Supabase. Refreshing reloads the same profile details. Profile photos use a private Supabase Storage bucket. JPG, PNG, and WebP uploads are resized to a square JPEG in the browser; photos can also be replaced or removed. The original classroom recording uses a temporary SQLite demo database.
 
 The [35-second demo video](https://github.com/1nate-ball/hitched-carpool/raw/refs/heads/main/docs/demo.mp4) shows this process in a real browser. To record it again, run `node scripts/record-demo.cjs` locally with Playwright and Chromium installed. The checks also confirm that profile changes survive a server restart.
 
@@ -220,7 +220,7 @@ Run `python3 scripts/check_supabase_connection.py` to check the project connecti
 
 We added a starting city to posted trips. From/To searches now query saved future trips by city and destination; signed-in search results show database trips. The open-seat count includes all accepted requests without exposing other riders' names or notes. Drivers can update only their own trips, and the browser cannot change a trip's driver ID.
 
-Start typing a place or street address in either location field to see suggestions from Photon and Hitch’s saved meeting places. Select a result to fill the address and attach its pin. You can also choose a saved place in the map panel, click the map, or pan with the keyboard and use the map center. Keep a clear meeting address in the text field. Selected coordinates are saved with the trip and can be opened from Trip Detail after reloading. Typed addresses still work when a map is unavailable. The arrival point is separate from the optional return date/time.
+Start typing a place or street address in either location field to see suggestions from Photon and Hitch’s saved meeting places. Select a result to fill the address and attach its pin. The pin button inside each address field opens the same location search alongside a map. Choose a place, adjust the pin, and click **Use this location**; Cancel keeps the original selection. You can also pan with the keyboard and use the map center. Keep a clear meeting address in the text field. Selected coordinates are saved with the trip and can be opened from Trip Detail after reloading. Typed addresses still work when a map is unavailable. The arrival point is separate from the optional return date/time.
 
 We use [Leaflet 1.9.4](https://leafletjs.com/examples-v1/quick-start/) and [OpenStreetMap tiles](https://operations.osmfoundation.org/policies/tiles/) with visible attribution and normal browser caching. There is no map API key or new paid project. Address suggestions use the [Photon demo service](https://github.com/komoot/photon) and favor the starting city or selected destination. Check the pin against the agreed meeting spot. If the suggestion service is unavailable, type the address or choose the pin on the map.
 
@@ -232,3 +232,11 @@ We also tested with two disposable accounts in a fresh local Supabase instance. 
 
 
 PR #12 now includes Robbie's signup/login flow. A signed-out visitor going to Post a Trip logs in (or signs up), then returns to that form with their account name. Background requests from a previous login are discarded after logout or account switching. The combined form/API tests are in `tests/test_auth_trip_integration.cjs`; they use a fake Auth/Data API, not real test accounts. GitHub runs all JavaScript and Python checks on pull requests as well as main.
+
+### Profile photo setup
+
+Apply `supabase/migrations/20261112000100_profile_photos.sql` once before deploying this branch. It adds the profile photo path and a private `profile-photos` bucket. Signed-in users can view photos; uploads and removal are limited to the owner’s folder. This migration was tested on the isolated local Hitch database and applied once to the hosted Hitch project on November 12, 2026. Do not rerun it.
+
+### Mobile design
+
+Hitch starts with a compact route search and upcoming ride cards. Signed-in pages use saved trips; signed-out examples are labeled as sample rides. My Trips separates confirmed, pending, and past rides. Posting uses Route, Time & seats, and Review steps, with the same database validation and confirmation after saving. The wordmark has a small forward arrow, with a short entrance movement and a hover/tap response. Reduced-motion preferences disable that movement.

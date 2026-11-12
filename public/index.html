@@ -6,10 +6,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
-<title>Hitch Carpool</title>
+<title>Hitch · Rides with BYU students</title>
+<meta name="theme-color" content="#214b3b">
+<link rel="icon" href="/images/hitch-icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800;9..40,900&display=swap">
 <style>
 /* Layout: phone-width app column centered on a quiet stage; sticky top bars, sticky bottom nav.
    Colors, fonts and shared component styles live in hitch.css (the design system). */
@@ -61,7 +63,7 @@ form{display:flex;flex-direction:column;gap:14px}
 .field{display:flex;flex-direction:column;gap:6px;min-width:0}
 .field label,.label{font-weight:600;font-size:.9rem}
 .field .hint{font-size:.8rem;color:var(--muted)}
-.input,input[type=text],input[type=password],input[type=email],input[type=tel],input[type=date],input[type=time],input[type=number],select,textarea{width:100%;min-height:46px;padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:var(--surface)}
+.input,input[type=text],input[type=password],input[type=email],input[type=tel],input[type=date],input[type=time],input[type=datetime-local],input[type=number],select,textarea{width:100%;min-height:46px;padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:var(--surface)}
 textarea{min-height:90px;resize:vertical}
 input[readonly]{background:var(--surface-2);color:var(--muted)}
 .field.invalid input,.field.invalid select,.field.invalid textarea,.field.invalid .filebox{border-color:var(--bad)}
@@ -284,6 +286,8 @@ function denverISO(wall){
 }
 
 const I = {
+  arrow:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15m-6-6 6 6-6 6"/></svg>',
+  close:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 6 12 12M6 18 18 6"/></svg>',
   car:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16V11l2-5h10l2 5v5"/><path d="M3 16h18v3H3z"/><circle cx="7.5" cy="16" r="1.5"/><circle cx="16.5" cy="16" r="1.5"/><path d="M5 11h14"/></svg>',
   back:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
   user:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>',
@@ -301,7 +305,7 @@ const I = {
 };
 
 // ---------- brand: Peak H logo + mountain banner (colors come from hitch.css) ----------
-const LOGO = '<svg viewBox="0 0 48 48" aria-hidden="true"><rect class="mark-leg" x="9" y="8" width="7" height="32" rx="2"/><rect class="mark-leg" x="32" y="8" width="7" height="32" rx="2"/><path class="mark-peak" d="M16 31 L24 20 L32 31"/><circle class="mark-sun" cx="24" cy="11" r="3"/></svg>';
+const LOGO = '<span class="wordmark" aria-label="Hitch">hitch<svg class="logo-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></span>';
 const RIDGES = '<svg class="rg-wide" viewBox="0 0 1440 400" preserveAspectRatio="xMidYMax slice" aria-hidden="true"><circle class="r-sun" cx="1180" cy="170" r="54"/><path class="r-1" d="M0 280 L160 200 L290 250 L470 145 L620 235 L780 175 L960 260 L1110 170 L1260 230 L1440 185 V400 H0 Z"/><path class="r-2" d="M0 325 L200 255 L370 305 L540 235 L720 315 L900 248 L1080 320 L1260 260 L1440 305 V400 H0 Z"/><path class="r-3" d="M0 365 L220 320 L420 355 L630 315 L850 365 L1050 325 L1260 360 L1440 335 V400 H0 Z"/></svg><svg class="rg-phone" viewBox="0 0 460 250" preserveAspectRatio="xMidYMax slice" aria-hidden="true"><circle class="r-sun" cx="360" cy="118" r="24"/><path class="r-1" d="M0 170 L60 132 L120 158 L200 106 L270 148 L340 120 L460 160 V250 H0 Z"/><path class="r-2" d="M0 202 L90 170 L170 192 L250 162 L340 198 L460 176 V250 H0 Z"/><path class="r-3" d="M0 232 L100 212 L190 228 L280 208 L370 230 L460 218 V250 H0 Z"/></svg>';
 
 // ---------- destination art (stand-in "photos") ----------
@@ -393,13 +397,14 @@ const CHATS = {
 
 // ---------- state ----------
 const S = {
-  me:null, screen:'login', params:{}, hist:[],
+  me:null, screen:'login', params:{}, hist:[], visit:0, refreshedVisit:null,
   accounts:{}, taken:['jhale','kbrooks','mtanaka','hortiz','admin'],
   search:{dest:'', from:'', date:''}, cat:'All', miss:null,
-  filters:{max:'', round:false}, dbSearch:{key:'', state:'idle', ids:[]}, dbBase:{key:'', ids:[]}, tripsTab:'rider', homeLoaded:false, loginNotice:'', loginUser:'', after:null,
+  filters:{max:'', round:false}, dbSearch:{key:'', state:'idle', ids:[]}, dbBase:{key:'', ids:[]}, tripsTab:'rider', homeLoaded:false, ridesState:'idle', homeUpdatedAt:0, loginNotice:'', loginUser:'', after:null,
 };
 
 let cleanupLocationPickers = () => {};
+let cleanupProfilePhoto = () => {};
 
 // ---------- Supabase: Post a Trip ----------
 const DB = {session:null, api:null, profile:null, profileDetails:null, generation:0};
@@ -424,7 +429,17 @@ function upsertTrip(t){
   if (!CHATS[t.id]) CHATS[t.id] = [];
   return t;
 }
-async function loadDbTrips(){ // saved trips come back after a reload instead of resetting to the sample list
+async function loadDbTrips(){
+  const generation = DB.generation;
+  if (DB.tripLoad?.generation === generation) return DB.tripLoad.promise;
+  if (DB.session) S.ridesState = 'loading';
+  const promise = fetchDbTrips();
+  DB.tripLoad = {generation,promise};
+  try { return await promise; }
+  catch(error){ if(generation === DB.generation) S.ridesState='error'; throw error; }
+  finally { if(DB.tripLoad?.promise === promise) DB.tripLoad=null; }
+}
+async function fetchDbTrips(){ // saved trips come back after a reload instead of resetting to the sample list
   const generation = DB.generation;
   const api = await loadApi();
   const session = await api.getSession();
@@ -436,6 +451,7 @@ async function loadDbTrips(){ // saved trips come back after a reload instead of
   if (generation !== DB.generation) return [];
   const trips = rows.map(r => upsertTrip(fromRow(r)));
   await Promise.all([loadMyDbRequests(api), loadDriverDbRequests(api, trips), loadDbSeats(api, trips), nameDrivers(api, trips)]);
+  if(generation === DB.generation) { S.ridesState='done'; S.homeUpdatedAt=Date.now(); }
   return trips;
 }
 async function loadDriverDbRequests(api, trips){ // requests on the signed-in driver's own trips, with rider names
@@ -449,9 +465,10 @@ async function loadDriverDbRequests(api, trips){ // requests on the signed-in dr
   catch (error) { console.warn('Could not load rider names:', error.message); } // fall back to "Hitch rider"
   if (generation !== DB.generation) return;
   const names = Object.fromEntries(profiles.map(p => [p.id, p.full_name]));
+  const photos = Object.fromEntries(profiles.map(p => [p.id, p.photo]));
   for (const r of rows){
     const parts = (names[r.rider_id] || 'Hitch rider').trim().split(/\s+/);
-    USERS[r.rider_id] = {...DB_DRIVER, ...USERS[r.rider_id], first:parts[0], last:parts.slice(1).join(' ')};
+    USERS[r.rider_id] = {...DB_DRIVER, ...USERS[r.rider_id], first:parts[0], last:parts.slice(1).join(' '), photo:photos[r.rider_id] || null};
   }
   for (const t of mine){
     const own = rows.filter(r => r.trip_id === t.id);
@@ -498,12 +515,15 @@ function decideErrorMessage(error){
 }
 // Put real driver names (public.profiles) on saved trips. Drivers without a profile keep "Hitch driver".
 async function nameDrivers(api, trips){
-  const ids = trips.map(t => t.driver).filter(id => id !== 'me' && USERS[id] && !USERS[id].named);
+  const ids = trips.map(t => t.driver).filter(id => id !== 'me' && USERS[id]);
+  const generation = DB.generation;
   if (!ids.length) return;
   try {
-    for (const p of await api.loadProfiles(DB.session.accessToken, ids)){
+    const profiles = await api.loadProfiles(DB.session.accessToken, ids);
+    if (generation !== DB.generation) return;
+    for (const p of profiles){
       const parts = (p.full_name || '').trim().split(/\s+/);
-      if (USERS[p.id] && parts[0]) Object.assign(USERS[p.id], {first:parts[0], last:parts.slice(1).join(' '), named:true});
+      if (USERS[p.id] && parts[0]) Object.assign(USERS[p.id], {first:parts[0], last:parts.slice(1).join(' '), photo:p.photo || null, named:true});
     }
   } catch (error) { console.warn('Could not load driver names:', error.message); }
 }
@@ -584,32 +604,33 @@ function myStatus(t){
   return r ? r.status : null;
 }
 const isVerified = () => S.me && S.me.verified === 'verified';
-const upcoming = t => parse(t.depart) > NOW;
+const upcoming = t => t.dbTrip ? Date.parse(t.departureAt || denverISO(t.depart).iso) > Date.now() : parse(t.depart) > NOW;
 const openTrips = destId => TRIPS.filter(t => t.dest === destId && seatsLeft(t) > 0 && upcoming(t));
 
 function av(u, size=36){
   const style = `width:${size}px;height:${size}px;font-size:${Math.round(size*.38)}px;background:${u.color}`;
-  const inner = u.photo ? `<img src="${u.photo}" alt="">` : esc((u.first[0] || '') + (u.last[0] || ''));
+  const inner = esc((u.first[0] || '') + (u.last[0] || '')) + (u.photo ? `<img src="${esc(u.photo)}" alt="" onerror="this.remove()">` : '');
   return `<span class="av" style="${style}" aria-hidden="true">${inner}</span>`;
 }
-const vBadge = u => u.verified === 'verified' ? `<span class="verified">${I.check}Verified</span>` : `<span class="pill warn">Verification pending</span>`;
+const vBadge = u => u.verified === 'verified' ? '<span class="demo-badge">Demo profile</span>' : '';
 
 // ---------- navigation ----------
 // Screens that need a signed-in user. Signed out, they send you to Log in and come back after.
 const AUTH_SCREENS = new Set(['mytrips', 'manage', 'post', 'profile', 'edit', 'chat', 'reset']);
 const PUBLIC_SCREENS = new Set(['login', 'signup']);
 function go(screen, params={}, push=true){
+  S.visit++;
   if (push && !PUBLIC_SCREENS.has(S.screen)) S.hist.push({screen:S.screen, params:S.params});
   S.screen = screen; S.params = params; render(); window.scrollTo(0,0);
 }
-function back(){ const h = S.hist.pop(); if (h){ S.screen = h.screen; S.params = h.params; render(); window.scrollTo(0,0);} else go('home',{},false); }
+function back(){ S.visit++; const h = S.hist.pop(); if (h){ S.screen = h.screen; S.params = h.params; render(); window.scrollTo(0,0);} else go('home',{},false); }
 function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, 2600); }
 
 const NAVMAP = {home:'home', results:'home', detail:'home', mytrips:'mytrips', manage:'mytrips', post:'post', profile:'profile', edit:'profile'};
 function nav(){
   const cur = NAVMAP[S.screen];
   const b = (id, icon, label) => `<button data-act="nav" data-to="${id}" ${cur===id?'aria-current="page"':''}>${icon}${label}</button>`;
-  return `<nav class="nav" aria-label="Main"><button class="nav-brand" data-act="nav" data-to="home" aria-label="Hitch home"><span class="logo">${LOGO}</span>Hitch</button>${b('home',I.compass,'Explore')}${b('mytrips',I.ticket,'My Trips')}${b('post',I.plus,'Post a trip')}${b('profile',I.user,'Profile')}<span class="nav-me">${S.me && DB.session ? av(S.me, 38) : ''}</span></nav>`;
+  return `<nav class="nav" aria-label="Main"><button class="nav-brand" data-act="nav" data-to="home" aria-label="Hitch home">${LOGO}</button>${b('home',I.search,'Find rides')}${b('mytrips',I.ticket,'My Trips')}${b('post',I.plus,'Offer a ride')}${b('profile',I.user,'Profile')}<span class="nav-me">${S.me && DB.session ? av(S.me, 38) : ''}</span></nav>`;
 }
 function topbar(title, sub=''){
   return `<header class="topbar"><button class="iconbtn" data-act="back" aria-label="Back">${I.back}</button><div class="title"><h2>${esc(title)}</h2>${sub?`<div class="small muted">${sub}</div>`:''}</div></header>`;
@@ -623,52 +644,40 @@ function pendingBanner(){
 const SCREENS = {}, BIND = {};
 
 function destCard(d){
-  const n = openTrips(d.id).length;
+  const n = openTrips(d.id).filter(t=>DB.session ? t.dbTrip : !t.dbTrip).length;
   return `<button class="dcard" data-act="dest" data-id="${d.id}" aria-label="${esc(d.name)}: ${n} trips available">
     <div class="dart">${destArt(d)}<span class="count pill ${n?'neutral':'warn'}" style="background:var(--surface)">${n ? `${n} trip${n>1?'s':''}` : 'No trips yet'}</span></div>
     <div class="dbody"><h3>${esc(d.name)}</h3><div class="dmeta">${d.drive} drive</div><div class="dprice tnum">est. ${money(d.est)} <span>/ rider</span></div></div>
   </button>`;
 }
 const skelCards = n => Array.from({length:n}, () => `<div class="dcard" aria-hidden="true"><div class="dart skel" style="border-radius:0"></div><div class="dbody"><div class="skel" style="height:14px;width:70%"></div><div class="skel" style="height:11px;width:50%"></div><div class="skel" style="height:11px;width:40%"></div></div></div>`).join('');
+function homeRideList(){
+  if (DB.session && S.ridesState === 'error') return '<div class="alert bad" role="alert">Could not load rides. <button class="btn sm" data-act="retryhome">Try again</button></div>';
+  if (DB.session && ['idle','loading'].includes(S.ridesState)) return '<div class="ride-skeleton skel" aria-label="Loading upcoming rides" role="status"></div>';
+  const rides = TRIPS.filter(t => (DB.session ? t.dbTrip : !t.dbTrip) && upcoming(t) && seatsLeft(t)>0 && (S.cat==='All' || D(t.dest)?.cat===S.cat)).sort((a,b)=>parse(a.depart)-parse(b.depart)).slice(0,6);
+  return rides.length ? rides.map(tripCard).join('') : '<div class="empty"><h3>No upcoming rides yet</h3><p class="small muted">Try another destination, or offer seats on your next trip.</p><button class="btn" data-act="nav" data-to="post">Offer a ride</button></div>';
+}
 SCREENS.home = () => {
-  const loc = S.me.location === 'allowed';
-  const cats = ['All','Weekend getaways','Ski trips','National parks'];
-  const list = S.cat === 'All' ? DESTS : DESTS.filter(d => d.cat === S.cat);
-  let sections = '';
-  if (!S.homeLoaded){
-    sections = `<div class="section"><div class="skel" style="height:18px;width:40%"></div><div class="dgrid">${skelCards(4)}</div></div>`;
-  } else if (S.cat !== 'All'){
-    sections = `<div class="section"><div class="section-head"><h2>${esc(S.cat)}</h2></div><div class="dgrid">${list.map(destCard).join('')}</div></div>`;
-  } else if (loc){
-    sections = `<div class="section"><div class="section-head"><h2>Nearby</h2><span class="small muted">Close to Provo</span></div><div class="dgrid">${DESTS.filter(d=>d.near).map(destCard).join('')}</div></div>
-    <div class="section"><div class="section-head"><h2>Popular carpool trips</h2></div><div class="dgrid">${DESTS.filter(d=>!d.near).map(destCard).join('')}</div></div>`;
-  } else {
-    sections = `<div class="section"><div class="section-head"><h2>Popular destinations</h2></div><div class="dgrid">${DESTS.map(destCard).join('')}</div></div>`;
-  }
-  const miss = S.miss ? `<div class="alert info" role="status"><b>No destinations match "${esc(S.miss)}".</b><span>Try a nearby or popular spot below, like Salt Lake City, Park City, or Moab.</span></div>` : '';
-  return `
-<header class="topbar"><div class="brandrow" style="flex:1"><span class="logo">${LOGO}</span><div class="brand-name">Hitch</div></div>
-  <button class="iconbtn" aria-label="Account (not available in prototype)" title="Account">${S.me ? av(S.me, 38) : I.user}</button></header>
-<div class="screen">
-  <section class="ridge-hero">${RIDGES}<img class="hero-photo" src="images/explore-hero.jpg" alt="" onerror="this.remove()"><h1>Hitch a ride this weekend.</h1><p>Split the drive with BYU students already heading your way.</p></section>
+  const cats=['All','Weekend getaways','Ski trips','National parks'];
+  const miss=S.miss ? `<div class="alert info" role="status">No destinations match "${esc(S.miss)}". Try Salt Lake City, Park City, or Moab.</div>` : '';
+  return `<header class="topbar home-header"><button class="brand-home" data-act="nav" data-to="home" aria-label="Hitch home">${LOGO}</button><button class="account-button" data-act="${DB.session?'nav':'auth'}" data-to="${DB.session?'profile':'login'}" aria-label="${DB.session?'Your profile':'Log in'}">${DB.session?av(S.me,36):I.user}</button></header>
+<div class="screen home-layout">
+  <section class="home-search"><p class="eyebrow">Rides with BYU students</p><h1>Where are you<br>headed?</h1>
   <form class="searchcard" id="searchForm" novalidate role="search">
-    <label class="sfield"><span class="tag">From</span><input id="s-from" type="text" maxlength="80" placeholder="e.g. Provo" value="${esc(S.search.from)}" aria-label="Starting city (optional)">${I.pin}</label>
-    <label class="sfield"><span class="tag">To</span><input id="s-dest" type="text" list="destlist" placeholder="Search a destination" value="${esc(S.search.dest)}" aria-label="Destination">${I.search}</label>
+    <div class="route-fields"><label class="sfield"><span class="route-point"></span><span class="search-copy"><span class="tag">From</span><input id="s-from" type="text" maxlength="80" placeholder="Starting city" value="${esc(S.search.from)}" aria-label="Starting city (optional)"></span></label>
+    <label class="sfield"><span class="route-point end"></span><span class="search-copy"><span class="tag">To</span><input id="s-dest" type="text" list="destlist" placeholder="Choose a destination" value="${esc(S.search.dest)}" aria-label="Destination"></span>${I.search}</label></div>
     <datalist id="destlist">${DESTS.map(d=>`<option value="${esc(d.name)}">`).join('')}</datalist>
-    <label class="sfield"><span class="tag">Date</span><input id="s-date" type="date" value="${esc(S.search.date)}" aria-label="Travel date (optional)"></label>
-    <div class="err" id="s-err"></div>
-    <button class="btn primary block" type="submit">${I.search.replace('<svg','<svg width="18" height="18"')}Search rides</button>
-  </form>
-  ${pendingBanner()}
-  ${!loc ? `<p class="small muted">Location is off, so we're showing popular destinations instead of nearby ones. Type a starting point above.</p>` : ''}
-  ${miss}
-  <div class="chips" role="group" aria-label="Categories">${cats.map(c => `<button class="chip" data-act="cat" data-c="${c}" aria-pressed="${S.cat===c}">${c}</button>`).join('')}</div>
-  ${sections}
-  <p class="small muted">Prices are estimates. The actual cost depends on the driver and how many riders join.</p>
+    <div class="home-options"><label class="date-control"><input id="s-date" type="date" value="${esc(S.search.date)}" aria-label="Travel date (optional)"></label><label class="toggle"><input type="checkbox" id="s-round" ${S.filters.round?'checked':''}>Round trips only</label></div>
+    <div class="err" id="s-err" role="alert"></div><button class="btn primary block" type="submit">Find a ride ${I.arrow.replace('<svg','<svg width="18" height="18"')}</button>
+  </form>${miss}${pendingBanner()}</section>
+  <section class="home-rides"><div class="section-head"><h2>${DB.session?'Upcoming rides':'Sample rides'}</h2>${!DB.session?'<button class="link small" data-act="auth" data-to="login">Log in</button>':''}</div><div class="home-ride-list">${homeRideList()}</div></section>
+  <details class="destination-discovery"><summary>Explore destinations</summary><div class="chips" role="group" aria-label="Categories">${cats.map(c=>`<button class="chip" data-act="cat" data-c="${c}" aria-pressed="${S.cat===c}">${c}</button>`).join('')}</div><div class="dgrid">${(S.cat==='All'?DESTS:DESTS.filter(d=>d.cat===S.cat)).map(destCard).join('')}</div><p class="small muted">Destination prices are estimates. Posted rides show the driver's actual price.</p></details>
 </div>${nav()}`;
 };
 BIND.home = () => {
-  if (!S.homeLoaded) setTimeout(() => { S.homeLoaded = true; if (S.screen === 'home') render(); }, 700);
+  if (DB.session && (S.ridesState==='idle' || Date.now()-S.homeUpdatedAt>30000) && S.ridesState!=='loading' && S.ridesState!=='error') {
+    loadDbTrips().then(()=>{if(S.screen==='home')render();}).catch(()=>{if(S.screen==='home')render();});
+  }
   document.getElementById('searchForm').addEventListener('submit', e => {
     e.preventDefault();
     const q = document.getElementById('s-dest').value.trim();
@@ -677,22 +686,18 @@ BIND.home = () => {
     const ql = q.toLowerCase();
     const d = DESTS.find(d => d.name.toLowerCase().includes(ql) || ql.includes(d.name.toLowerCase()) || d.alias.some(a => ql.includes(a)));
     if (!d){ S.miss = q; S.cat = 'All'; render(); return; }
-    S.miss = null; S.filters = {max:'', round:false};
+    S.miss = null; S.filters = {max:'', round:document.getElementById('s-round').checked};
     go('results', {dest:d.id});
   });
 };
 
 /* Screen 4: Available trips / search results */
 function tripCard(t){
-  const u = U(t.driver), st = myStatus(t);
-  const tag = st === 'driver' ? '<span class="pill accent">Your trip</span>' : st === 'confirmed' ? '<span class="pill ok">Seat confirmed</span>' : st === 'pending' ? '<span class="pill warn">Awaiting driver</span>' : '';
-  return `<button class="tcard" data-act="trip" data-id="${t.id}">
-    <div class="ttop"><div><div class="twhen tnum">${fDate(t.depart)}</div><div class="small muted tnum">Leaves ${fTime(t.depart)}</div></div>
-      <div class="tprice tnum"><b>${money(t.price)}</b><div>per rider · ${t.ret ? 'round trip' : 'one way'}</div></div></div>
-    <div class="driver">${av(u,34)}<div style="min-width:0"><div class="nm">${esc(fullName(u))}${t.driver==='me'?' (you)':''}</div>${vBadge(u)}</div></div>
-    ${routeHTML(esc(t.pickup), esc(t.dropoff))}
-    <div class="tfoot"><span class="tnum"><b>${seatsLeft(t)}</b> of ${t.seats} seats left</span>${t.ret ? `<span class="small tnum">Returns ${fDT(t.ret)}</span>` : '<span class="pill neutral">One-way</span>'}${tag}</div>
-  </button>`;
+  const u=U(t.driver), st=myStatus(t), d=D(t.dest);
+  const tag=st==='driver'?'Your trip':st==='confirmed'?'Seat confirmed':st==='pending'?'Awaiting driver':'';
+  return `<button class="tcard" data-act="trip" data-id="${t.id}"><div class="ttop"><span class="small muted tnum">${fDate(t.depart)} · ${fTime(t.depart)}</span><div class="tprice tnum"><b>${money(t.price)}</b><span> / seat</span></div></div>
+    <h3>${esc(t.origin||'Provo')} <span class="route-arrow">→</span> ${esc(d.name)}</h3><p class="small muted trip-meeting">${esc(t.pickup)} · ${t.ret?'Round trip':'One-way'}</p>
+    <div class="tfoot"><span class="driver">${av(u,28)}<span class="nm">${esc(fullName(u))}${t.driver==='me'?' (you)':''}</span></span><span class="small muted tnum">${seatsLeft(t)} seats open</span></div>${tag?`<span class="trip-status">${tag}</span>`:''}${!t.dbTrip?'<span class="demo-badge">Sample ride</span>':''}</button>`;
 }
 function resultsList(){
   const d = D(S.params.dest), {max, round} = S.filters, q = S.dbSearch;
@@ -710,7 +715,7 @@ function resultsList(){
   // A helpful tile after the trips: log in to see more, or offer to post a trip.
   const tile = q.state === 'signedout'
     ? `<div class="tile tint-sky">${I.lock.replace('<svg','<svg width="28" height="28" aria-hidden="true"')}<h3>More rides are waiting</h3><p class="small">You're seeing sample trips. Log in to see trips other BYU students have posted to ${esc(d.name)}.</p><button class="btn primary sm" data-act="needlogin">Log in</button></div>`
-    : `<div class="tile tint-sage">${I.car.replace('<svg','<svg width="28" height="28" aria-hidden="true"')}<h3>Driving to ${esc(d.name)}?</h3><p class="small">Post your trip and split the gas with students heading the same way.</p><button class="btn primary sm" data-act="nav" data-to="post">Post a trip</button></div>`;
+    : `<div class="tile tint-sage">${I.car.replace('<svg','<svg width="28" height="28" aria-hidden="true"')}<h3>Driving to ${esc(d.name)}?</h3><p class="small">Post your trip and split the gas with students heading the same way.</p><button class="btn primary sm" data-act="nav" data-to="post">Offer a ride</button></div>`;
   return `<p class="small muted" role="status">${list.length} trip${list.length>1?'s':''} · earliest departure first</p>` + list.map(tripCard).join('') + tile;
 }
 // Ask Supabase for this destination's trips matching the current date and max-price filters.
@@ -793,7 +798,6 @@ SCREENS.results = () => {
   const from = S.search.from || (S.me.location === 'allowed' ? 'Current location' : 'Provo');
   return `${topbar(d.name, `${esc(from)} → ${esc(d.name)} · ${S.search.date ? fDate(S.search.date) : 'Any date'}`)}
 <div class="screen">
-  <div class="hero rhero">${destArt(d)}<button class="iconbtn" data-act="back" aria-label="Back">${I.back}</button><div class="cap"><div class="small" style="opacity:.9">${esc(from)} →</div><h1>${esc(d.name)}</h1><div class="small" style="opacity:.9">${S.search.date ? fDate(S.search.date) : 'Any date'}</div></div></div>
   <div class="row" style="justify-content:space-between"><div class="filters">
     <label class="fdate"><span class="sr-only">Travel date</span><input id="f-date" type="date" value="${esc(S.search.date)}" aria-label="Travel date"></label>
     ${priceSlider()}
@@ -858,15 +862,10 @@ SCREENS.detail = () => {
   else action = `<button class="btn primary" data-act="request">Request a seat</button>`;
   return `${topbar('Trip details')}
 <div class="screen detail-layout">
-  <div class="hero">${destArt(d)}<div class="cap"><div class="small" style="opacity:.85">${esc(t.origin || 'Provo')} → </div><h1>${esc(d.name)}</h1></div></div>
+<div class="detail-heading"><h1><span>${esc(t.origin || 'Provo')} →</span> ${esc(d.name)}</h1><p class="small muted tnum">${I.cal} ${fDT(t.depart)} <span class="pill neutral">${t.ret?'Round trip':'One-way'}</span></p></div>
   ${!isVerified() && !st ? `<div class="alert warn">${I.lock.replace('<svg','<svg width="18" height="18"')}<span>You need a verified ID before you can request a seat. Verification is pending.</span></div>` : ''}
   <div class="dmain">
-  <div class="card"><h3>Outbound trip</h3>
-    <dl class="kv wide tnum" style="margin:0">
-      <dt>Leaves</dt><dd>${fDT(t.depart)}</dd>
-      <dt>Pickup</dt><dd>${esc(t.pickup)} ${pinLink(t.pickupPin, 'pickup')}</dd>
-      <dt>${DROP_LABEL}</dt><dd>${esc(t.dropoff)} ${pinLink(t.dropoffPin, 'arrival')}</dd>
-    </dl></div>
+  <div class="card itinerary"><div class="itinerary-stop"><span class="route-point"></span><div><h3>${esc(t.origin || 'Provo')}</h3><p class="small muted">Pickup · ${esc(t.pickup)}</p>${pinLink(t.pickupPin,'pickup')}</div></div><div class="itinerary-line"></div><div class="itinerary-stop"><span class="route-point end"></span><div><h3>${esc(d.name)}</h3><p class="small muted">${DROP_LABEL} · ${esc(t.dropoff)}</p>${pinLink(t.dropoffPin,'arrival')}</div></div></div>
   <div class="card"><div class="section-head"><h3>Return trip</h3>${t.ret ? '<span class="pill accent">Included</span>' : '<span class="pill neutral">Not included</span>'}</div>
     ${t.ret ? `<dl class="kv wide tnum" style="margin:0"><dt>Leaves</dt><dd>${fDT(t.ret)}</dd><dt>Route</dt><dd>${esc(d.name)} → ${esc(t.origin || 'Provo')}</dd></dl><p class="small muted" style="margin:8px 0 0">Confirm the return meeting spot with the driver.</p>` : '<p class="small muted" style="margin:0">One-way trip. Riders arrange their own ride back.</p>'}</div>
   <div class="card"><h3>Driver</h3>
@@ -875,7 +874,7 @@ SCREENS.detail = () => {
     ${t.vehicle ? `<div class="small muted">${I.car.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px"')} ${esc(t.vehicle)}</div>` : ''}</div>
   <div class="card"><div class="section-head"><h3>Who's going</h3><span class="small tnum"><b>${left}</b> of ${t.seats} seats left</span></div>
     ${passengers.length ? `<div class="plist">${passengers.map(p => `<div class="driver">${av(p,34)}<div><div class="nm">${esc(fullName(p))}${p===S.me?' (you)':''}</div>${vBadge(p)}</div></div>`).join('')}</div>` : '<p class="muted small">No confirmed riders yet. Be the first.</p>'}</div>
-  <div class="card"><div class="section-head"><h3>Price</h3><span class="tnum"><b>${money(t.price)}</b> per seat</span></div><p class="small muted">${covers} No payment is collected in the app.</p></div>
+  <p class="small muted price-note">${covers} No payment is collected in the app.</p>
   </div>
   <aside class="booking card" aria-label="Book this trip">
     <div><b class="tnum bk-price">${money(t.price)}</b> <span class="muted">per seat · ${t.ret ? 'round trip' : 'one way'}</span></div>
@@ -885,7 +884,7 @@ SCREENS.detail = () => {
   </aside>
 </div>
 <div class="desk-nav">${nav()}</div>
-<div class="actionbar"><div class="p tnum"><b>${money(t.price)}</b><div>${t.ret ? 'round trip' : 'one way'}</div></div>${action}</div>`;
+<div class="actionbar"><div class="p tnum"><b>${money(t.price)}</b><div>per seat · ${t.ret ? 'round trip' : 'one way'}</div></div>${action}</div>`;
 };
 
 // Trip Detail loads the trip (and its driver's name) from the database each time it opens.
@@ -987,12 +986,7 @@ function postedTripsSection(){
       <button class="link" type="button" data-act="viewmytrips">See everything in My Trips</button>`
     : `<p class="muted small">Trips you publish show up here, so you can manage requests without leaving this page.</p>`}`;
 }
-SCREENS.mytrips = () => {
-  const tab = S.tripsTab;
-  let body;
-  if (tab === 'rider'){
-    const mine = TRIPS.filter(t => ['pending','confirmed','declined'].includes(myStatus(t))).sort((a,b) => parse(a.depart) - parse(b.depart));
-    body = mine.length ? mine.map(t => {
+function riderTripCard(t){
       const st = myStatus(t), d = D(t.dest), u = U(t.driver);
       const pill = st === 'confirmed' ? '<span class="pill ok">Seat confirmed</span>' : st === 'pending' ? '<span class="pill warn">Awaiting driver</span>' : '<span class="pill bad">Request declined</span>';
       const acts = st === 'pending' && t.dbTrip ? `<div class="row"><button class="btn sm" data-act="trip" data-id="${t.id}">View trip</button></div>
@@ -1004,17 +998,37 @@ SCREENS.mytrips = () => {
         : `<p class="small muted">${esc(u.first)} couldn't take you on this trip.</p><div class="row"><button class="btn sm primary" data-act="dest" data-id="${t.dest}">Find another ride</button></div>`;
       return `<div class="mcard"><div class="mtop"><div><h3>${esc(d.name)}</h3><div class="small muted tnum">${fDT(t.depart)}</div></div>${pill}</div>
         <div class="row" style="justify-content:space-between"><div class="driver">${av(u,28)}<span class="small">${esc(fullName(u))}</span></div><span class="tnum small"><b>${money(t.price)}</b> · ${t.ret?'round trip':'one way'}</span></div>${acts}</div>`;
-    }).join('') : `<div class="empty">${I.ticket}<h2>No trips yet</h2><p class="muted small">Seat requests and confirmed rides will show up here.</p><button class="btn primary" data-act="nav" data-to="home">Find a ride</button></div>`;
-  } else {
-    const mine = myDriverTrips();
-    body = mine.length ? mine.map(t => driverTripCard(t)).join('') : `<div class="empty">${I.car}<h2>You haven't posted a trip</h2><p class="muted small">Offer seats in your car and riders can request to join.</p><button class="btn primary" data-act="nav" data-to="post">Post a trip</button></div>`;
-  }
-  return `<header class="topbar"><div class="title"><h2>My Trips</h2></div></header>
-<div class="screen">
-  <div class="seg" role="tablist"><button role="tab" aria-selected="${tab==='rider'}" data-act="tab" data-t="rider">As a rider</button><button role="tab" aria-selected="${tab==='driver'}" data-act="tab" data-t="driver">As a driver</button></div>
-  ${body}
-</div>${nav()}`;
+
+}
+function tripGroups(groups, card){
+  return groups.filter(([,trips])=>trips.length).map(([title,trips])=>`<section class="trips-section"><h2>${title}</h2>${trips.map(card).join('')}</section>`).join('');
+}
+SCREENS.mytrips = () => {
+  const tab=S.tripsTab;
+  const mine=(tab==='driver'?myDriverTrips():TRIPS.filter(t=>(!DB.session||t.dbTrip)&&['pending','confirmed','declined'].includes(myStatus(t)))).sort((a,b)=>parse(a.depart)-parse(b.depart));
+  const future=mine.filter(upcoming), past=mine.filter(t=>!upcoming(t)).reverse();
+  let body;
+  if(tab==='rider'){
+    const confirmed=future.filter(t=>myStatus(t)==='confirmed');
+    body=tripGroups([['Your next ride',confirmed.slice(0,1)],['More confirmed rides',confirmed.slice(1)],['Awaiting driver',future.filter(t=>myStatus(t)==='pending')],['Not accepted',future.filter(t=>myStatus(t)==='declined')],['Past rides',past]],riderTripCard);
+  } else body=tripGroups([['Upcoming rides',future],['Past rides',past]],t=>driverTripCard(t));
+  if(!mine.length) body=`<div class="empty">${I.ticket}<h2>${tab==='driver'?"You haven't offered a ride":"No trips yet"}</h2><p class="muted small">${tab==='driver'?'Offer seats and manage your requests here.':'Your seat requests and confirmed rides will appear here.'}</p><button class="btn primary" data-act="nav" data-to="${tab==='driver'?'post':'home'}">${tab==='driver'?'Offer a ride':'Find a ride'}</button></div>`;
+  return `<header class="topbar"><div class="title"><h2>My Trips</h2></div></header><div class="screen"><div class="seg" role="tablist"><button role="tab" aria-selected="${tab==='rider'}" data-act="tab" data-t="rider">As a rider</button><button role="tab" aria-selected="${tab==='driver'}" data-act="tab" data-t="driver">As a driver</button></div>${body}</div>${nav()}`;
 };
+
+function refreshTripScreen(screen){
+  if(!DB.session || S.params.demo || S.refreshedVisit===S.visit) return;
+  const visit=S.visit, generation=DB.generation;
+  S.refreshedVisit=visit;
+  document.querySelectorAll('[data-act="decide"]').forEach(button=>button.disabled=true);
+  loadDbTrips().then(()=>{
+    if(generation===DB.generation && visit===S.visit && S.screen===screen) render();
+  }).catch(()=>{
+    if(generation===DB.generation && visit===S.visit && S.screen===screen) { render(); toast('Could not refresh trips. Open My Trips to try again.'); }
+  });
+}
+BIND.mytrips=()=>refreshTripScreen('mytrips');
+BIND.manage=()=>refreshTripScreen('manage');
 
 // Outbound route with labelled stops. Same wording on cards, preview, details, and the request dialog.
 const DROP_LABEL = 'Drop-off at destination';
@@ -1023,15 +1037,22 @@ function routeHTML(pickup, dropoff){
 }
 
 function locationPicker(kind){
-  return `<div id="pt-${kind}-suggestions" class="place-suggestions" hidden></div>
+  const label = kind === 'pickup' ? 'pickup' : 'drop-off';
+  return `<div id="pt-${kind}-picker" class="location-field">
+    <div class="location-input"><input id="pt-${kind}" type="text" maxlength="120" autocomplete="off" placeholder="Search an address or place" required aria-describedby="pe-${kind}">
+      <button id="pt-${kind}-open" class="iconbtn" type="button" aria-label="Choose ${label} on map" aria-haspopup="dialog">${I.pin}</button></div>
+    <div id="pt-${kind}-suggestions" class="place-suggestions" hidden></div>
     <span id="pt-${kind}-search-status" class="sr-only" role="status"></span>
-    <details id="pt-${kind}-picker" class="location-picker"><summary>Choose ${kind === 'pickup' ? 'pickup' : 'arrival'} map pin</summary>
-    <label for="pt-${kind}-search">Search saved ${kind} places</label><input id="pt-${kind}-search" type="search" placeholder="Search a place or city">
-    <div id="pt-${kind}-places" class="place-options" aria-live="polite">Loading saved places…</div>
-    <p class="small muted">Choose a saved place, tap the map, or move the map with arrow keys and use its center. Enter a clear meeting address above. No location permission is needed.</p>
-    <div id="pt-${kind}-map" class="location-map" aria-label="${kind} map"></div>
-    <button class="btn sm" type="button" id="pt-${kind}-center">Use map center for ${kind}</button>
-    <p id="pt-${kind}-status" class="small muted" role="status">No map pin selected. Typed addresses also work.</p></details>`;
+    <div id="pt-${kind}-status" class="location-status small muted" role="status"></div>
+    <dialog id="pt-${kind}-dialog" class="location-dialog" aria-labelledby="pt-${kind}-title">
+      <div class="section-head"><h2 id="pt-${kind}-title">Choose ${label} location</h2><button id="pt-${kind}-close" class="iconbtn" type="button" aria-label="Close location picker">${I.close}</button></div>
+      <label for="pt-${kind}-search">Address or place</label><input id="pt-${kind}-search" class="input" type="search" maxlength="120" autocomplete="off" placeholder="Search an address or place">
+      <div id="pt-${kind}-places" class="place-suggestions"></div>
+      <div id="pt-${kind}-map" class="location-map" aria-label="${label} map"></div>
+      <div class="location-map-actions"><button class="btn sm" type="button" id="pt-${kind}-center">Use map center</button><span id="pt-${kind}-map-status" class="small muted" role="status">Search a place or tap the map.</span></div>
+      <div class="row"><button id="pt-${kind}-cancel" class="btn" type="button">Cancel</button><button id="pt-${kind}-confirm" class="btn primary" type="button">Use this location</button></div>
+    </dialog>
+  </div>`;
 }
 function pinLink(pin, label){
   return pin ? `<a class="link" target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat=${pin.lat}&mlon=${pin.lng}#map=17/${pin.lat}/${pin.lng}">View ${label} pin</a>` : '';
@@ -1040,49 +1061,32 @@ function pinLink(pin, label){
 SCREENS.post = () => {
   if (!isVerified()) return `<header class="topbar"><div class="title"><h2>Post a trip</h2></div></header>
 <div class="screen">${pendingBanner()}<div class="empty">${I.lock}<h2>Verify your ID to post trips</h2><p class="muted small">Only verified students can offer rides. We'll unlock posting as soon as your ID is approved.</p><button class="btn" data-act="nav" data-to="home">Browse trips instead</button></div></div>${nav()}`;
-  return `<header class="topbar"><div class="title"><h2>Post a trip</h2><div class="small muted">Offer seats in your car · Posting as ${esc(DB.session?.user.email || '')} · <button class="link" type="button" data-act="logout">Log out</button></div></div></header>
-<div class="screen post-layout">
-<form id="ptForm" novalidate>
-  <div class="fieldset"><div class="eyebrow">Outbound trip · where & when</div>
-    <div class="field"><label for="pt-dest">Destination</label><select id="pt-dest" required><option value="">Choose a destination</option>${DESTS.map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select><div class="err" id="pe-dest"></div></div>
-    <div class="field"><label for="pt-depart">Departure date & time</label><input id="pt-depart" type="datetime-local" required aria-describedby="pt-tzhint pe-depart"><div class="small muted" id="pt-tzhint">Utah time (Mountain Time). Use the calendar to choose a valid date.</div><div class="err" id="pe-depart"></div></div>
+  return `<header class="topbar"><div class="title"><h2>Offer a ride</h2></div></header>
+<div class="screen post-layout"><form id="ptForm" novalidate>
+  <ol class="post-progress" aria-label="Posting progress"><li id="pt-progress-0" aria-current="step"><span>1</span>Route</li><li id="pt-progress-1"><span>2</span>Time & seats</li><li id="pt-progress-2"><span>3</span>Review</li></ol>
+  <section class="fieldset post-step" id="pt-step-0" aria-labelledby="pt-route-title"><h2 id="pt-route-title" tabindex="-1">Where are you driving?</h2>
     <div class="field"><label for="pt-origin">Starting city</label><input id="pt-origin" type="text" maxlength="80" value="Provo" required aria-describedby="pe-origin"><div class="err" id="pe-origin"></div></div>
-    <div class="two-desk"><div class="field"><label for="pt-pickup">Pickup location</label><input id="pt-pickup" type="text" maxlength="120" autocomplete="off" placeholder="Search an address or place" required aria-describedby="pt-pickhint pe-pickup"><div class="small muted" id="pt-pickhint">Where riders meet you before you leave.</div><div class="err" id="pe-pickup"></div>${locationPicker('pickup')}</div>
-    <div class="field"><label for="pt-dropoff">Drop-off at destination</label><input id="pt-dropoff" type="text" maxlength="120" autocomplete="off" placeholder="Search an address or place" required aria-describedby="pt-drophint pe-dropoff"><div class="small muted" id="pt-drophint">Where riders get out when you arrive (outbound trip). Add a ride back under Return trip.</div><div class="err" id="pe-dropoff"></div>${locationPicker('dropoff')}</div></div>
-    <div class="small muted">Address data © <a class="link" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></div>
-  </div>
-  <div class="fieldset"><div class="eyebrow">Seats & price</div>
-    <div class="two"><div class="field"><label for="pt-seats">Available seats</label><input id="pt-seats" type="number" min="1" max="7" step="1" inputmode="numeric" placeholder="1–7" required><div class="err" id="pe-seats"></div></div>
-    <div class="field"><label for="pt-price">Price per seat ($)</label><input id="pt-price" type="number" min="1" max="150" step="1" inputmode="numeric" placeholder="1–150" required><div class="err" id="pe-price"></div></div></div>
-  </div>
-  <div class="fieldset"><div class="eyebrow">Return trip (optional)</div>
-    <label class="check"><input type="checkbox" id="pt-ret" aria-describedby="pt-rethint"><span><b>Include a return trip</b><br><span class="small muted" id="pt-rethint">You drive riders back from your destination to your starting city. Leave unchecked for one-way.</span></span></label>
+    <div class="field"><label for="pt-dest">Destination</label><select id="pt-dest" required><option value="">Choose a destination</option>${DESTS.map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select><div class="err" id="pe-dest"></div></div>
+    <div class="field"><label for="pt-pickup">Pickup location</label>${locationPicker('pickup')}<div class="err" id="pe-pickup"></div></div>
+    <div class="field"><label for="pt-dropoff">Drop-off at destination</label>${locationPicker('dropoff')}<div class="err" id="pe-dropoff"></div></div>
+    <p class="small muted">Address data © <a class="link" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></p>
+  </section>
+  <section class="fieldset post-step" id="pt-step-1" hidden aria-labelledby="pt-time-title"><h2 id="pt-time-title" tabindex="-1">When are you leaving?</h2>
+    <div class="field"><label for="pt-depart">Departure date & time</label><input id="pt-depart" type="datetime-local" required aria-describedby="pt-tzhint pe-depart"><div class="small muted" id="pt-tzhint">Mountain Time</div><div class="err" id="pe-depart"></div></div>
+    <div class="two"><div class="field"><label for="pt-seats">Available seats</label><input id="pt-seats" type="number" min="1" max="7" step="1" inputmode="numeric" placeholder="1–7" required><div class="err" id="pe-seats"></div></div><div class="field"><label for="pt-price">Price per seat ($)</label><input id="pt-price" type="number" min="1" max="150" step="1" inputmode="numeric" placeholder="1–150" required><div class="err" id="pe-price"></div></div></div>
+    <label class="check"><input type="checkbox" id="pt-ret"><span>Include a return trip</span></label>
     <div id="pt-retfields" hidden><div class="field"><label for="pt-return">Return date & time</label><input id="pt-return" type="datetime-local" aria-describedby="pt-tzhint pe-return"><div class="err" id="pe-return"></div></div></div>
-    <div class="alert info small" id="pt-covers"></div>
-  </div>
-  <div class="alert bad" id="pt-sum" role="alert" hidden>Check the highlighted fields before publishing.</div>
-  <div class="alert bad" id="pt-dberr" role="alert" hidden></div>
-  <button class="btn primary block" type="submit" id="pt-submit">Publish trip</button>
-</form>
-<aside class="post-aside" aria-label="Trip preview">
-  <div class="eyebrow">Preview · how riders will see your trip</div>
-  <div class="card preview" id="pt-preview"></div>
-  <div class="card tips tint-sage" id="pt-tips"></div>
-</aside>
-<section class="pt-mine" id="pt-mine" aria-labelledby="pt-mine-h">${postedTripsSection()}</section>
-</div>${nav()}`;
+    <p class="small muted" id="pt-covers"></p>
+  </section>
+  <section class="post-step" id="pt-step-2" hidden aria-labelledby="pt-review-title"><div class="section-head"><h2 id="pt-review-title" tabindex="-1">Review your ride</h2><button class="link" id="pt-edit-route" type="button">Edit route</button></div><div class="card review-preview" id="pt-review"></div><button class="link" id="pt-edit-time" type="button">Edit time and seats</button></section>
+  <div class="alert bad" id="pt-sum" role="alert" hidden>Check the highlighted fields.</div><div class="alert bad" id="pt-dberr" role="alert" hidden></div>
+  <div class="post-actions"><button class="btn" type="button" id="pt-prev" hidden>Back</button><button class="btn primary" type="button" id="pt-next">Continue</button><button class="btn primary" type="submit" id="pt-submit" hidden>Publish trip</button></div>
+</form><section class="pt-mine" id="pt-mine" aria-labelledby="pt-mine-h">${postedTripsSection()}</section></div>${nav()}`;
 };
 // Live preview for the desktop Post a trip layout (display only; does not affect saving)
 function postPreview(v){
-  const d = D(v.dest), ph = t => `<span class="ph">${t}</span>`;
-  const when = v.depart ? fDT(v.depart) : '';
-  const seats = +v.seats;
-  return `<div class="dart${d ? '' : ' blank'}">${d ? destArt(d) : RIDGES}<span class="count pill ${v.ret ? 'accent' : 'neutral'}" style="background:var(--surface)">${v.ret ? 'Round trip' : 'One-way'}</span></div>
-  <div class="ttop"><div style="min-width:0"><h3>${d ? esc(d.name) : ph('Choose a destination')}</h3><div class="small muted tnum">${when ? esc(when) : 'Pick a date and time'}</div></div>
-    <div class="tprice"><b class="tnum">${+v.price ? money(+v.price) : '$–'}</b><div>per seat</div></div></div>
-  ${routeHTML(v.pickup ? esc(v.pickup) : ph('Pickup location'), v.dropoff ? esc(v.dropoff) : ph('Where riders get out'))}
-  <div class="leg-return">${v.ret ? `<span class="pill accent">Return trip</span><span class="tnum">${v.retAt ? `Leaves ${d ? esc(d.name) : 'destination'} ${esc(fDT(v.retAt))}` : ph('Pick a return date and time')}</span>` : `<span class="pill neutral">No return trip</span><span class="small muted">One-way</span>`}</div>
-  <div class="tfoot"><div class="driver">${av(S.me,28)}<span class="small"><b>You</b></span>${vBadge(S.me)}</div><span class="pill ok">${seats ? `${seats} seat${seats > 1 ? 's' : ''} open` : 'Seats open'}</span></div>`;
+  const d=D(v.dest);
+  return `<div class="ttop"><div><h3>${esc(v.origin||'Provo')} → ${d?esc(d.name):'Choose a destination'}</h3><p class="small muted tnum">${v.depart?esc(fDT(v.depart)):'Pick a date and time'}</p></div><div class="tprice"><b>${+v.price?money(+v.price):'$–'}</b><div>per seat</div></div></div>${routeHTML(esc(v.pickup||'Pickup location'),esc(v.dropoff||'Drop-off at destination'))}<div class="review-facts"><span>${+v.seats||'–'} seats</span><span>${v.ret?'Round trip':'One-way'}</span></div><p class="small muted">${v.ret?`Return: ${v.retAt?esc(fDT(v.retAt)):'Choose a return time'}. Price covers both directions.`:'Return trip not included. Price covers one direction.'}</p>`;
 }
 function postTips(v){
   const d = D(v.dest);
@@ -1101,14 +1105,13 @@ BIND.post = () => {
       .catch(error => console.warn('Could not load your trips:', error.message));
   }
   const refresh = () => {
-    if (!$('pt-preview')) return;
+    if (!$('pt-review')) return;
     const val = id => $(id).value.trim();
-    const v = {dest:val('pt-dest'), depart:val('pt-depart'), pickup:val('pt-pickup'), dropoff:val('pt-dropoff'), seats:val('pt-seats'), price:val('pt-price'), ret:$('pt-ret').checked, retAt:val('pt-return')};
-    $('pt-preview').innerHTML = postPreview(v);
-    $('pt-tips').innerHTML = postTips(v);
+    const v = {origin:val('pt-origin'), dest:val('pt-dest'), depart:val('pt-depart'), pickup:val('pt-pickup'), dropoff:val('pt-dropoff'), seats:val('pt-seats'), price:val('pt-price'), ret:$('pt-ret').checked, retAt:val('pt-return')};
+    $('pt-review').innerHTML = postPreview(v);
   };
   f.addEventListener('input', refresh); f.addEventListener('change', refresh); refresh();
-  const covers = () => { $('pt-covers').textContent = $('pt-ret').checked ? 'Your price per seat covers both directions: there and back.' : 'Your price per seat covers one direction only. Riders will see that this is a one-way trip and arrange their own ride back.'; };
+  const covers = () => { $('pt-covers').textContent = $('pt-ret').checked ? 'Price per seat covers the outbound and return trip.' : 'One-way ride. Price per seat covers the outbound trip only.'; };
   const setMins = () => { $('pt-depart').min = denverWall(new Date()); $('pt-return').min = $('pt-depart').value || $('pt-depart').min; };
   $('pt-ret').addEventListener('change', () => { $('pt-retfields').hidden = !$('pt-ret').checked; covers(); });
   $('pt-depart').addEventListener('change', setMins);
@@ -1122,7 +1125,7 @@ BIND.post = () => {
   }).catch(() => { /* Address entry remains available when map code cannot load. */ });
 
   const FIELDS = {origin:'pt-origin',dest:'pt-dest', depart:'pt-depart', pickup:'pt-pickup', dropoff:'pt-dropoff', seats:'pt-seats', price:'pt-price', return:'pt-return'};
-  function validate(){
+  function validate(keys = Object.keys(FIELDS)){
     const v = id => $(id).value.trim(), err = {}, out = {}, now = Date.now();
     if (!v('pt-origin') || v('pt-origin').length > 80) err.origin = 'Enter a starting city, up to 80 characters.';
     if (!v('pt-dest')) err.dest = 'Choose a destination.';
@@ -1148,11 +1151,12 @@ BIND.post = () => {
         else out.ret = rt;
       }
     }
+    for(const key of Object.keys(err)) if(!keys.includes(key)) delete err[key];
     Object.keys(FIELDS).forEach(k => { const el = $('pe-'+k); el.textContent = err[k] || ''; el.closest('.field').classList.toggle('invalid', !!err[k]); $(FIELDS[k]).setAttribute('aria-invalid', err[k] ? 'true' : 'false'); });
     $('pt-sum').hidden = !Object.keys(err).length;
-    if (Object.keys(err).length){ $(FIELDS[Object.keys(err)[0]]).focus(); return null; }
+    if (Object.keys(err).length){ const key=Object.keys(err)[0]; showStep(routeKeys.includes(key)?0:1); $(FIELDS[key]).focus(); return null; }
     return {
-      destination_id: v('pt-dest'), departure_at: out.dep.iso, origin_city:v('pt-origin'),
+      destination_id: v('pt-dest'), departure_at: out.dep?.iso, origin_city:v('pt-origin'),
       pickup_latitude:selectedPins.pickup?.lat ?? null, pickup_longitude:selectedPins.pickup?.lng ?? null,
       dropoff_latitude:selectedPins.dropoff?.lat ?? null, dropoff_longitude:selectedPins.dropoff?.lng ?? null,
       pickup_location: v('pt-pickup'), dropoff_location: v('pt-dropoff'),
@@ -1160,10 +1164,26 @@ BIND.post = () => {
     };
   }
 
+  let step = 0;
+  const routeKeys=['origin','dest','pickup','dropoff'], timeKeys=['depart','seats','price','return'];
+  function showStep(value){
+    step=value; f.dataset.step=String(step);
+    for(let i=0;i<3;i++) { $('pt-step-'+i).hidden=i!==step; const progress=$('pt-progress-'+i); if(i===step) progress.setAttribute('aria-current','step'); else progress.removeAttribute('aria-current'); }
+    $('pt-prev').hidden=step===0; $('pt-next').hidden=step===2; $('pt-submit').hidden=step!==2;
+    $('pt-next').textContent=step===1?'Review ride':'Continue'; $('pt-mine').hidden=step!==0;
+    refresh();
+  }
+  function advance(){if(validate(step===0?routeKeys:timeKeys)){showStep(step+1); $('pt-step-'+step).querySelector('h2')?.focus();}}
+  $('pt-next').addEventListener('click',advance);
+  $('pt-prev').addEventListener('click',()=>showStep(step-1));
+  $('pt-edit-route').addEventListener('click',()=>showStep(0));
+  $('pt-edit-time').addEventListener('click',()=>showStep(1));
+  showStep(0);
   let busy = false; // stops double-clicks from creating duplicate trips
   f.addEventListener('submit', async e => {
     e.preventDefault();
     if (busy) return;
+    if(step<2){advance();return;}
     const btn = $('pt-submit'), dbErr = $('pt-dberr');
     dbErr.hidden = true;
     const payload = validate(); if (!payload) return;
@@ -1273,10 +1293,10 @@ const SCREEN_KEY = 'hitch-last-screen';
 const RESTORABLE = new Set(['home', 'mytrips', 'post', 'profile']);
 function rememberScreen(){ // so a refresh returns to the same tab instead of always Explore
   if (!DB.session || !RESTORABLE.has(S.screen)) return;
-  try { sessionStorage.setItem(SCREEN_KEY, S.screen); } catch { /* storage blocked */ }
+  try { sessionStorage.setItem(SCREEN_KEY, S.screen); sessionStorage.setItem(SCREEN_KEY+'-role', S.tripsTab); } catch { /* storage blocked */ }
 }
 function lastScreen(){
-  try { const v = sessionStorage.getItem(SCREEN_KEY); return RESTORABLE.has(v) ? v : null; } catch { return null; }
+  try { const role=sessionStorage.getItem(SCREEN_KEY+'-role'); if(['rider','driver'].includes(role)) S.tripsTab=role; const v = sessionStorage.getItem(SCREEN_KEY); return RESTORABLE.has(v) ? v : null; } catch { return null; }
 }
 // Weak-password rule shown on the form. Supabase also enforces its own minimum.
 function passwordProblem(p){
@@ -1286,7 +1306,7 @@ function passwordProblem(p){
 }
 const SAMPLE_COLORS = ['#2F6B5E','#3B6EA8','#B0562F','#7B4FA0','#A8456B','#4F6B2E'];
 function clearAccountDetails(){
-  DB.profile = null; DB.profileDetails = null;
+  DB.profile = null; DB.profileDetails = null; S.ridesState = 'idle'; S.homeUpdatedAt = 0;
   if (S.me) Object.assign(S.me, {first:'Hitch', last:'student', hometown:'', bio:'', color:SAMPLE_COLORS[0], photo:null});
 }
 function applyProfileDetails(details){
@@ -1314,7 +1334,7 @@ async function loadAccount(){
 function applyAccountName(){
   if (!S.me || !DB.profile) return;
   const parts = DB.profile.full_name.trim().split(/\s+/);
-  S.me.first = parts[0]; S.me.last = parts.slice(1).join(' ');
+  S.me.first = parts[0]; S.me.last = parts.slice(1).join(' '); S.me.photo = DB.profile.photo || null;
 }
 async function afterSignIn(session, message){
   const generation = ++DB.generation;
@@ -1333,7 +1353,7 @@ async function logOut(notice, returnTo = null){
   DB.generation++;
   try { (await loadApi()).signOut(); } catch { /* still clear local state */ }
   DB.session = null; clearAccountDetails(); clearDbTrips();
-  try { sessionStorage.removeItem(SCREEN_KEY); } catch { /* ignore */ }
+  try { sessionStorage.removeItem(SCREEN_KEY); sessionStorage.removeItem(SCREEN_KEY+'-role'); } catch { /* ignore */ }
   S.hist = []; S.after = returnTo; S.loginNotice = notice; S.screen = 'login'; S.params = {};
   render(); window.scrollTo(0,0);
 }
@@ -1346,7 +1366,7 @@ function authArt(kind){
   return `<div class="auth-art" aria-hidden="true">${RIDGES}<img class="auth-photo" src="images/login.jpg" alt="" onerror="this.remove()"><div class="auth-copy"><h2>${title}</h2><p>${sub}</p></div></div>`;
 }
 function authHeader(sub){
-  return `<div class="brandrow"><span class="logo">${LOGO}</span><div><div class="brand-name">Hitch</div><div class="brand-sub">${sub}</div></div></div>`;
+  return `<div class="brandrow">${LOGO}<div class="brand-sub">${sub}</div></div>`;
 }
 
 SCREENS.login = () => `<div class="screen auth-layout">${authArt('login')}<div class="auth-form">
@@ -1469,11 +1489,10 @@ function hometownField(id, label, value = ''){
   return `<div class="field">
     <label for="${id}">${label}</label>
     <input id="${id}" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="${id}-options"
-      aria-describedby="${id}-hint ${id}-error" autocomplete="off" maxlength="100" placeholder="Search city or state" value="${esc(value)}">
+      aria-describedby="${id}-error" autocomplete="off" maxlength="100" placeholder="Search city or state" value="${esc(value)}">
     <input id="${id}-value" type="hidden" value="${esc(value)}">
     <div id="${id}-options" class="place-suggestions" role="listbox" aria-label="Hometown suggestions" hidden></div>
     <div id="${id}-status" class="small muted" role="status"></div>
-    <div id="${id}-hint" class="hint">Choose a U.S. city and state, or leave this blank.</div>
     <div id="${id}-error" class="err" role="alert"></div>
   </div>`;
 }
@@ -1555,11 +1574,11 @@ SCREENS.profile = () => {
   return `<header class="topbar"><div class="title"><h2>Profile</h2></div><span class="pill">Demo verification</span></header>
 <div class="screen">
   ${pendingBanner()}
-  <div class="phead">${av(m,96)}<h1>${esc(fullName(m))}</h1>${m.verified === 'verified' ? `<span class="pill ok">${I.check.replace('<svg','<svg width="14" height="14"')}ID verified</span>` : '<span class="pill warn">Verification pending</span>'}</div>
+  <div class="phead">${av(m,96)}<h1>${esc(fullName(m))}</h1>${m.verified === 'verified' ? `<span class="pill ok">Class demo account</span>` : '<span class="pill warn">Verification pending</span>'}</div>
   ${hasProfileDetails() ? `<div class="card"><dl class="kv" style="margin:0"><dt>Hometown</dt><dd>${m.hometown ? esc(m.hometown) : '<span class="muted">Not added yet</span>'}</dd><dt>Bio</dt><dd>${m.bio ? esc(m.bio) : '<span class="muted">Not added yet</span>'}</dd></dl></div>` : '<div class="alert bad small" role="alert">Could not load your profile details. Refresh to try again.</div>'}
   <div style="display:flex;flex-direction:column;gap:10px">
     <button class="btn block" data-act="go" data-to="edit" ${hasProfileDetails() ? '' : 'disabled'}>Edit profile</button>
-    <button class="btn primary block" data-act="nav" data-to="post" ${isVerified()?'':'disabled'}>Post a trip</button>
+    <button class="btn primary block" data-act="nav" data-to="post" ${isVerified()?'':'disabled'}>Offer a ride</button>
     <button class="btn primary block" data-act="mymanage">Manage my trip</button>
     ${isVerified() ? '' : '<p class="small muted" style="text-align:center">Posting a trip unlocks once your ID is verified.</p>'}
     <button class="btn block danger" data-act="logout">Log out</button>
@@ -1575,15 +1594,18 @@ SCREENS.edit = () => {
 <div class="screen">
 <form id="edForm" novalidate>
   <div class="fieldset"><div class="eyebrow">Photo</div>
-    <div class="avpick" role="group" aria-label="Sample avatars">${SAMPLE_COLORS.map(c => `<button type="button" data-c="${c}" aria-label="Avatar color ${c}" aria-pressed="${!m.photo && m.color===c}">${av({...m, photo:null, color:c},48)}</button>`).join('')}</div>
-    <p class="small muted">Prototype uses sample avatars.</p>
+    <div class="photo-editor"><div id="ed-photo-preview">${av(m,80)}</div><div class="photo-actions">
+      <button id="ed-photo-open" class="btn" type="button">${m.photo ? 'Change photo' : 'Upload photo'}</button>
+      <input id="ed-photo" hidden type="file" accept="image/jpeg,image/png,image/webp" aria-label="Profile photo">
+      <button id="ed-photo-remove" class="link" type="button" ${m.photo ? '' : 'hidden'}>Remove photo</button>
+    </div></div>
+    <div id="ed-photo-error" class="err" role="alert"></div>
   </div>
   <div class="fieldset"><div class="eyebrow">Profile details</div>
-    <div class="field"><label for="ed-name">Name</label><input id="ed-name" type="text" value="${esc(fullName(m))}" readonly><div class="hint">Your name comes from your Hitch account.</div></div>
-    ${hometownField('ed-home', 'Hometown', m.hometown)}
-    <div class="field"><label for="ed-bio">Short bio</label><textarea id="ed-bio" maxlength="160" placeholder="Major, where you usually travel, what you're like on a road trip">${esc(m.bio)}</textarea><div class="hint" id="ed-count"></div></div>
+    <div class="field"><label for="ed-name">Name</label><input id="ed-name" type="text" value="${esc(fullName(m))}" readonly></div>
+    ${hometownField('ed-home', 'Hometown (optional)', m.hometown)}
+    <div class="field"><label for="ed-bio">Short bio</label><textarea id="ed-bio" maxlength="160" placeholder="Major, where you usually travel, what you're like on a road trip">${esc(m.bio)}</textarea></div>
   </div>
-  <div class="privacy">${I.lock}<span>Hometown and bio are saved to your Hitch account.</span></div>
   <div id="ed-error" class="alert bad small" role="alert" hidden></div>
   <div class="row"><button type="button" class="btn" data-act="back">Cancel</button><button type="submit" class="btn primary">Save changes</button></div>
 </form>
@@ -1592,32 +1614,58 @@ SCREENS.edit = () => {
 BIND.edit = () => {
   if (!hasProfileDetails()) return;
   bindHometown('ed-home');
-  let color = S.me.color;
-  const bio = document.getElementById('ed-bio'), cnt = document.getElementById('ed-count');
-  const c = () => cnt.textContent = `${bio.value.length} / 160`; bio.addEventListener('input', c); c();
-  document.querySelectorAll('.avpick button').forEach(b => b.addEventListener('click', () => { color = b.dataset.c; document.querySelectorAll('.avpick button').forEach(x => x.setAttribute('aria-pressed', x === b)); }));
+  const color = S.me.color, owner = {...S.me};
+  const bio = document.getElementById('ed-bio'), fileInput = document.getElementById('ed-photo');
+  const preview = document.getElementById('ed-photo-preview'), remove = document.getElementById('ed-photo-remove');
+  const photoError = document.getElementById('ed-photo-error'), saveButton = document.querySelector('#edForm [type="submit"]');
+  let photo = null, photoChanged = false, previewUrl = null, photoVersion = 0, active = true, saving = false;
+  const clearPreview = () => { if (previewUrl) URL.revokeObjectURL(previewUrl); previewUrl = null; };
+  cleanupProfilePhoto = () => { active = false; photoVersion++; clearPreview(); };
+  document.getElementById('ed-photo-open').addEventListener('click', () => { if (!saving) fileInput.click(); });
+  fileInput.addEventListener('change', async () => {
+    if (saving) return;
+    const file = fileInput.files[0]; if (!file) return;
+    const version = ++photoVersion;
+    saveButton.disabled = true; photoError.textContent = '';
+    try {
+      const {prepareProfilePhoto} = await import('/hitch-photos.js');
+      const resized = await prepareProfilePhoto(file);
+      if (!active || version !== photoVersion) return;
+      clearPreview(); photo=resized; photoChanged=true; previewUrl=URL.createObjectURL(photo);
+      preview.innerHTML = av({...owner,photo:previewUrl},80); remove.hidden=false;
+    } catch(error) { if (active && version === photoVersion) photoError.textContent=error.message; }
+    finally { if (active && version === photoVersion) { saveButton.disabled=false; fileInput.value=''; } }
+  });
+  remove.addEventListener('click', () => {
+    if (saving) return;
+    photoVersion++; clearPreview(); photo=null; photoChanged=true; fileInput.value='';
+    preview.innerHTML=av({...owner,photo:null},80); remove.hidden=true; photoError.textContent=''; saveButton.disabled=false;
+  });
   document.getElementById('edForm').addEventListener('submit', async e => {
     e.preventDefault();
     const button = e.target.querySelector('[type="submit"]');
     const box = document.getElementById('ed-error'), generation = DB.generation, userId = DB.session?.user.id;
-    if (button.disabled || !hasProfileDetails()) return;
+    if (button.disabled || saving || !hasProfileDetails()) return;
     const hometown = hometownValue('ed-home');
     if (hometown === null) { document.getElementById('ed-home').focus(); return; }
     const fields = {hometown, bio:bio.value.trim(), color};
-    box.hidden = true;
+    box.hidden = true; saving = true; fileInput.disabled = remove.disabled = true;
     button.disabled = true; button.textContent = 'Saving…';
     try {
       const api = await loadApi(), session = await api.getSession();
       if (generation !== DB.generation) return;
       if (!session || session.user.id !== userId) throw new Error('Your session changed. Sign in again before saving.');
+      const photoResult = photoChanged ? await api.saveProfilePhoto(session.accessToken,userId,photo) : null;
+      if (generation !== DB.generation || DB.session?.user.id !== userId) return;
       const details = await api.saveProfileDetails(session.accessToken, fields);
       if (generation !== DB.generation || DB.session?.user.id !== userId) return;
       applyProfileDetails(details);
+      if (photoResult) { Object.assign(DB.profile ||= {id:userId,full_name:fullName(S.me)},photoResult); S.me.photo=photoResult.photo; }
       if (S.screen !== 'edit' || !e.target.isConnected) return;
       S.hist.pop(); go('profile', {}, false); toast('Profile saved');
     } catch (error) {
       if (generation !== DB.generation) return;
-      box.textContent = error.message; box.hidden = false; button.disabled = false; button.textContent = 'Save changes';
+      box.textContent = error.message; box.hidden = false; saving = false; fileInput.disabled = remove.disabled = false; button.disabled = false; button.textContent = 'Save changes';
     }
   });
 };
@@ -1656,13 +1704,14 @@ async function boot(){
 }
 function render(){
   cleanupLocationPickers(); cleanupLocationPickers = () => {};
+  cleanupProfilePhoto(); cleanupProfilePhoto = () => {};
   document.querySelectorAll('.scrim').forEach(x => x.remove());
   if (AUTH_SCREENS.has(S.screen) && !DB.session){ // signed out: send to Log in, then come back here
     S.after = {screen:S.screen, params:S.params}; S.screen = 'login'; S.params = {}; S.hist = [];
   }
   rememberScreen();
   app.dataset.screen = S.screen;
-  app.innerHTML = '<div class="banner small" role="status">Classroom demo · Accounts, profile saving, Post a trip, and seat requests on posted trips use real databases. Other rides, verification, and chat are prototype interactions.</div>' + SCREENS[S.screen]();
+  app.innerHTML = '<details class="demo-notice"><summary>Class demo</summary><p>Accounts, profiles, posted trips, and seat requests use real databases. Sample rides, identity verification, and chat are prototypes.</p></details>' + SCREENS[S.screen]();
   BIND[S.screen]?.();
 }
 document.addEventListener('click', e => {
@@ -1673,6 +1722,7 @@ document.addEventListener('click', e => {
     case 'back': back(); break;
     case 'nav': S.hist = []; if (el.dataset.to === 'home'){ S.miss = null; } go(el.dataset.to, {}, false); break;
     case 'cat': S.cat = el.dataset.c; render(); break;
+    case 'retryhome': S.ridesState='idle'; render(); break;
     case 'dest': S.miss = null; S.filters = {max:'', round:false}; go('results', {dest:id}); break;
     case 'change': S.hist = []; go('home', {}, false); setTimeout(() => document.getElementById('s-dest')?.focus(), 0); break;
     case 'retrysearch': searchDbTrips(); break;
@@ -1680,7 +1730,7 @@ document.addEventListener('click', e => {
     case 'clearf': S.filters = {max:'', round:false}; S.search.date = ''; render(); break;
     case 'trip': S.detailLoad = null; go('detail', {id}); break;
     case 'request': openRequestDialog(); break;
-    case 'tab': S.tripsTab = el.dataset.t; render(); break;
+    case 'tab': S.visit++; S.tripsTab = el.dataset.t; render(); break;
     case 'withdraw': { const t = TRIPS.find(x => x.id === id); t.requests = t.requests.filter(r => r.uid !== 'me'); render(); toast('Request withdrawn'); break; }
     case 'manage': go('manage', {id, demo: !!el.dataset.demo}); break;
     case 'chat': go('chat', {id}); break;
