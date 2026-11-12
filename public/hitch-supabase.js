@@ -10,7 +10,7 @@ async function config() {
   return configuration;
 }
 
-async function request(path, accessToken, payload, method) {
+async function request(path, accessToken, payload, method, prefer) {
   if (!accessToken) throw new Error('Sign in before using the Hitch database.');
   const { url, publishableKey } = await config();
   const response = await fetch(`${url}/rest/v1/${path}`, {
@@ -18,7 +18,7 @@ async function request(path, accessToken, payload, method) {
     headers: {
       apikey: publishableKey,
       Authorization: `Bearer ${accessToken}`,
-      ...(payload ? { 'Content-Type': 'application/json', Prefer: 'return=representation' } : {}),
+      ...(payload ? { 'Content-Type': 'application/json', Prefer: ['return=representation', prefer].filter(Boolean).join(',') } : {}),
     },
     ...(payload ? { body: JSON.stringify(payload) } : {}),
   });
@@ -32,8 +32,29 @@ async function request(path, accessToken, payload, method) {
   return data;
 }
 
-export function loadDestinations(accessToken) {
-  return request('destinations?select=id,name&order=name', accessToken);
+// Every destination, including ones drivers typed in. Falls back to id/name if the
+// any-destination migration hasn't been applied yet, so older databases keep working.
+export async function loadDestinations(accessToken) {
+  try {
+    return await request('destinations?select=id,name,latitude,longitude,photo_url&order=name', accessToken);
+  } catch (error) {
+    if (error.status !== 400) throw error;
+    return request('destinations?select=id,name&order=name', accessToken);
+  }
+}
+
+// Post a Trip: returns the destination row for a typed place, creating it if it's new.
+// The database cleans the name, reuses an existing row ignoring case, and generates the id.
+export async function ensureDestination(accessToken, { name, latitude = null, longitude = null }) {
+  const pin = Number.isFinite(latitude) && Number.isFinite(longitude);
+  const data = await request('rpc/find_or_create_destination', accessToken, {
+    p_name: String(name || '').trim(),
+    p_latitude: pin ? latitude : null,
+    p_longitude: pin ? longitude : null,
+  });
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row?.id) throw new Error('Could not save the destination.');
+  return row;
 }
 
 export function loadTrips(accessToken) {
@@ -342,4 +363,23 @@ export async function saveProfilePhoto(accessToken,userId,photo) {
   }
   if (photoPath(previous?.avatar_path) && previous.avatar_path !== path) await remove(previous.avatar_path).catch(()=>{});
   return {avatar_path:path,photo:photoUrl};
+}
+
+// ---------- Pickup identification (car details + pickup code) ----------
+// RLS returns the row only to the trip's driver and to riders whose request was accepted.
+export async function loadPickupDetails(accessToken, tripId) {
+  const rows = await request(`trip_pickup_details?select=trip_id,vehicle_make_model,vehicle_color,license_plate,pickup_code&trip_id=eq.${encodeURIComponent(tripId)}`, accessToken);
+  return rows[0] || null;
+}
+
+// Driver only. Creates the row (the database picks the pickup code) or updates the car details.
+export async function savePickupDetails(accessToken, tripId, { makeModel = '', color = '', plate = '' } = {}) {
+  const rows = await request('trip_pickup_details?on_conflict=trip_id&select=trip_id,vehicle_make_model,vehicle_color,license_plate,pickup_code', accessToken, {
+    trip_id: tripId,
+    vehicle_make_model: makeModel.trim().slice(0, 60),
+    vehicle_color: color.trim().slice(0, 30),
+    license_plate: plate.trim().toUpperCase().slice(0, 10),
+  }, 'POST', 'resolution=merge-duplicates');
+  if (!Array.isArray(rows) || !rows[0]) throw new Error('Could not save the car details.');
+  return rows[0];
 }

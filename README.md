@@ -236,3 +236,36 @@ PR #12 now includes Robbie's signup/login flow. A signed-out visitor going to Po
 ### Profile photos
 
 Edit profile supports uploading, replacing, and removing a photo. Images are resized before saving to the private Supabase Storage bucket. The photo setup in `supabase/migrations/20261112000100_profile_photos.sql` was already applied to the Hitch project on November 12, 2026. Do not rerun it.
+## Sprint 3 (Robbie): passwords, any destination, arrival wording, pickup identification
+
+**Log in / Sign up**
+- Every password box (Log in, Sign up, Choose a new password) has an eye button that shows or hides what you typed. Passwords are hidden by default. The button works from the keyboard and is labeled "Show password" or "Hide password" for screen readers.
+- Sign up asks you to type your password twice. The account isn't created until both match ("Passwords don't match").
+
+**Post a Trip: type any destination**
+- The Destination field is a search box instead of a list of 8 places. Suggestions show the preset places, places other drivers already added, and places from Photon (OpenStreetMap). No API key is needed.
+- If you pick or type a place that isn't saved yet, publishing calls the database function `find_or_create_destination`. It cleans up the name, reuses an existing destination even if the capitalization or spacing is different, and creates the id.
+- Riders can find trips to a new place from Explore search. Places that have open trips also show under "More places students are driving".
+- **Prices.** The preset places still have fixed estimates. New places get an estimate from their distance from Provo: about 1.2× the straight-line miles, at roughly $0.18 per road mile, which matches the presets. Drivers still set their own price per seat.
+- **Pictures.** New places show the drawn mountain picture. `destinations.photo_url` is ready for the "Auto-generate a picture for new destinations" card (Nathan) to fill in, and the app shows that photo as soon as it's set.
+
+**Arrival destination.** "Drop off" now reads **Arrival destination** everywhere. The return trip uses **Return pickup**, with help text explaining the difference.
+
+**Profile picture.** Uses the profile photo upload described under *Profile photos* above (already live).
+
+**Pickup identification**
+- Post a Trip has an optional "Your car" section: make and model, color, and license plate. Drivers can also edit these on Manage requests.
+- The database creates a 4-digit pickup code for each trip. Car details and the code are stored in `trip_pickup_details`, and only the driver and riders whose request was **accepted** can read them. They never appear on trip cards or in `available_trips`.
+- At pickup, the rider tells the driver the code. This is pickup identification, not identity verification or a safety guarantee.
+
+**Women-only rides.** This card is a planning card. See [the proposal](docs/women-only-rides-proposal.md).
+
+**Database: run these in the Supabase SQL Editor, in this order, once each:**
+1. `supabase/migrations/20261110000100_any_destination.sql`
+2. `supabase/migrations/20261110000300_pickup_identification.sql`
+
+(Profile photos already use `20261112000100_profile_photos.sql`, which is applied. Don't rerun it.)
+
+Until these run, the app keeps working as before. Destinations and names still load, and the new features show a clear "not turned on in the database yet" message.
+
+**Checks:** `node --test tests/*.cjs` (Sprint 3 tests are in `tests/test_sprint3.cjs`) and `POSTGRES_BIN=... python3 scripts/check_sprint3_schema.py`. The script runs 24 checks against a throwaway local PostgreSQL (with every migration loaded): duplicate destination names, and plate/code hidden from pending and unrelated users.

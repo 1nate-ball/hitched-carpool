@@ -67,6 +67,16 @@ input[readonly]{background:var(--surface-2);color:var(--muted)}
 .field.invalid input,.field.invalid select,.field.invalid textarea,.field.invalid .filebox{border-color:var(--bad)}
 .err{font-size:.8rem;color:var(--bad);font-weight:500}
 .err:empty{display:none}
+/* Password fields: eye button inside the box shows or hides what you typed */
+.pwwrap{position:relative;display:block}
+.pwwrap input{padding-right:52px}
+.pweye{position:absolute;top:50%;right:4px;transform:translateY(-50%);width:44px;height:40px;display:grid;place-items:center;border:0;background:none;border-radius:9px;color:var(--muted);cursor:pointer}
+.pweye:hover{color:var(--ink,inherit);background:var(--surface-2)}
+.pweye:focus-visible{outline:2px solid var(--accent,currentColor);outline-offset:1px}
+.pweye svg{width:20px;height:20px}
+/* Pickup identification */
+.vehicle-box{display:flex;flex-direction:column;gap:6px}
+.pickup-code{font-family:var(--f-display);font-size:1.6rem;letter-spacing:.2em;font-weight:700}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .fieldset{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:14px}
 .fieldset > .eyebrow{margin-bottom:-4px}
@@ -285,6 +295,8 @@ function denverISO(wall){
 
 const I = {
   close:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 6 12 12M6 18 18 6"/></svg>',
+  eye:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  eyeOff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.9 10.9 0 0112 5c6.5 0 10 7 10 7a17.6 17.6 0 01-3.2 4.2M6.6 6.6A17.4 17.4 0 002 12s3.5 7 10 7a10.6 10.6 0 005.4-1.4"/><path d="M9.9 9.9a3 3 0 004.2 4.2"/></svg>',
   car:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16V11l2-5h10l2 5v5"/><path d="M3 16h18v3H3z"/><circle cx="7.5" cy="16" r="1.5"/><circle cx="16.5" cy="16" r="1.5"/><path d="M5 11h14"/></svg>',
   back:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
   user:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>',
@@ -348,9 +360,46 @@ const DESTS = [
   {id:'zion', name:'Zion National Park', alias:['zion'], drive:'4 hr', est:38, cat:'National parks', art:'redrock'},
   {id:'jackson', name:'Jackson Hole', alias:['jackson'], drive:'4 hr 50 min', est:45, cat:'Ski trips', art:'snow'},
 ];
-const D = id => DESTS.find(d => d.id === id);
+// Destinations drivers typed in (loaded from Supabase). Same shape as DESTS, with custom:true.
+const EXTRA_DESTS = [];
+const PROVO_PIN = {lat:40.2338, lng:-111.6585};
+function milesBetween(a, b){ // straight-line miles (haversine)
+  const r = x => x * Math.PI / 180, dLat = r(b.lat - a.lat), dLng = r(b.lng - a.lng);
+  const h = Math.sin(dLat/2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dLng/2) ** 2;
+  return 3958.8 * 2 * Math.asin(Math.sqrt(h));
+}
+// Price and drive-time estimate for a place without preset numbers. Calibrated on the presets:
+// road miles are about 1.2x straight-line, ~55 mph average, and riders pay about $0.18 per road mile.
+function estimateFor(pin, from = PROVO_PIN){
+  if (!pin || !Number.isFinite(pin.lat) || !Number.isFinite(pin.lng)) return null;
+  const road = milesBetween(from, pin) * 1.2;
+  if (road < 3) return null;
+  const mins = Math.max(10, Math.round(road / 55 * 60 / 5) * 5), h = Math.floor(mins / 60), m = mins % 60;
+  return {est:Math.min(150, Math.max(3, Math.round(road * 0.18))), drive: h ? `${h} hr${m ? ` ${m} min` : ''}` : `${m} min`};
+}
+const safePhoto = url => typeof url === 'string' && /^https:\/\/[^\s"'<>]+$/.test(url) ? url : null;
+function customDest(row){
+  const d = {id:row.id, name:row.name, alias:[], cat:'Other', art:'snow', custom:true,
+    lat:row.latitude ?? null, lng:row.longitude ?? null, photo:safePhoto(row.photo_url)};
+  return Object.assign(d, estimateFor(d) || {});
+}
+function setExtraDestinations(rows){
+  EXTRA_DESTS.length = 0;
+  for (const row of rows || []){
+    const preset = DESTS.find(d => d.id === row.id);
+    if (preset){ preset.photo = safePhoto(row.photo_url) || preset.photo; continue; }
+    if (row.id && row.name) EXTRA_DESTS.push(customDest(row));
+  }
+}
+const allDests = () => DESTS.concat(EXTRA_DESTS);
+// Unknown ids (e.g. a trip to a place added after this page loaded) still render instead of crashing.
+const D = id => DESTS.find(d => d.id === id) || EXTRA_DESTS.find(d => d.id === id) || (id ? {id, name:'New destination', alias:[], art:'snow', custom:true} : undefined);
 // Real photo over the drawn picture; if the photo is missing, the drawing shows instead.
-const destArt = d => `${art(d.art)}<img class="dphoto" src="images/dest-${d.id}.jpg" alt="" loading="lazy" onerror="this.remove()">`;
+// Typed-in places use photo_url from the database (filled by the auto-picture card) when there is one.
+const destArt = d => {
+  const src = d.custom ? d.photo : (d.photo || `images/dest-${d.id}.jpg`);
+  return `${art(d.art || 'snow')}${src ? `<img class="dphoto" src="${esc(src)}" alt="" loading="lazy" onerror="this.remove()">` : ''}`;
+};
 
 const USERS = {
   u1:{first:'Kaylee', last:'Brooks', hometown:'Boise, ID', bio:'Junior in nursing. I head south most weekends and like company on the road.', color:'#3B6EA8', verified:'verified'},
@@ -434,11 +483,17 @@ async function loadDbTrips(){ // saved trips come back after a reload instead of
   DB.session = session;
   clearDbTrips(); // never retain a prior account's "me" mapping after switching accounts
   if (!DB.session) return [];
-  const rows = await api.loadTrips(DB.session.accessToken);
+  const [rows] = await Promise.all([api.loadTrips(DB.session.accessToken), loadDbDestinations(api)]);
   if (generation !== DB.generation) return [];
   const trips = rows.map(r => upsertTrip(fromRow(r)));
   await Promise.all([loadMyDbRequests(api), loadDriverDbRequests(api, trips), loadDbSeats(api, trips), nameDrivers(api, trips)]);
   return trips;
+}
+// Destinations other drivers typed in, so their trips show the right name and can be searched.
+async function loadDbDestinations(api){
+  if (!DB.session || !api.loadDestinations) return;
+  try { setExtraDestinations(await api.loadDestinations(DB.session.accessToken)); }
+  catch (error) { console.warn('Could not load destinations:', error.message); }
 }
 async function loadDriverDbRequests(api, trips){ // requests on the signed-in driver's own trips, with rider names
   const generation = DB.generation, session = DB.session;
@@ -577,6 +632,8 @@ function dbErrorMessage(error){
   if (error.status === 401) return 'Your sign-in expired. Sign in again, then publish.';
   if (error.code === '42501' || error.status === 403) return "The database didn't allow this post. Sign out, sign back in, and try again.";
   if (/Departure must be in the future/.test(error.message)) return 'Departure must be in the future. Pick a later time.';
+  if (error.code === 'PGRST202' || error.code === '42883') return "New destinations aren't turned on in the database yet. Pick a suggested destination, or ask the team to run the any-destination migration.";
+  if (/Destination/.test(error.message)) return error.message;
   if (error.code === '23514' || error.code === '23503' || error.status === 400) return "The database rejected one of the values. Check the trip details and try again.";
   return 'Something went wrong saving your trip. Your trip was not published. Please try again.';
 }
@@ -632,7 +689,7 @@ function destCard(d){
   const n = openTrips(d.id).length;
   return `<button class="dcard" data-act="dest" data-id="${d.id}" aria-label="${esc(d.name)}: ${n} trips available">
     <div class="dart">${destArt(d)}<span class="count pill ${n?'neutral':'warn'}" style="background:var(--surface)">${n ? `${n} trip${n>1?'s':''}` : 'No trips yet'}</span></div>
-    <div class="dbody"><h3>${esc(d.name)}</h3><div class="dmeta">${d.drive} drive</div><div class="dprice tnum">est. ${money(d.est)} <span>/ rider</span></div></div>
+    <div class="dbody"><h3>${esc(d.name)}</h3>${d.drive ? `<div class="dmeta">${d.drive} drive</div>` : ''}${d.est ? `<div class="dprice tnum">est. ${money(d.est)} <span>/ rider</span></div>` : ''}</div>
   </button>`;
 }
 const skelCards = n => Array.from({length:n}, () => `<div class="dcard" aria-hidden="true"><div class="dart skel" style="border-radius:0"></div><div class="dbody"><div class="skel" style="height:14px;width:70%"></div><div class="skel" style="height:11px;width:50%"></div><div class="skel" style="height:11px;width:40%"></div></div></div>`).join('');
@@ -651,7 +708,9 @@ SCREENS.home = () => {
   } else {
     sections = `<div class="section"><div class="section-head"><h2>Popular destinations</h2></div><div class="dgrid">${DESTS.map(destCard).join('')}</div></div>`;
   }
-  const miss = S.miss ? `<div class="alert info" role="status"><b>No destinations match "${esc(S.miss)}".</b><span>Try a nearby or popular spot below, like Salt Lake City, Park City, or Moab.</span></div>` : '';
+  const added = EXTRA_DESTS.filter(d => openTrips(d.id).length);
+  if (S.homeLoaded && S.cat === 'All' && added.length) sections += `<div class="section"><div class="section-head"><h2>More places students are driving</h2><span class="small muted">Added by drivers</span></div><div class="dgrid">${added.map(destCard).join('')}</div></div>`;
+  const miss = S.miss ? `<div class="alert info" role="status"><b>No destinations match "${esc(S.miss)}".</b><span>No one has posted a trip there yet. Try a nearby or popular spot below, like Salt Lake City, Park City, or Moab.</span></div>` : '';
   return `
 <header class="topbar"><div class="brandrow" style="flex:1"><span class="logo">${LOGO}</span><div class="brand-name">Hitch</div></div>
   <button class="iconbtn" aria-label="Account (not available in prototype)" title="Account">${S.me ? av(S.me, 38) : I.user}</button></header>
@@ -660,7 +719,7 @@ SCREENS.home = () => {
   <form class="searchcard" id="searchForm" novalidate role="search">
     <label class="sfield"><span class="tag">From</span><input id="s-from" type="text" maxlength="80" placeholder="e.g. Provo" value="${esc(S.search.from)}" aria-label="Starting city (optional)">${I.pin}</label>
     <label class="sfield"><span class="tag">To</span><input id="s-dest" type="text" list="destlist" placeholder="Search a destination" value="${esc(S.search.dest)}" aria-label="Destination">${I.search}</label>
-    <datalist id="destlist">${DESTS.map(d=>`<option value="${esc(d.name)}">`).join('')}</datalist>
+    <datalist id="destlist">${allDests().map(d=>`<option value="${esc(d.name)}">`).join('')}</datalist>
     <label class="sfield"><span class="tag">Date</span><input id="s-date" type="date" value="${esc(S.search.date)}" aria-label="Travel date (optional)"></label>
     <div class="err" id="s-err"></div>
     <button class="btn primary block" type="submit">${I.search.replace('<svg','<svg width="18" height="18"')}Search rides</button>
@@ -681,7 +740,9 @@ BIND.home = () => {
     S.search = {dest:q, from:document.getElementById('s-from').value.trim(), date:document.getElementById('s-date').value};
     if (!q){ document.getElementById('s-err').textContent = 'Enter a destination to search.'; return; }
     const ql = q.toLowerCase();
-    const d = DESTS.find(d => d.name.toLowerCase().includes(ql) || ql.includes(d.name.toLowerCase()) || d.alias.some(a => ql.includes(a)));
+    // Exact name first (so "Moab" never matches a longer added place), then the old loose match.
+    const d = allDests().find(d => d.name.toLowerCase() === ql)
+      || allDests().find(d => d.name.toLowerCase().includes(ql) || ql.includes(d.name.toLowerCase()) || d.alias.some(a => ql.includes(a)));
     if (!d){ S.miss = q; S.cat = 'All'; render(); return; }
     S.miss = null; S.filters = {max:'', round:false};
     go('results', {dest:d.id});
@@ -844,6 +905,79 @@ BIND.results = () => {
   if (S.dbSearch.key !== key) searchDbTrips();
 };
 
+/* Pickup identification: car details + a 4-digit pickup code for each saved trip.
+   The database shows them only to the driver and to riders whose request was accepted. */
+const PICKUP = {}; // tripId -> {state:'loading'|'done'|'error', row}
+function ensurePickup(t, force = false){
+  if (!t?.dbTrip || !DB.session) return;
+  if (!force && PICKUP[t.id] && PICKUP[t.id].state !== 'error') return;
+  PICKUP[t.id] = {state:'loading', row:PICKUP[t.id]?.row || null};
+  const generation = DB.generation;
+  loadApi().then(api => api.loadPickupDetails(DB.session.accessToken, t.id))
+    .then(row => { if (generation === DB.generation) PICKUP[t.id] = {state:'done', row}; })
+    .catch(error => { console.warn('Could not load pickup details:', error.message); if (generation === DB.generation) PICKUP[t.id] = {state:'error', row:null}; })
+    .finally(() => { if (generation === DB.generation && ['detail','manage'].includes(S.screen) && S.params.id === t.id) render(); });
+}
+const carLine = row => [row.vehicle_color, row.vehicle_make_model].filter(Boolean).join(' ');
+function pickupView(t, st){
+  const head = `<div class="section-head"><h3>Pickup identification</h3></div>`;
+  const note = '<p class="small muted" style="margin:0">Use this to find the right car at pickup. It is not proof of identity or a safety guarantee.</p>';
+  if (!t.dbTrip){ // sample trips keep their sample car line
+    return t.vehicle && (st === 'driver' || st === 'confirmed') ? `<div class="card">${head}<div class="small">${I.car.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px"')} ${esc(t.vehicle)}</div></div>` : '';
+  }
+  if (st !== 'driver' && st !== 'confirmed')
+    return `<div class="card">${head}<p class="small muted" style="margin:0">${I.lock.replace('<svg','<svg width="14" height="14" style="vertical-align:-2px"')} The driver's car, license plate, and pickup code show here once your seat is confirmed.</p></div>`;
+  const p = PICKUP[t.id];
+  if (!p || p.state === 'loading') return `<div class="card">${head}<p class="small muted" role="status" style="margin:0">Loading pickup details…</p></div>`;
+  if (p.state === 'error') return `<div class="card">${head}<p class="small muted" style="margin:0">Pickup details could not load. <button class="link" data-act="retrypickup" data-id="${t.id}">Try again</button></p></div>`;
+  const r = p.row;
+  if (!r) return `<div class="card">${head}<p class="small muted" style="margin:0">${st === 'driver' ? 'Add your car on Manage requests so confirmed riders can find you. Saving also creates your pickup code.' : "The driver hasn't added car details yet. Check back before the trip."}</p>${st === 'driver' ? `<button class="btn sm" data-act="manage" data-id="${t.id}">Add car details</button>` : ''}</div>`;
+  return `<div class="card">${head}
+    <dl class="kv wide" style="margin:0"><dt>Car</dt><dd>${carLine(r) ? esc(carLine(r)) : '<span class="muted">Not added</span>'}</dd><dt>License plate</dt><dd class="tnum">${r.license_plate ? esc(r.license_plate) : '<span class="muted">Not added</span>'}</dd>
+    <dt>Pickup code</dt><dd><span class="pickup-code tnum">${esc(r.pickup_code)}</span></dd></dl>
+    <p class="small" style="margin:0">${st === 'driver' ? 'Ask each rider for this code when they get in.' : 'Tell the driver this code when you get in, and check the plate first.'}</p>${note}</div>`;
+}
+function pickupEditor(t){
+  if (!t.dbTrip) return '';
+  const p = PICKUP[t.id], r = p?.row || {};
+  if (!p || p.state === 'loading') return `<div class="card"><h3>Your car &amp; pickup code</h3><p class="small muted" role="status">Loading…</p></div>`;
+  return `<div class="card vehicle-box"><div class="section-head"><h3>Your car &amp; pickup code</h3>${r.pickup_code ? `<span class="pickup-code tnum" aria-label="Pickup code ${esc(r.pickup_code)}">${esc(r.pickup_code)}</span>` : ''}</div>
+    <p class="small muted" style="margin:0">Only you and confirmed riders can see these. Riders tell you the pickup code when they get in.</p>
+    <div class="two-desk"><div class="field"><label for="pk-make">Make &amp; model</label><input id="pk-make" type="text" maxlength="60" placeholder="e.g. Honda Civic" value="${esc(r.vehicle_make_model || '')}"></div>
+    <div class="field"><label for="pk-color">Color</label><input id="pk-color" type="text" maxlength="30" placeholder="e.g. Gray" value="${esc(r.vehicle_color || '')}"></div></div>
+    <div class="field"><label for="pk-plate">License plate</label><input id="pk-plate" type="text" maxlength="10" autocapitalize="characters" placeholder="e.g. ABC 123" value="${esc(r.license_plate || '')}" aria-describedby="pk-err"><div class="err" id="pk-err" role="alert"></div></div>
+    <button class="btn sm primary" data-act="savepickup" data-id="${t.id}" ${S.savingPickup ? 'disabled aria-busy="true"' : ''}>${S.savingPickup ? 'Saving…' : r.pickup_code ? 'Save car details' : 'Save and create pickup code'}</button></div>`;
+}
+const PLATE_OK = /^[A-Z0-9 -]{0,10}$/;
+async function savePickupFromForm(t){
+  const val = id => document.getElementById(id)?.value || '';
+  const fields = {makeModel:val('pk-make'), color:val('pk-color'), plate:val('pk-plate').trim().toUpperCase()};
+  if (!PLATE_OK.test(fields.plate)){ document.getElementById('pk-err').textContent = 'Use up to 10 letters, numbers, spaces, or dashes.'; return; }
+  let saved = false;
+  S.savingPickup = true; // don't re-render yet: that would reset what the driver typed
+  const btn = document.querySelector('[data-act="savepickup"]'); if (btn){ btn.disabled = true; btn.setAttribute('aria-busy', 'true'); btn.textContent = 'Saving…'; }
+  try {
+    const api = await loadApi(); DB.session = await api.getSession();
+    if (!DB.session) throw Object.assign(new Error('Signed out'), {status:401});
+    PICKUP[t.id] = {state:'done', row:await api.savePickupDetails(DB.session.accessToken, t.id, fields)};
+    rememberCar(fields); saved = true;
+    toast('Car details saved. Confirmed riders can see them now.');
+  } catch (error) {
+    toast(error.status === 401 ? 'Your sign-in expired. Log in again, then save.'
+      : error.code === '42P01' || error.status === 404 ? "Pickup details aren't turned on in the database yet."
+      : error.code === '42501' || error.status === 403 ? 'Only the driver can change car details.'
+      : 'Could not save car details. Try again.');
+  } finally {
+    S.savingPickup = false;
+    if (S.screen === 'manage' && saved) render();
+    else { const btn = document.querySelector('[data-act="savepickup"]'); if (btn){ btn.disabled = false; btn.removeAttribute('aria-busy'); btn.textContent = 'Save car details'; } }
+  }
+}
+// Prefill the next trip's car fields on this device (per account). Convenience only.
+const CAR_KEY = () => `hitch-car-${DB.session?.user.id || ''}`;
+function rememberCar(fields){ try { localStorage.setItem(CAR_KEY(), JSON.stringify(fields)); } catch { /* storage blocked */ } }
+function rememberedCar(){ try { return JSON.parse(localStorage.getItem(CAR_KEY())) || {}; } catch { return {}; } }
+
 /* Screen 5: Trip details / request a seat */
 SCREENS.detail = () => {
   const t = TRIPS.find(x => x.id === S.params.id), load = S.detailLoad || {};
@@ -874,11 +1008,12 @@ SCREENS.detail = () => {
       <dt>${DROP_LABEL}</dt><dd>${esc(t.dropoff)} ${pinLink(t.dropoffPin, 'arrival')}</dd>
     </dl></div>
   <div class="card"><div class="section-head"><h3>Return trip</h3>${t.ret ? '<span class="pill accent">Included</span>' : '<span class="pill neutral">Not included</span>'}</div>
-    ${t.ret ? `<dl class="kv wide tnum" style="margin:0"><dt>Leaves</dt><dd>${fDT(t.ret)}</dd><dt>Route</dt><dd>${esc(d.name)} → ${esc(t.origin || 'Provo')}</dd></dl><p class="small muted" style="margin:8px 0 0">Confirm the return meeting spot with the driver.</p>` : '<p class="small muted" style="margin:0">One-way trip. Riders arrange their own ride back.</p>'}</div>
+    ${t.ret ? `<dl class="kv wide tnum" style="margin:0"><dt>Return pickup</dt><dd>${fDT(t.ret)}</dd><dt>Route</dt><dd>${esc(d.name)} → ${esc(t.origin || 'Provo')}</dd></dl><p class="small muted" style="margin:8px 0 0">Confirm the return meeting spot with the driver.</p>` : '<p class="small muted" style="margin:0">One-way trip. Riders arrange their own ride back.</p>'}</div>
   <div class="card"><h3>Driver</h3>
     <div class="driver">${av(u,48)}<div style="min-width:0"><div class="nm">${esc(fullName(u))}${t.driver==='me'?' (you)':''}</div>${vBadge(u)}</div></div>
     ${t.dbTrip ? '' : `<p>${esc(u.bio || 'No bio yet.')}</p>`}
-    ${t.vehicle ? `<div class="small muted">${I.car.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px"')} ${esc(t.vehicle)}</div>` : ''}</div>
+    ${t.vehicle && !t.dbTrip ? `<div class="small muted">${I.car.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px"')} ${esc(t.vehicle)}</div>` : ''}</div>
+  ${pickupView(t, st)}
   <div class="card"><div class="section-head"><h3>Who's going</h3><span class="small tnum"><b>${left}</b> of ${t.seats} seats left</span></div>
     ${passengers.length ? `<div class="plist">${passengers.map(p => `<div class="driver">${av(p,34)}<div><div class="nm">${esc(fullName(p))}${p===S.me?' (you)':''}</div>${vBadge(p)}</div></div>`).join('')}</div>` : '<p class="muted small">No confirmed riders yet. Be the first.</p>'}</div>
   <div class="card"><div class="section-head"><h3>Price</h3><span class="tnum"><b>${money(t.price)}</b> per seat</span></div><p class="small muted">${covers} No payment is collected in the app.</p></div>
@@ -897,6 +1032,7 @@ SCREENS.detail = () => {
 // Trip Detail loads the trip (and its driver's name) from the database each time it opens.
 BIND.detail = () => {
   const id = S.params.id, t = TRIPS.find(x => x.id === id);
+  if (t && ['driver','confirmed'].includes(myStatus(t))) ensurePickup(t);
   if ((t && !t.dbTrip) || S.detailLoad?.id === id) return; // sample trip, or already loaded this visit
   S.detailLoad = {id, state:'loading'};
   refreshTripDetail(id).then(found => {
@@ -921,7 +1057,7 @@ function openPublishedDialog(t){
   </div>`;
   document.body.appendChild(wrap);
   const first = wrap.querySelector('[data-x="trips"]'); first.focus();
-  const close = () => { wrap.remove(); document.removeEventListener('keydown', onKey); (document.getElementById('pt-dest') || back)?.focus?.(); };
+  const close = () => { wrap.remove(); document.removeEventListener('keydown', onKey); (document.getElementById('pt-dest-name') || back)?.focus?.(); };
   const onKey = e => {
     if (e.key === 'Escape') close();
     if (e.key === 'Tab'){ // keep keyboard focus inside the window
@@ -943,7 +1079,7 @@ function openRequestDialog(){
   wrap.className = 'scrim';
   wrap.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="rq-h">
     <h2 id="rq-h">Would you like to request a seat for this trip?</h2>
-    <dl class="kv wide tnum" style="margin:0"><dt>To</dt><dd>${esc(d.name)}</dd><dt>Leaves</dt><dd>${fDT(t.depart)}</dd><dt>Pickup</dt><dd>${esc(t.pickup)} ${pinLink(t.pickupPin, 'pickup')}</dd><dt>${DROP_LABEL}</dt><dd>${esc(t.dropoff)} ${pinLink(t.dropoffPin, 'arrival')}</dd><dt>Return trip</dt><dd>${t.ret ? `Leaves ${esc(d.name)} ${fDT(t.ret)}` : 'Not included. You arrange your own ride back.'}</dd><dt>Price</dt><dd><b>${money(t.price)}</b> per seat, ${t.ret?'round trip':'one way'}</dd></dl>
+    <dl class="kv wide tnum" style="margin:0"><dt>To</dt><dd>${esc(d.name)}</dd><dt>Leaves</dt><dd>${fDT(t.depart)}</dd><dt>Pickup</dt><dd>${esc(t.pickup)} ${pinLink(t.pickupPin, 'pickup')}</dd><dt>${DROP_LABEL}</dt><dd>${esc(t.dropoff)} ${pinLink(t.dropoffPin, 'arrival')}</dd><dt>Return pickup</dt><dd>${t.ret ? `Leaves ${esc(d.name)} ${fDT(t.ret)}` : 'Not included. You arrange your own ride back.'}</dd><dt>Price</dt><dd><b>${money(t.price)}</b> per seat, ${t.ret?'round trip':'one way'}</dd></dl>
     <div class="field"><label for="rq-note">Note to ${esc(u.first)} <span class="muted">(optional)</span></label>
       <textarea id="rq-note" rows="3" maxlength="300" placeholder="Where you're headed, flexible times, luggage…"></textarea></div>
     <div class="alert info small">Your seat isn't reserved until ${esc(u.first)} accepts. We'll let you know as soon as they decide.</div>
@@ -1023,15 +1159,15 @@ SCREENS.mytrips = () => {
 };
 
 // Outbound route with labelled stops. Same wording on cards, preview, details, and the request dialog.
-const DROP_LABEL = 'Drop-off at destination';
+const DROP_LABEL = 'Arrival destination';
 function routeHTML(pickup, dropoff){
   return `<div class="route" aria-label="Outbound trip"><span class="dot"></span><span><span class="lbl">Pickup</span>${pickup}</span><span class="line"></span><span></span><span class="dot end"></span><span><span class="lbl">${DROP_LABEL}</span>${dropoff}</span></div>`;
 }
 
 function locationPicker(kind){
-  const label = kind === 'pickup' ? 'pickup' : 'drop-off';
+  const label = kind === 'pickup' ? 'pickup' : 'arrival';
   return `<div id="pt-${kind}-picker" class="location-field">
-    <div class="location-input"><input id="pt-${kind}" type="text" maxlength="120" autocomplete="off" placeholder="Search an address or place" required aria-describedby="pe-${kind}">
+    <div class="location-input"><input id="pt-${kind}" type="text" maxlength="120" autocomplete="off" placeholder="Search an address or place" required aria-describedby="${kind === 'dropoff' ? 'pt-drophint ' : ''}pe-${kind}">
       <button id="pt-${kind}-open" class="iconbtn" type="button" aria-label="Choose ${label} on map" aria-haspopup="dialog">${I.pin}</button></div>
     <div id="pt-${kind}-suggestions" class="place-suggestions" hidden></div>
     <span id="pt-${kind}-search-status" class="sr-only" role="status"></span>
@@ -1057,10 +1193,13 @@ SCREENS.post = () => {
 <div class="screen post-layout">
 <form id="ptForm" novalidate>
   <div class="fieldset"><div class="eyebrow">Outbound route</div>
-    <div class="field"><label for="pt-dest">Destination</label><select id="pt-dest" required><option value="">Choose a destination</option>${DESTS.map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select><div class="err" id="pe-dest"></div></div>
+    <div class="field"><label for="pt-dest-name">Destination</label><input id="pt-dest-name" type="text" maxlength="80" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="pt-dest-options" placeholder="Type any city, park, or place" required aria-describedby="pt-desthint pe-dest"><input id="pt-dest" type="hidden" value="">
+      <div id="pt-dest-options" class="place-suggestions" role="listbox" aria-label="Destination suggestions" hidden></div>
+      <span id="pt-dest-status" class="sr-only" role="status"></span>
+      <div class="small muted" id="pt-desthint">Pick a suggestion or type your own. New places are added for other riders to search.</div><div class="err" id="pe-dest"></div></div>
     <div class="field"><label for="pt-origin">Starting city</label><input id="pt-origin" type="text" maxlength="80" value="Provo" required aria-describedby="pe-origin"><div class="err" id="pe-origin"></div></div>
     <div class="two-desk"><div class="field"><label for="pt-pickup">Pickup location</label>${locationPicker('pickup')}<div class="err" id="pe-pickup"></div></div>
-    <div class="field"><label for="pt-dropoff">Drop-off at destination</label>${locationPicker('dropoff')}<div class="err" id="pe-dropoff"></div></div></div>
+    <div class="field"><label for="pt-dropoff">Arrival destination</label>${locationPicker('dropoff')}<div class="small muted" id="pt-drophint">Where riders get out when you <b>arrive</b> on the way there. Driving them back later? That is the <b>return</b> trip below.</div><div class="err" id="pe-dropoff"></div></div></div>
     <div class="small muted">Address data © <a class="link" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></div>
   </div>
   <div class="fieldset post-schedule"><div class="eyebrow">Departure · Mountain Time</div>
@@ -1069,10 +1208,16 @@ SCREENS.post = () => {
     <div class="two"><div class="field"><label for="pt-seats">Available seats</label><input id="pt-seats" type="number" min="1" max="7" step="1" inputmode="numeric" placeholder="1–7" required><div class="err" id="pe-seats"></div></div>
     <div class="field"><label for="pt-price">Price per seat ($)</label><input id="pt-price" type="number" min="1" max="150" step="1" inputmode="numeric" placeholder="1–150" required><div class="err" id="pe-price"></div></div></div>
   </div>
+  <div class="fieldset"><div class="eyebrow">Your car (optional) · for pickup</div>
+    <p class="small muted" style="margin:0">Only riders you accept can see these, along with a pickup code we create for this trip. They are not shown on trip cards.</p>
+    <div class="two-desk"><div class="field"><label for="pt-car">Make &amp; model</label><input id="pt-car" type="text" maxlength="60" placeholder="e.g. Honda Civic"></div>
+    <div class="field"><label for="pt-color">Color</label><input id="pt-color" type="text" maxlength="30" placeholder="e.g. Gray"></div></div>
+    <div class="field"><label for="pt-plate">License plate</label><input id="pt-plate" type="text" maxlength="10" autocapitalize="characters" placeholder="e.g. ABC 123" aria-describedby="pe-plate"><div class="err" id="pe-plate"></div></div>
+  </div>
   <div class="fieldset"><div class="eyebrow">Return trip (optional)</div>
-    <label class="check"><input type="checkbox" id="pt-ret"><span><b>Include a return trip</b></span></label>
-    <div id="pt-retfields" hidden><div class="post-date-time"><div class="field"><label for="pt-return">Return date</label><input id="pt-return" type="date" aria-describedby="pe-return"><div class="err" id="pe-return"></div></div>
-    <div class="field"><label for="pt-return-time">Return time</label><input id="pt-return-time" type="time" aria-describedby="pe-returnTime"><div class="err" id="pe-returnTime"></div></div></div></div>
+    <label class="check"><input type="checkbox" id="pt-ret" aria-describedby="pt-rethint"><span><b>Include a return trip</b><br><span class="small muted" id="pt-rethint">Arrival is where you drop riders off on the way there. The return trip is when you pick them back up and drive home to your starting city.</span></span></label>
+    <div id="pt-retfields" hidden><div class="post-date-time"><div class="field"><label for="pt-return">Return pickup date</label><input id="pt-return" type="date" aria-describedby="pe-return"><div class="err" id="pe-return"></div></div>
+    <div class="field"><label for="pt-return-time">Return pickup time</label><input id="pt-return-time" type="time" aria-describedby="pe-returnTime"><div class="err" id="pe-returnTime"></div></div></div></div>
     <div class="alert info small" id="pt-covers"></div>
   </div>
   <div class="alert bad" id="pt-sum" role="alert" hidden>Check the highlighted fields before publishing.</div>
@@ -1088,23 +1233,33 @@ SCREENS.post = () => {
 </div>${nav()}`;
 };
 // Live preview for the desktop Post a trip layout (display only; does not affect saving)
+// The destination as typed: a known place, or a new one that will be created on publish.
+function typedDest(v){
+  if (v.dest) return D(v.dest);
+  if (!v.destName) return null;
+  const pin = Number.isFinite(v.destLat) ? {lat:v.destLat, lng:v.destLng} : null;
+  return {id:'', name:v.destName, alias:[], art:'snow', custom:true, ...(pin || {}), ...(estimateFor(pin) || {})};
+}
 function postPreview(v){
-  const d = D(v.dest), ph = t => `<span class="ph">${t}</span>`;
+  const d = typedDest(v), ph = t => `<span class="ph">${t}</span>`;
   const when = v.depart ? fDT(v.depart) : '';
   const seats = +v.seats;
   return `<div class="dart${d ? '' : ' blank'}">${d ? destArt(d) : RIDGES}<span class="count pill ${v.ret ? 'accent' : 'neutral'}" style="background:var(--surface)">${v.ret ? 'Round trip' : 'One-way'}</span></div>
   <div class="ttop"><div style="min-width:0"><h3>${d ? esc(d.name) : ph('Choose a destination')}</h3><div class="small muted tnum">${when ? esc(when) : 'Pick a date and time'}</div></div>
     <div class="tprice"><b class="tnum">${+v.price ? money(+v.price) : '$–'}</b><div>per seat</div></div></div>
-  ${routeHTML(v.pickup ? esc(v.pickup) : ph('Pickup location'), v.dropoff ? esc(v.dropoff) : ph('Where riders get out'))}
+  ${routeHTML(v.pickup ? esc(v.pickup) : ph('Pickup location'), v.dropoff ? esc(v.dropoff) : ph('Arrival destination'))}
   <div class="leg-return">${v.ret ? `<span class="pill accent">Return trip</span><span class="tnum">${v.retAt ? `Leaves ${d ? esc(d.name) : 'destination'} ${esc(fDT(v.retAt))}` : ph('Pick a return date and time')}</span>` : `<span class="pill neutral">No return trip</span><span class="small muted">One-way</span>`}</div>
   <div class="tfoot"><div class="driver">${av(S.me,28)}<span class="small"><b>You</b></span>${vBadge(S.me)}</div><span class="pill ok">${seats ? `${seats} seat${seats > 1 ? 's' : ''} open` : 'Seats open'}</span></div>`;
 }
 function postTips(v){
-  const d = D(v.dest);
+  const d = typedDest(v);
+  const price = !d ? 'Price close to the estimate for your destination.'
+    : d.est ? `Riders expect about <b>${money(d.est)}</b> per seat to ${esc(d.name)}${d.custom ? ' (estimated from distance)' : ''}.`
+    : `Pick ${esc(d.name)} from the suggestions to see a price estimate, or price it to split your gas.`;
   return `<h3>Fill your seats faster</h3><ul>
     <li>Post at least 3 days before you leave.</li>
     <li>Pick a pickup spot everyone knows, like a dorm or campus lot.</li>
-    <li>${d ? `Riders expect about <b>${money(d.est)}</b> per seat to ${esc(d.name)}.` : 'Price close to the estimate for your destination.'}</li></ul>`;
+    <li>${price}</li></ul>`;
 }
 BIND.post = () => {
   const $ = id => document.getElementById(id);
@@ -1118,7 +1273,8 @@ BIND.post = () => {
   const refresh = () => {
     if (!$('pt-preview')) return;
     const val = id => $(id).value.trim();
-    const v = {dest:val('pt-dest'), depart:val('pt-depart') && val('pt-time') ? val('pt-depart')+'T'+val('pt-time') : '', pickup:val('pt-pickup'), dropoff:val('pt-dropoff'), seats:val('pt-seats'), price:val('pt-price'), ret:$('pt-ret').checked, retAt:val('pt-return') && val('pt-return-time') ? val('pt-return')+'T'+val('pt-return-time') : ''};
+    const dh = $('pt-dest');
+    const v = {dest:val('pt-dest'), destName:val('pt-dest-name'), destLat:dh.dataset?.lat ? Number(dh.dataset.lat) : NaN, destLng:dh.dataset?.lng ? Number(dh.dataset.lng) : NaN, depart:val('pt-depart') && val('pt-time') ? val('pt-depart')+'T'+val('pt-time') : '', pickup:val('pt-pickup'), dropoff:val('pt-dropoff'), seats:val('pt-seats'), price:val('pt-price'), ret:$('pt-ret').checked, retAt:val('pt-return') && val('pt-return-time') ? val('pt-return')+'T'+val('pt-return-time') : ''};
     $('pt-preview').innerHTML = postPreview(v);
     $('pt-tips').innerHTML = postTips(v);
   };
@@ -1128,19 +1284,40 @@ BIND.post = () => {
   $('pt-ret').addEventListener('change', () => { $('pt-retfields').hidden = !$('pt-ret').checked; covers(); });
   $('pt-depart').addEventListener('change', setMins);
   covers(); setMins();
+  const car = rememberedCar(); // last car this driver used on this device
+  if ($('pt-car') && !$('pt-car').value){ $('pt-car').value = car.makeModel || ''; $('pt-color').value = car.color || ''; $('pt-plate').value = car.plate || ''; }
+  let destPicker = null;
+  if ($('pt-dest-options')) import('/hitch-locations.js').then(module => {
+    if (!f.isConnected) return;
+    destPicker = module.bindDestinationPicker({input:$('pt-dest-name'), hidden:$('pt-dest'), box:$('pt-dest-options'), status:$('pt-dest-status'), known:allDests, onChange:refresh});
+    const stop = cleanupLocationPickers;
+    cleanupLocationPickers = () => { stop(); destPicker?.destroy(); };
+  }).catch(() => { /* Typing a destination still works without suggestions. */ });
   let selectedPins = {pickup:null,dropoff:null};
   if ($('pt-pickup-picker')) import('/hitch-locations.js').then(async module => {
     const api = await loadApi();
     if (!f.isConnected) return;
     const picker = module.bindLocationPickers({api,session:DB.session,form:f,onChange:refresh});
-    selectedPins = picker.pins; cleanupLocationPickers = () => picker.destroy();
+    selectedPins = picker.pins; const prev = cleanupLocationPickers; cleanupLocationPickers = () => { prev(); picker.destroy(); };
   }).catch(() => { /* Address entry remains available when map code cannot load. */ });
 
-  const FIELDS = {origin:'pt-origin',dest:'pt-dest', depart:'pt-depart', time:'pt-time', pickup:'pt-pickup', dropoff:'pt-dropoff', seats:'pt-seats', price:'pt-price', return:'pt-return', returnTime:'pt-return-time'};
+  const FIELDS = {origin:'pt-origin',dest:'pt-dest-name', depart:'pt-depart', time:'pt-time', pickup:'pt-pickup', dropoff:'pt-dropoff', seats:'pt-seats', price:'pt-price', plate:'pt-plate', return:'pt-return', returnTime:'pt-return-time'};
   function validate(){
     const v = id => $(id).value.trim(), err = {}, out = {}, now = Date.now();
     if (!v('pt-origin') || v('pt-origin').length > 80) err.origin = 'Enter a starting city, up to 80 characters.';
-    if (!v('pt-dest')) err.dest = 'Choose a destination.';
+    // Destination: a known place id, or typed text that becomes a new destination on publish.
+    let destId = v('pt-dest'), newDest = null;
+    const typed = v('pt-dest-name').replace(/\s+/g, ' ');
+    if (!destId && typed){
+      const hit = allDests().find(d => d.name.toLowerCase() === typed.toLowerCase() || d.alias.includes(typed.toLowerCase()));
+      if (hit) destId = hit.id;
+      else if (typed.length < 2 || typed.length > 80) err.dest = 'Enter a destination from 2 to 80 characters.';
+      else {
+        const lat = Number($('pt-dest').dataset?.lat), lng = Number($('pt-dest').dataset?.lng);
+        newDest = {name:typed, latitude:Number.isFinite(lat) && $('pt-dest').dataset?.lat ? lat : null, longitude:Number.isFinite(lng) && $('pt-dest').dataset?.lng ? lng : null};
+      }
+    }
+    if (!destId && !newDest && !err.dest) err.dest = 'Enter where you are driving.';
     if ($('pt-depart').validity.badInput || !v('pt-depart')) err.depart = 'Choose a valid departure date.';
     if ($('pt-time').validity.badInput || !v('pt-time')) err.time = 'Choose a departure time.';
     if (!err.depart && !err.time) {
@@ -1150,10 +1327,13 @@ BIND.post = () => {
       else out.dep = dep;
     }
     if (!v('pt-pickup')) err.pickup = 'Add a pickup location.';
-    if (!v('pt-dropoff')) err.dropoff = 'Add a drop-off at your destination.';
+    if (!v('pt-dropoff')) err.dropoff = 'Add where riders get out when you arrive.';
     const seats = Number(v('pt-seats')), price = Number(v('pt-price'));
     if (!v('pt-seats')) err.seats = 'Enter how many seats are open.'; else if (!Number.isInteger(seats) || seats < 1 || seats > 7) err.seats = 'Seats must be a whole number from 1 to 7.';
     if (!v('pt-price')) err.price = 'Enter a price per seat.'; else if (!Number.isInteger(price) || price < 1 || price > 150) err.price = 'Price must be a whole dollar amount from $1 to $150.';
+    const plate = (v('pt-plate') || '').toUpperCase();
+    if (!PLATE_OK.test(plate)) err.plate = 'Use up to 10 letters, numbers, spaces, or dashes.';
+    pendingCar = {makeModel:v('pt-car') || '', color:v('pt-color') || '', plate};
     out.ret = null;
     if ($('pt-ret').checked){
       if ($('pt-return').validity.badInput || !v('pt-return')) err.return = 'Choose a valid return date.';
@@ -1168,8 +1348,9 @@ BIND.post = () => {
     Object.keys(FIELDS).forEach(k => { const el = $('pe-'+k); el.textContent = err[k] || ''; el.closest('.field').classList.toggle('invalid', !!err[k]); $(FIELDS[k]).setAttribute('aria-invalid', err[k] ? 'true' : 'false'); });
     $('pt-sum').hidden = !Object.keys(err).length;
     if (Object.keys(err).length){ $(FIELDS[Object.keys(err)[0]]).focus(); return null; }
+    pendingDest = newDest;
     return {
-      destination_id: v('pt-dest'), departure_at: out.dep.iso, origin_city:v('pt-origin'),
+      destination_id: destId || null, departure_at: out.dep.iso, origin_city:v('pt-origin'),
       pickup_latitude:selectedPins.pickup?.lat ?? null, pickup_longitude:selectedPins.pickup?.lng ?? null,
       dropoff_latitude:selectedPins.dropoff?.lat ?? null, dropoff_longitude:selectedPins.dropoff?.lng ?? null,
       pickup_location: v('pt-pickup'), dropoff_location: v('pt-dropoff'),
@@ -1177,6 +1358,8 @@ BIND.post = () => {
     };
   }
 
+  let pendingCar = null; // car details saved right after the trip (separate, restricted table)
+  let pendingDest = null; // a typed destination that doesn't exist yet; created right before publishing
   let busy = false; // stops double-clicks from creating duplicate trips
   f.addEventListener('submit', async e => {
     e.preventDefault();
@@ -1194,6 +1377,12 @@ BIND.post = () => {
       if (generation !== DB.generation) return;
       DB.session = session;
       if (!DB.session){ const ex = new Error('Signed out'); ex.status = 401; throw ex; }
+      if (!payload.destination_id && pendingDest){
+        const row = await api.ensureDestination(DB.session.accessToken, pendingDest);
+        if (generation !== DB.generation) return;
+        if (!D(row.id) || D(row.id).name === 'New destination') EXTRA_DESTS.push(customDest(row));
+        payload.destination_id = row.id; $('pt-dest').value = row.id; // a retry reuses the same destination
+      }
       saved = await api.publishTrip(DB.session.accessToken, payload);
     } catch (error) {
       if (generation !== DB.generation) return;
@@ -1219,6 +1408,7 @@ BIND.post = () => {
       // Success only after the database confirms the row. Navigate with the database UUID.
       const id = typeof saved === 'string' ? saved.slice(6) : upsertTrip(fromRow(saved)).id;
       S.published = id;
+      savePickupAfterPublish(id, pendingCar);
       render(); // fresh empty form, and the new trip appears under "Your posted trips"
       openPublishedDialog(TRIPS.find(t => t.id === id));
       return;
@@ -1228,6 +1418,21 @@ BIND.post = () => {
     busy = false; btn.disabled = false; btn.removeAttribute('aria-busy'); btn.textContent = 'Publish trip';
   });
 };
+
+// Always create the pickup row (so the trip gets a pickup code), even with no car typed in.
+// Best effort: the trip is already published, so a failure only shows a note.
+async function savePickupAfterPublish(tripId, car){
+  if (!car) return;
+  try {
+    const api = await loadApi();
+    if (!DB.session || !api.savePickupDetails) return;
+    PICKUP[tripId] = {state:'done', row:await api.savePickupDetails(DB.session.accessToken, tripId, car)};
+    if (car.makeModel || car.color || car.plate) rememberCar(car);
+  } catch (error) {
+    console.warn('Could not save car details:', error.message);
+    toast('Trip posted. Add your car on Manage requests to create a pickup code.');
+  }
+}
 
 /* Screen 8: Manage rider requests */
 SCREENS.manage = () => {
@@ -1239,6 +1444,7 @@ SCREENS.manage = () => {
   ${demo ? `<div class="alert info small"><b>Prototype driver view.</b> You're seeing this trip as ${esc(fullName(drv))} so you can accept or decline your own request.</div>` : ''}
   <div class="card"><div class="mtop"><div><h3>${esc(d.name)}</h3><div class="small muted tnum">${fDT(t.depart)}</div></div><span class="tnum"><b>${money(t.price)}</b><span class="small muted"> / seat</span></span></div>
     <div class="small tnum"><b>${left}</b> of ${t.seats} seats left · ${t.ret ? `Returns ${fDT(t.ret)}` : 'One-way'}</div></div>
+  ${!demo && t.driver === 'me' ? pickupEditor(t) : ''}
   <div class="section"><div class="section-head"><h2>Pending requests</h2><span class="small muted">${pend.length}</span></div>
     ${pend.length ? pend.map(r => { const u = U(r.uid); return `<div class="rq"><div class="driver">${av(u,44)}<div style="min-width:0"><div class="nm">${esc(fullName(u))}${r.uid==='me'?' (you)':''}</div><div class="small muted">${esc(u.hometown || '')}</div></div><span style="margin-left:auto">${vBadge(u)}</span></div>
       ${u.bio ? `<p class="small">${esc(u.bio)}</p>` : ''}${r.note ? `<div class="note">"${esc(r.note)}"</div>` : ''}
@@ -1250,6 +1456,11 @@ SCREENS.manage = () => {
   </div>
   ${demo ? '' : `<button class="btn primary block" data-act="chat" data-id="${t.id}">${I.chat.replace('<svg','<svg width="18" height="18"')}Open trip group chat</button>`}
 </div>${nav()}`;
+};
+
+BIND.manage = () => {
+  const t = TRIPS.find(x => x.id === S.params.id);
+  if (t && t.driver === 'me' && !S.params.demo) ensurePickup(t);
 };
 
 /* Screen 9: Trip group chat */
@@ -1295,6 +1506,21 @@ function rememberScreen(){ // so a refresh returns to the same tab instead of al
 function lastScreen(){
   try { const v = sessionStorage.getItem(SCREEN_KEY); return RESTORABLE.has(v) ? v : null; } catch { return null; }
 }
+// Password box with an eye button. Hidden by default; the button is a real <button> so it works
+// with the keyboard, and its label tells screen readers what pressing it will do.
+function passInput(id, autocomplete, describedBy = ''){
+  return `<span class="pwwrap"><input id="${id}" type="password" autocomplete="${autocomplete}" required${describedBy ? ` aria-describedby="${describedBy}"` : ''}><button type="button" class="pweye" data-act="togglepass" data-for="${id}" aria-label="Show password" aria-pressed="false" aria-controls="${id}">${I.eye}</button></span>`;
+}
+function togglePassword(btn){
+  const input = document.getElementById(btn.dataset.for); if (!input) return;
+  const show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+  btn.setAttribute('aria-pressed', String(show));
+  btn.innerHTML = show ? I.eyeOff : I.eye;
+}
+// Sign up's two password boxes share one eye state, so "Confirm password" always matches what you see.
+const passwordsMatch = (pass, confirm) => pass === confirm;
 // Weak-password rule shown on the form. Supabase also enforces its own minimum.
 function passwordProblem(p){
   if (p.length < 8) return 'Use at least 8 characters.';
@@ -1373,7 +1599,7 @@ SCREENS.login = () => `<div class="screen auth-layout">${authArt('login')}<div c
   ${S.after ? '<p class="small muted">Log in to continue.</p>' : ''}
   <form id="liForm" class="fieldset" novalidate>
     <div class="field"><label for="li-email">BYU email</label><input id="li-email" type="email" autocomplete="username" value="${esc(S.loginUser)}" required></div>
-    <div class="field"><label for="li-pass">Password</label><input id="li-pass" type="password" autocomplete="current-password" required></div>
+    <div class="field"><label for="li-pass">Password</label>${passInput('li-pass', 'current-password')}</div>
     <div class="alert bad small" id="li-err" role="alert" hidden></div>
     <button class="btn primary block" type="submit" id="li-btn">Log in</button>
   </form>
@@ -1443,7 +1669,7 @@ SCREENS.reset = () => `<div class="screen auth-layout">${authArt('login')}<div c
   ${authHeader('Rides with BYU students')}
   <h1>Choose a new password</h1>
   <form id="resetForm" class="fieldset" novalidate>
-    <div class="field"><label for="reset-pass">New password</label><input id="reset-pass" type="password" autocomplete="new-password" aria-describedby="reset-hint" required><div class="hint" id="reset-hint">At least 8 characters, with a letter and a number.</div></div>
+    <div class="field"><label for="reset-pass">New password</label>${passInput('reset-pass', 'new-password', 'reset-hint')}<div class="hint" id="reset-hint">At least 8 characters, with a letter and a number.</div></div>
     <div id="reset-err" class="alert bad small" role="alert" hidden></div>
     <button id="reset-btn" class="btn primary block" type="submit">Save new password</button>
   </form>
@@ -1517,7 +1743,8 @@ SCREENS.signup = () => `<div class="screen auth-layout">${authArt('signup')}<div
   <form id="suForm" class="fieldset" novalidate>
     <div class="field"><label for="su-name">Full name</label><input id="su-name" type="text" autocomplete="name" maxlength="80" required aria-describedby="se-name"><div class="err" id="se-name"></div></div>
     <div class="field"><label for="su-email">BYU email</label><input id="su-email" type="email" autocomplete="email" placeholder="you@byu.edu" required aria-describedby="se-email"><div class="err" id="se-email"></div></div>
-    <div class="field"><label for="su-pass">Password</label><input id="su-pass" type="password" autocomplete="new-password" required aria-describedby="su-passhint se-pass"><div class="hint" id="su-passhint">At least 8 characters, with a letter and a number.</div><div class="err" id="se-pass"></div></div>
+    <div class="field"><label for="su-pass">Password</label>${passInput('su-pass', 'new-password', 'su-passhint se-pass')}<div class="hint" id="su-passhint">At least 8 characters, with a letter and a number.</div><div class="err" id="se-pass"></div></div>
+    <div class="field"><label for="su-pass2">Confirm password</label>${passInput('su-pass2', 'new-password', 'se-pass2')}<div class="err" id="se-pass2"></div></div>
     ${hometownField('su-home', 'Hometown (optional)')}
     <div class="field"><label for="su-bio">Short bio (optional)</label><textarea id="su-bio" maxlength="160" rows="2" aria-describedby="su-biohint"></textarea><div class="hint" id="su-biohint">Up to 160 characters. You can add or edit this later.</div></div>
     <div class="alert bad small" id="su-err" role="alert" hidden></div>
@@ -1528,7 +1755,7 @@ SCREENS.signup = () => `<div class="screen auth-layout">${authArt('signup')}<div
 BIND.signup = () => {
   const $ = id => document.getElementById(id);
   bindHometown('su-home');
-  const FIELDS = {name:'su-name', email:'su-email', pass:'su-pass'};
+  const FIELDS = {name:'su-name', email:'su-email', pass:'su-pass', pass2:'su-pass2'};
   const show = err => {
     Object.keys(FIELDS).forEach(k => { $('se-'+k).innerHTML = err[k] || ''; $(FIELDS[k]).closest('.field').classList.toggle('invalid', !!err[k]); $(FIELDS[k]).setAttribute('aria-invalid', err[k] ? 'true' : 'false'); });
     const first = Object.keys(err)[0]; if (first) $(FIELDS[first]).focus();
@@ -1542,6 +1769,9 @@ BIND.signup = () => {
     if (!name) err.name = 'Enter your name.';
     if (!email) err.email = 'Enter your BYU email.'; else if (!SCHOOL_EMAIL.test(email)) err.email = 'Use your BYU email address (ending in @byu.edu).';
     const weak = passwordProblem(pass); if (weak) err.pass = weak;
+    const confirm = $('su-pass2').value;
+    if (!confirm) err.pass2 = 'Type your password again.';
+    else if (!passwordsMatch(pass, confirm)) err.pass2 = "Passwords don't match.";
     const hometown = hometownValue('su-home');
     box.hidden = true; show(err);
     if (Object.keys(err).length) return;
@@ -1746,6 +1976,9 @@ document.addEventListener('click', e => {
     case 'needlogin': S.after = {screen:S.screen, params:S.params}; S.loginNotice = ''; go('login', {}, false); break;
     case 'forgot': S.loginUser = document.getElementById('li-email').value.trim(); S.loginNotice = ''; go('forgot', {}, false); break;
     case 'auth': S.loginNotice = ''; go(el.dataset.to, {}, false); break;
+    case 'togglepass': togglePassword(el); break;
+    case 'savepickup': { const t = TRIPS.find(x => x.id === id); if (t && !S.savingPickup) savePickupFromForm(t); break; }
+    case 'retrypickup': ensurePickup(TRIPS.find(x => x.id === id), true); break;
   }
 });
 boot();

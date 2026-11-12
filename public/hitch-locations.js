@@ -39,8 +39,12 @@ export function bindLocationPickers({api, session, form, onChange}) {
     const status = $(`pt-${kind}-status`), mapStatus = $(`pt-${kind}-map-status`);
     let map, marker, draft = {pin:null, name:'', city:''};
     const nearbyPlace = () => {
-      const dest = $('pt-dest');
-      const city = kind === 'pickup' ? $('pt-origin').value.trim() : DESTINATION_CITIES[dest.value] || dest.selectedOptions?.[0]?.textContent || '';
+      const dest = $('pt-dest'), typed = $('pt-dest-name');
+      if (kind === 'dropoff' && dest?.dataset.lat && dest?.dataset.lng) { // typed destination picked from search
+        const latitude = Number(dest.dataset.lat), longitude = Number(dest.dataset.lng);
+        if (validPin({lat:latitude, lng:longitude})) return {latitude, longitude};
+      }
+      const city = kind === 'pickup' ? $('pt-origin').value.trim() : DESTINATION_CITIES[dest?.value] || typed?.value.trim() || '';
       return places.find(place => place.city.toLowerCase() === city.toLowerCase()) || PROVO;
     };
     function moveMarker(pin) {
@@ -169,7 +173,108 @@ export function bindLocationPickers({api, session, form, onChange}) {
       if (!name) { mapStatus.textContent='Choose a place or a map point first.'; search.focus(); return; }
       commit(draft.pin,name,draft.city); close();
     });
-    $(kind==='pickup'?'pt-origin':'pt-dest').addEventListener('change', () => { inline.hide(); modal.hide(); });
+    $(kind==='pickup'?'pt-origin':'pt-dest-name')?.addEventListener('change', () => { inline.hide(); modal.hide(); });
   }
   return {pins, destroy(){ destroyed=true; cleanups.forEach(fn=>fn()); maps.forEach(map=>map.remove()); }};
+}
+
+// ---------- Post a Trip: type any destination ----------
+// Known places (presets + destinations other drivers added) that match what was typed.
+export function matchingDestinations(dests, query) {
+  const q = query.trim().toLocaleLowerCase();
+  if (!q) return [];
+  return dests.filter(d => d.name.toLocaleLowerCase().includes(q) || (d.alias || []).some(a => a.includes(q) || q.includes(a))).slice(0, 6);
+}
+const sameName = (a, b) => a.trim().toLocaleLowerCase() === b.trim().toLocaleLowerCase();
+
+// Combobox for the Destination field. `known()` returns [{id, name, alias, lat, lng}].
+// Choosing a known place stores its id in the hidden #pt-dest. Anything else (a search result
+// or plain typed text) leaves #pt-dest empty; the form then creates the destination on publish.
+export function bindDestinationPicker({input, hidden, box, status, known, onChange, search = searchAddresses}) {
+  let timer, controller, version = 0;
+  const cache = new Map();
+  function setPin(lat, lng) {
+    if (validPin({lat, lng})) { hidden.dataset.lat = String(lat); hidden.dataset.lng = String(lng); }
+    else { delete hidden.dataset.lat; delete hidden.dataset.lng; }
+  }
+  function close() {
+    version++; clearTimeout(timer); controller?.abort();
+    box.hidden = true; box.replaceChildren(); input.setAttribute('aria-expanded', 'false');
+  }
+  function choose(item) {
+    input.value = item.name.slice(0, 80);
+    hidden.value = item.id || '';
+    setPin(item.lat ?? item.latitude, item.lng ?? item.longitude);
+    close();
+    status.textContent = item.id ? `${item.name} selected.` : `${item.name} selected. It will be added as a new destination when you publish.`;
+    onChange(); input.focus();
+  }
+  function show(items, message) {
+    box.replaceChildren();
+    const seen = new Set();
+    for (const item of items) {
+      const key = item.name.toLocaleLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const button = document.createElement('button'), title = document.createElement('strong'), sub = document.createElement('span');
+      button.type = 'button'; button.className = 'place-suggestion'; button.setAttribute('role', 'option');
+      title.textContent = item.name; sub.textContent = item.subtitle || (item.id ? 'Hitch destination' : 'New destination');
+      button.append(title, sub);
+      button.addEventListener('click', () => choose(item));
+      box.append(button);
+    }
+    if (message) { const p = document.createElement('p'); p.className = 'small muted'; p.textContent = message; box.append(p); }
+    box.hidden = !seen.size && !message;
+    input.setAttribute('aria-expanded', String(!box.hidden));
+    status.textContent = message || `${seen.size} destination ${seen.size === 1 ? 'suggestion' : 'suggestions'}. Press Down Arrow to review.`;
+  }
+  // Typing the exact name of a known place counts as choosing it.
+  function matchExact() {
+    const hit = known().find(d => sameName(d.name, input.value) || (d.alias || []).some(a => sameName(a, input.value)));
+    if (hit) { hidden.value = hit.id; setPin(hit.lat, hit.lng); }
+    return hit;
+  }
+  input.addEventListener('input', () => {
+    close();
+    hidden.value = ''; setPin();
+    const query = input.value.trim();
+    matchExact();
+    onChange();
+    if (!query) { status.textContent = ''; return; }
+    const local = matchingDestinations(known(), query).map(d => ({...d, subtitle:'Hitch destination'}));
+    if (query.length < 3) { show(local, ''); return; }
+    show(local, 'Searching places…');
+    const mine = version;
+    timer = setTimeout(async () => {
+      if (mine !== version || !input.isConnected) return;
+      const request = new AbortController(); controller = request;
+      const timeout = setTimeout(() => request.abort(), 5000);
+      try {
+        let found = cache.get(query.toLowerCase());
+        if (!found) {
+          found = (await search(query, {latitude:40.2338, longitude:-111.6585}, request.signal))
+            .map(p => ({name:p.name, subtitle:p.subtitle, latitude:p.latitude, longitude:p.longitude}));
+          cache.set(query.toLowerCase(), found);
+        }
+        if (mine !== version) return;
+        const fresh = found.filter(p => !local.some(d => sameName(d.name, p.name)));
+        show([...local, ...fresh], local.length || fresh.length ? '' : `No matches. You can still publish with "${query}" as a new destination.`);
+      } catch {
+        if (mine === version) show(local, `Place search is unavailable. You can still publish with "${query}".`);
+      } finally { clearTimeout(timeout); }
+    }, 400);
+  });
+  input.addEventListener('change', () => { matchExact(); onChange(); });
+  input.addEventListener('keydown', e => {
+    if (box.hidden) return;
+    if (e.key === 'Escape') { e.preventDefault(); close(); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); box.querySelector('button')?.focus(); }
+  });
+  box.addEventListener('keydown', e => {
+    const buttons = [...box.querySelectorAll('button')], i = buttons.indexOf(document.activeElement);
+    if (e.key === 'Escape') { e.preventDefault(); close(); input.focus(); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); buttons[Math.min(i + 1, buttons.length - 1)]?.focus(); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); i <= 0 ? input.focus() : buttons[i - 1].focus(); }
+  });
+  return {choose, destroy: close};
 }
