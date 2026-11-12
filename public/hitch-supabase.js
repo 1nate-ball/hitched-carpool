@@ -1,5 +1,5 @@
 // Publishable configuration only. Caller supplies a current Supabase Auth session.
-// Used by signed-in trips, requests and account profiles.
+// Used by the Post a Trip form; the profile page still uses the Python/SQLite backend.
 let configuration;
 async function config() {
   if (!configuration) {
@@ -92,10 +92,9 @@ export function loadTripRequests(accessToken, tripIds) {
 }
 
 // Names for riders/drivers. Emails are never readable through the API.
-export async function loadProfiles(accessToken, userIds) {
+export function loadProfiles(accessToken, userIds) {
   if (!userIds.length) return Promise.resolve([]);
-  const rows = await request(`profiles?select=id,full_name,avatar_path&id=in.${inList(userIds)}`, accessToken);
-  return Promise.all(rows.map(async row => ({...row, photo:await profilePhotoUrl(accessToken,row.avatar_path)})));
+  return request(`profiles?select=id,full_name&id=in.${inList(userIds)}`, accessToken);
 }
 
 // Seats left per trip, counting accepted requests. Full or departed trips aren't returned.
@@ -278,68 +277,6 @@ export async function loadTrip(accessToken, tripId) {
 
 // The signed-in user's row in public.profiles (created at sign-up).
 export async function loadMyProfile(accessToken, userId) {
-  const rows = await request(`profiles?select=id,full_name,avatar_path&id=eq.${encodeURIComponent(userId)}`, accessToken);
-  return rows[0] ? {...rows[0], photo:await profilePhotoUrl(accessToken,rows[0].avatar_path)} : null;
-}
-
-const photoUrls = new Map();
-const photoPath = path => typeof path === 'string' && /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.jpg$/.test(path);
-async function storageRequest(path, accessToken, body, method='POST') {
-  if (!accessToken) throw new Error('Sign in before changing your photo.');
-  const {url,publishableKey} = await config(), binary = body instanceof Blob;
-  const response = await fetch(`${url}/storage/v1/${path}`,{
-    method, headers:{apikey:publishableKey,Authorization:`Bearer ${accessToken}`,
-      'Content-Type':binary ? 'image/jpeg' : 'application/json'},
-    body:binary ? body : JSON.stringify(body),
-  });
-  const data = await response.json().catch(()=>({}));
-  if (!response.ok) throw new Error(data.message || data.error || 'Could not save your profile photo. Try again.');
-  return data;
-}
-async function signPhoto(accessToken,path) {
-  const {url} = await config();
-  const data = await storageRequest(`object/sign/profile-photos/${path}`,accessToken,{expiresIn:3600});
-  if (!data.signedURL?.startsWith('/object/sign/profile-photos/')) throw new Error('Could not display your profile photo.');
-  return `${url}/storage/v1${data.signedURL}`;
-}
-export async function profilePhotoUrl(accessToken,path) {
-  if (!photoPath(path)) return null;
-  const key = `${accessToken}|${path}`, cached = photoUrls.get(key);
-  if (cached && cached.expires > Date.now()) return cached.url;
-  try {
-    const url = await signPhoto(accessToken,path);
-    if (photoUrls.size >= 100) photoUrls.delete(photoUrls.keys().next().value);
-    photoUrls.set(key,{url,expires:Date.now()+50*60*1000});
-    return url;
-  } catch { return null; } // An unavailable image does not prevent loading the account or trip.
-}
-export async function saveProfilePhoto(accessToken,userId,photo) {
-  if (!/^[0-9a-f-]{36}$/.test(userId)) throw new Error('Sign in again before changing your photo.');
-  if (photo !== null && (!(photo instanceof Blob) || photo.type !== 'image/jpeg' || !photo.size || photo.size > 1048576)) throw new Error('Choose a valid profile photo smaller than 1 MB.');
-  const previous = await loadMyProfile(accessToken,userId);
-  const path = photo ? `${userId}/${crypto.randomUUID()}.jpg` : null;
-  const remove = p => storageRequest('object/profile-photos',accessToken,{prefixes:[p]},'DELETE');
-  let uploaded = false, attemptedSave = false, photoUrl = null;
-  try {
-    if (photo) {
-      await storageRequest(`object/profile-photos/${path}`,accessToken,photo);
-      uploaded = true;
-      photoUrl = await signPhoto(accessToken,path);
-    }
-    attemptedSave = true;
-    const rows = await request(`profiles?id=eq.${userId}&select=id,avatar_path`,accessToken,{avatar_path:path},'PATCH');
-    if (rows[0]?.id !== userId || rows[0]?.avatar_path !== path) throw new Error('Could not save your profile photo.');
-  } catch(error) {
-    if (attemptedSave && error.status === undefined) {
-      // A lost response may still have committed. Never delete a photo until the profile is checked.
-      let current;
-      try { current = await loadMyProfile(accessToken,userId); }
-      catch { throw new Error('Could not confirm whether your photo saved. Refresh your profile before trying again.'); }
-      if (current?.avatar_path === path) return {avatar_path:path,photo:photoUrl};
-    }
-    if (uploaded) await remove(path).catch(()=>{});
-    throw error;
-  }
-  if (photoPath(previous?.avatar_path) && previous.avatar_path !== path) await remove(previous.avatar_path).catch(()=>{});
-  return {avatar_path:path,photo:photoUrl};
+  const rows = await request(`profiles?select=id,full_name&id=eq.${encodeURIComponent(userId)}`, accessToken);
+  return rows[0] || null;
 }

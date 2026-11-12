@@ -7,7 +7,7 @@ const vm = require('node:vm');
 const html = fs.readFileSync('public/index.html', 'utf8');
 const source = html.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/\nboot\(\);/, '');
 
-function fixture({review=true}={}) {
+function fixture() {
   const fields = new Map();
   const get = id => {
     if (!fields.has(id)) fields.set(id, {
@@ -15,7 +15,7 @@ function fixture({review=true}={}) {
       textContent:'', innerHTML:'', dataset:{}, attrs:{}, listeners:{},
       addEventListener(event, fn){ this.listeners[event] = fn; },
       setAttribute(k,v){ this.attrs[k]=v; }, removeAttribute(k){ delete this.attrs[k]; },
-      querySelector(){return {focus(){}};}, closest(){ return {classList:{toggle(){}}}; }, focus(){ this.focused=true; },
+      closest(){ return {classList:{toggle(){}}}; }, focus(){ this.focused=true; },
     });
     return fields.get(id);
   };
@@ -37,7 +37,6 @@ function fixture({review=true}={}) {
   get('pt-pickup').value='Helaman Halls'; get('pt-dropoff').value='Moab Main Street';
   get('pt-seats').value='3'; get('pt-price').value='25';
   run('BIND.post();');
-  if(review){get('pt-next').listeners.click();get('pt-next').listeners.click();}
   return {get,run,api:context.api,rows,session,submit:()=>get('ptForm').listeners.submit({preventDefault(){}})};
 }
 
@@ -103,16 +102,4 @@ test('switching account remaps ownership; signed-out state clears database rows'
   assert.equal(f.run("USERS['driver-a'].verified"),'pending');
   f.api.getSession=async()=>null; await f.run('loadDbTrips()');
   assert.equal(f.run('TRIPS.filter(t=>t.dbTrip).length'),0);
-});
-
-// Pressing Enter follows the wizard; publishing is possible only after review.
-test('route and time steps preserve fields and never publish until review',async()=>{
-  const f=fixture({review:false});
-  f.get('pt-pickup').value='';
-  await f.submit();assert.equal(f.get('ptForm').dataset.step,'0');assert.equal(f.rows.length,0);
-  f.get('pt-pickup').value='Helaman Halls';
-  await f.submit();assert.equal(f.get('ptForm').dataset.step,'1');assert.equal(f.rows.length,0);
-  f.get('pt-next').listeners.click();assert.equal(f.get('ptForm').dataset.step,'2');assert.equal(f.rows.length,0);
-  f.get('pt-prev').listeners.click();assert.equal(f.get('pt-depart').value,'2099-11-06T16:00');
-  f.get('pt-next').listeners.click();await f.submit();assert.equal(f.rows.length,1);
 });
