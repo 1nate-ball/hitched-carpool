@@ -682,7 +682,7 @@ const NAVMAP = {home:'home', results:'home', detail:'home', mytrips:'mytrips', m
 function nav(){
   const cur = NAVMAP[S.screen];
   const b = (id, icon, label) => `<button data-act="nav" data-to="${id}" ${cur===id?'aria-current="page"':''}>${icon}${label}</button>`;
-  return `<nav class="nav" aria-label="Main"><button class="nav-brand" data-act="nav" data-to="home" aria-label="Hitch home"><span class="logo">${LOGO}</span>Hitch</button>${b('home',I.compass,'Explore')}${b('mytrips',I.ticket,'My Trips')}${b('post',I.plus,'Post a trip')}${b('profile',I.user,'Profile')}<span class="nav-me">${S.me && DB.session ? av(S.me, 38) : ''}</span></nav>`;
+  return `<nav class="nav" aria-label="Main"><button class="nav-brand" data-act="nav" data-to="home" aria-label="Hitch home"><span class="logo">${LOGO}</span>Hitch</button>${b('home',I.compass,'Explore')}${b('mytrips',I.ticket,'My Trips')}${b('post',I.plus,'Post a trip')}<button class="nav-profile" data-act="nav" data-to="profile" aria-label="Profile" ${cur==='profile'?'aria-current="page"':''}>${S.me && DB.session ? av(S.me, 30) : I.user}<span>Profile</span></button></nav>`;
 }
 function topbar(title, sub=''){
   return `<header class="topbar"><button class="iconbtn" data-act="back" aria-label="Back">${I.back}</button><div class="title"><h2>${esc(title)}</h2>${sub?`<div class="small muted">${sub}</div>`:''}</div></header>`;
@@ -702,7 +702,7 @@ function destCard(d){
   const n = openTrips(d.id).length;
   return `<button class="dcard" data-act="dest" data-id="${d.id}" aria-label="${esc(d.name)}: ${n} trips available">
     <div class="dart">${destArt(d)}<span class="count pill ${n?'neutral':'warn'}" style="background:var(--surface)">${n ? `${n} trip${n>1?'s':''}` : 'No trips yet'}</span></div>
-    <div class="dbody"><h3>${esc(d.name)}</h3>${d.drive ? `<div class="dmeta">${d.drive} drive</div>` : ''}${d.est ? `<div class="dprice tnum">est. ${money(d.est)} <span>/ rider</span></div>` : ''}</div>
+    <div class="dbody"><h3>${esc(d.name)}</h3>${d.drive ? `<div class="dmeta">${I.clock}${d.drive} drive</div>` : ''}${d.est ? `<div class="dprice tnum">est. ${money(d.est)} <span>/ rider</span></div>` : ''}</div>
   </button>`;
 }
 const skelCards = n => Array.from({length:n}, () => `<div class="dcard" aria-hidden="true"><div class="dart skel" style="border-radius:0"></div><div class="dbody"><div class="skel" style="height:14px;width:70%"></div><div class="skel" style="height:11px;width:50%"></div><div class="skel" style="height:11px;width:40%"></div></div></div>`).join('');
@@ -726,7 +726,7 @@ SCREENS.home = () => {
   const miss = S.miss ? `<div class="alert info" role="status"><b>No destinations match "${esc(S.miss)}".</b><span>No one has posted a trip there yet. Try a nearby or popular spot below, like Salt Lake City, Park City, or Moab.</span></div>` : '';
   return `
 <header class="topbar"><div class="brandrow" style="flex:1"><span class="logo">${LOGO}</span><div class="brand-name">Hitch</div></div>
-  <button class="iconbtn" aria-label="Account (not available in prototype)" title="Account">${S.me ? av(S.me, 38) : I.user}</button></header>
+  <button class="iconbtn" data-act="nav" data-to="profile" aria-label="Open profile" title="Profile">${S.me && DB.session ? av(S.me, 38) : I.user}</button></header>
 <div class="screen">
   <section class="ridge-hero">${RIDGES}<img class="hero-photo" src="images/explore-hero.jpg" alt="" onerror="this.remove()"><h1>Hitch a ride this weekend.</h1><p>Split the drive with BYU students already heading your way.</p></section>
   <form class="searchcard" id="searchForm" novalidate role="search">
@@ -747,6 +747,8 @@ SCREENS.home = () => {
 };
 BIND.home = () => {
   if (!S.homeLoaded) setTimeout(() => { S.homeLoaded = true; if (S.screen === 'home') render(); }, 700);
+  const sDate = document.getElementById('s-date'), dateEmpty = () => sDate && sDate.classList && sDate.classList.toggle('no-date', !sDate.value);
+  dateEmpty(); if (sDate && sDate.addEventListener){ sDate.addEventListener('input', dateEmpty); sDate.addEventListener('change', dateEmpty); }
   document.getElementById('searchForm').addEventListener('submit', e => {
     e.preventDefault();
     const q = document.getElementById('s-dest').value.trim();
@@ -1825,11 +1827,11 @@ SCREENS.profile = () => {
   ${verifyInfo()}
   ${hasProfileDetails() ? `<div class="card"><dl class="kv" style="margin:0"><dt>Hometown</dt><dd>${m.hometown ? esc(m.hometown) : '<span class="muted">Not added yet</span>'}</dd><dt>Bio</dt><dd>${m.bio ? esc(m.bio) : '<span class="muted">Not added yet</span>'}</dd></dl></div>` : '<div class="alert bad small" role="alert">Could not load your profile details. Refresh to try again.</div>'}
   <div style="display:flex;flex-direction:column;gap:10px">
-    <button class="btn block" data-act="go" data-to="edit" ${hasProfileDetails() ? '' : 'disabled'}>Edit profile</button>
     <button class="btn primary block" data-act="nav" data-to="post" ${isVerified()?'':'disabled'}>Post a trip</button>
-    <button class="btn primary block" data-act="mymanage">Manage my trip</button>
     ${isVerified() ? '' : '<p class="small muted" style="text-align:center">Posting a trip unlocks once your BYU email is verified.</p>'}
-    <button class="btn block danger" data-act="logout">Log out</button>
+    <button class="btn secondary block" data-act="mymanage">Manage my trip</button>
+    <button class="btn secondary block" data-act="go" data-to="edit" ${hasProfileDetails() ? '' : 'disabled'}>Edit profile</button>
+    <button class="btn block logout" data-act="logout">Log out</button>
     ${DB.session ? `<p class="small muted" style="text-align:center">Signed in as ${esc(DB.session.user.email)}</p>` : ''}
   </div>
   <div class="privacy">${I.lock}<span>Hitch does not collect student IDs or dates of birth in this version.</span></div>
