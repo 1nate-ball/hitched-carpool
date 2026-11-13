@@ -2,9 +2,10 @@
 -- Synthetic Auth rows and trips exist ONLY inside this transaction; ROLLBACK removes them.
 -- This checks database roles/RLS, not Auth login or the browser UI.
 begin;
-insert into auth.users (id, email) values
- ('a81e5a01-1111-4111-8111-111111111111', 'hitch-schema-a@example.invalid'),
- ('a81e5a01-2222-4222-8222-222222222222', 'hitch-schema-b@example.invalid');
+-- Drivers must be verified (confirmed byu.edu email) since 20261108000100_driver_verification.sql.
+insert into auth.users (id, email, email_confirmed_at) values
+ ('a81e5a01-1111-4111-8111-111111111111', 'hitch-schema-a@byu.edu', now()),
+ ('a81e5a01-2222-4222-8222-222222222222', 'hitch-schema-b@byu.edu', now());
 set local role authenticated;
 select set_config('request.jwt.claim.sub','a81e5a01-1111-4111-8111-111111111111',true);
 
