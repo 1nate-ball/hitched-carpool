@@ -362,7 +362,7 @@ textarea{border-radius:16px}
   .rlist > :not(.tcard):not(.tile){grid-column:1/-1}
   .tile{align-self:stretch;justify-content:center;padding:28px}
 
-  .app[data-screen="login"] .screen,.app[data-screen="signup"] .screen{max-width:1200px;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:56px;align-items:center;padding-top:40px}
+  .screen.auth-layout{max-width:1200px;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:56px;align-items:center;padding-top:40px}
   .auth-art{display:flex;position:relative;overflow:hidden;min-height:560px;border-radius:28px;background:var(--sky);padding:48px}
   .auth-art svg{position:absolute;inset:0;width:100%;height:100%}
   .auth-art .rg-phone{display:none}
@@ -373,7 +373,7 @@ textarea{border-radius:16px}
   .auth-copy{position:relative;display:flex;flex-direction:column;gap:12px;max-width:30rem}
   .auth-copy h2{font-size:2.8rem;line-height:1.05;letter-spacing:-.03em}
   .auth-copy p{font-size:1.1rem;color:var(--hero-sub);margin:0}
-  .auth-form{display:flex;flex-direction:column;gap:18px;max-width:440px;width:100%}
+  .auth-form{gap:18px;max-width:440px}
 }
 
 /* ---------- Post a trip: your posted trips + "trip posted" window ---------- */
@@ -443,4 +443,26 @@ textarea{border-radius:16px}
   .nav .nav-profile .av{width:32px!important;height:32px!important;font-size:12px!important}
   .nav .nav-profile[aria-current="page"]{background:var(--brand-soft);border-color:var(--brand);color:var(--brand)}
   .nav .nav-profile[aria-current="page"] .av{box-shadow:none}
+}
+
+/* ---------- Sprint 3: Forgot / reset password layout (Penina) ---------- */
+/* Log in, Sign up, Forgot password and Reset password all share one layout: photo on the left, form on the right (desktop), roomy stacked form (phone) */
+.auth-form{display:flex;flex-direction:column;gap:16px;width:100%}
+.auth-form h1{margin:4px 0 0}
+.auth-form > p{margin:0}
+@media (max-width:959px){ .screen.auth-layout{padding-top:20px;padding-bottom:32px} }
+
+
+/* Forgot password + Choose a new password: the road photo fills the screen and the form floats on top in a white card */
+.app[data-screen="forgot"] .screen.auth-layout,.app[data-screen="reset"] .screen.auth-layout{position:relative;max-width:none;display:flex;justify-content:center;align-items:center;min-height:calc(100vh - 110px);min-height:calc(100dvh - 110px);padding:40px 16px;margin:0;gap:0}
+.app[data-screen="forgot"] .auth-art,.app[data-screen="reset"] .auth-art{display:block;position:absolute;inset:0;min-height:0;border-radius:0;padding:0;overflow:hidden;background:#2a3a2f}
+.app[data-screen="forgot"] .auth-art svg,.app[data-screen="reset"] .auth-art svg{display:none}
+.app[data-screen="forgot"] .auth-copy,.app[data-screen="reset"] .auth-copy{display:none}
+.app[data-screen="forgot"] .auth-photo,.app[data-screen="reset"] .auth-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 60%}
+.app[data-screen="forgot"] .auth-art::after,.app[data-screen="reset"] .auth-art::after{content:"";position:absolute;inset:0;background:rgba(10,16,14,.38)}
+.app[data-screen="forgot"] .auth-form,.app[data-screen="reset"] .auth-form{position:relative;z-index:1;max-width:420px;background:var(--surface);border-radius:24px;padding:32px 28px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.app[data-screen="forgot"] .auth-form .fieldset,.app[data-screen="reset"] .auth-form .fieldset{border:0;padding:0;background:none;box-shadow:none}
+@media (max-width:959px){
+  .app[data-screen="forgot"] .screen.auth-layout,.app[data-screen="reset"] .screen.auth-layout{min-height:calc(100dvh - 150px);padding:28px 16px}
+  .app[data-screen="forgot"] .auth-form,.app[data-screen="reset"] .auth-form{padding:26px 20px}
 }
