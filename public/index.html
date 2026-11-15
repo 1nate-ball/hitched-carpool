@@ -1146,12 +1146,30 @@ function postedTripsSection(){
       <button class="link" type="button" data-act="viewmytrips">See everything in My Trips</button>`
     : `<p class="muted small">Trips you publish show up here, so you can manage requests without leaving this page.</p>`}`;
 }
+// Group trips by when they leave: Today / This week / This month / Later / Past.
+// Sample trips are measured against the prototype NOW; real (database) trips against the current Utah time.
+const TRIP_GROUPS = ['Today', 'This week', 'This month', 'Later', 'Past'];
+function tripGroup(t){
+  const now = t.dbTrip ? parse(denverWall(new Date())) : NOW;
+  const dep = parse(t.depart);
+  const day = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (dep < now) return 'Past';
+  if (dep < new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1)) return 'Today';
+  if (dep < new Date(day.getFullYear(), day.getMonth(), day.getDate() + 7)) return 'This week'; // the next 7 days
+  if (dep.getFullYear() === day.getFullYear() && dep.getMonth() === day.getMonth()) return 'This month';
+  return 'Later';
+}
+function groupedTrips(list, card){
+  const by = {};
+  list.forEach(t => (by[tripGroup(t)] ||= []).push(t));
+  return TRIP_GROUPS.filter(g => by[g]).map(g => `<section class="tgroup" aria-label="${g}"><h3 class="eyebrow tgroup-head">${g} <span class="tgroup-n">${by[g].length}</span></h3>${by[g].map(card).join('')}</section>`).join('');
+}
 SCREENS.mytrips = () => {
   const tab = S.tripsTab;
   let body;
   if (tab === 'rider'){
     const mine = TRIPS.filter(t => ['pending','confirmed','declined'].includes(myStatus(t))).sort((a,b) => parse(a.depart) - parse(b.depart));
-    body = mine.length ? mine.map(t => {
+    body = mine.length ? groupedTrips(mine, t => {
       const st = myStatus(t), d = D(t.dest), u = U(t.driver);
       const pill = st === 'confirmed' ? '<span class="pill ok">Seat confirmed</span>' : st === 'pending' ? '<span class="pill warn">Awaiting driver</span>' : '<span class="pill bad">Request declined</span>';
       const acts = st === 'pending' && t.dbTrip ? `<div class="row"><button class="btn sm" data-act="trip" data-id="${t.id}">View trip</button></div>
@@ -1162,15 +1180,15 @@ SCREENS.mytrips = () => {
         : st === 'confirmed' ? `<div class="row"><button class="btn sm" data-act="trip" data-id="${t.id}">Trip details</button><button class="btn sm primary" data-act="chat" data-id="${t.id}">Group chat</button></div>`
         : `<p class="small muted">${esc(u.first)} couldn't take you on this trip.</p><div class="row"><button class="btn sm primary" data-act="dest" data-id="${t.dest}">Find another ride</button></div>`;
       return `<div class="mcard"><div class="mtop"><div><h3>${esc(d.name)}</h3><div class="small muted tnum">${fDT(t.depart)}</div></div>${pill}</div>
-        <div class="row" style="justify-content:space-between"><div class="driver">${av(u,28)}<span class="small">${esc(fullName(u))}</span></div><span class="tnum small"><b>${money(t.price)}</b> · ${t.ret?'round trip':'one way'}</span></div>${acts}</div>`;
-    }).join('') : `<div class="empty">${I.ticket}<h2>No trips yet</h2><p class="muted small">Seat requests and confirmed rides will show up here.</p><button class="btn primary" data-act="nav" data-to="home">Find a ride</button></div>`;
+        <div class="row mmeta"><div class="driver">${av(u,22)}<span class="small">${esc(fullName(u))}</span></div><span class="tnum small"><b>${money(t.price)}</b> · ${t.ret?'round trip':'one way'}</span></div>${acts}</div>`;
+    }) : `<div class="empty">${I.ticket}<h2>No trips yet</h2><p class="muted small">Seat requests and confirmed rides will show up here.</p><button class="btn primary" data-act="nav" data-to="home">Find a ride</button></div>`;
   } else {
     const mine = myDriverTrips();
-    body = mine.length ? mine.map(t => driverTripCard(t)).join('') : `<div class="empty">${I.car}<h2>You haven't posted a trip</h2><p class="muted small">Offer seats in your car and riders can request to join.</p><button class="btn primary" data-act="nav" data-to="post">Post a trip</button></div>`;
+    body = mine.length ? groupedTrips(mine, t => driverTripCard(t)) : `<div class="empty">${I.car}<h2>You haven't posted a trip</h2><p class="muted small">Offer seats in your car and riders can request to join.</p><button class="btn primary" data-act="nav" data-to="post">Post a trip</button></div>`;
   }
   return `<header class="topbar"><div class="title"><h2>My Trips</h2></div></header>
-<div class="screen">
-  <div class="seg" role="tablist"><button role="tab" aria-selected="${tab==='rider'}" data-act="tab" data-t="rider">As a rider</button><button role="tab" aria-selected="${tab==='driver'}" data-act="tab" data-t="driver">As a driver</button></div>
+<div class="screen mytrips">
+  <div class="seg seg-lg" role="tablist" aria-label="Show my trips"><button role="tab" aria-selected="${tab==='rider'}" data-act="tab" data-t="rider">As a rider</button><button role="tab" aria-selected="${tab==='driver'}" data-act="tab" data-t="driver">As a driver</button></div>
   ${body}
 </div>${nav()}`;
 };
