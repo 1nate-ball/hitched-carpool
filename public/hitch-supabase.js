@@ -99,8 +99,31 @@ export async function requestSeat(accessToken, tripId, note = '') {
 }
 
 // The signed-in rider's own requests (RLS also lets drivers read requests on their trips; filter those out).
+// Oldest first: after cancelling, a rider can request the same trip again, and the newest request wins.
 export function loadMyRequests(accessToken, riderId) {
-  return request(`ride_requests?select=trip_id,status,note,created_at&rider_id=eq.${encodeURIComponent(riderId)}`, accessToken);
+  return request(`ride_requests?select=id,trip_id,status,note,created_at&rider_id=eq.${encodeURIComponent(riderId)}&order=created_at`, accessToken);
+}
+
+// ---------- Cancel a seat request or a posted trip ----------
+// The rider cancels their own pending or accepted request. Seats left only counts accepted
+// requests, so an accepted seat goes back to the trip. The database refuses anyone else (42501),
+// a request that was already decided or cancelled, and trips that already left (23514).
+export async function cancelRequest(accessToken, requestId) {
+  const rows = await request(`ride_requests?id=eq.${encodeURIComponent(requestId)}&select=id,status`, accessToken, { status: 'cancelled' }, 'PATCH');
+  if (!Array.isArray(rows) || rows[0]?.status !== 'cancelled') {
+    const error = new Error('Only the rider can cancel this request.'); error.code = '42501'; throw error;
+  }
+  return rows[0];
+}
+
+// The driver cancels their own trip. The database stores its own time, refuses anyone but the
+// driver (no rows come back), and refuses trips that already left or were already cancelled (23514).
+export async function cancelTrip(accessToken, tripId) {
+  const rows = await request(`trips?id=eq.${encodeURIComponent(tripId)}&select=id,cancelled_at`, accessToken, { cancelled_at: new Date().toISOString() }, 'PATCH');
+  if (!Array.isArray(rows) || !rows[0]?.cancelled_at) {
+    const error = new Error('Only the driver can cancel this trip.'); error.code = '42501'; throw error;
+  }
+  return rows[0];
 }
 
 // ---------- Driver: accept or decline seat requests ----------

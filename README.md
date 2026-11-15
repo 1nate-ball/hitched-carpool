@@ -343,3 +343,27 @@ Edit profile supports uploading, replacing, and removing a photo. Images are res
 Until these run, the app keeps working as before. Destinations and names still load, and the new features show a clear "not turned on in the database yet" message.
 
 **Checks:** `node --test tests/*.cjs` (Sprint 3 tests are in `tests/test_sprint3.cjs`) and `POSTGRES_BIN=... python3 scripts/check_sprint3_schema.py`. The script runs 24 checks against a throwaway local PostgreSQL (with every migration loaded): duplicate destination names, and plate/code hidden from pending and unrelated users.
+
+## Sprint 3 (Joey): cancel a seat request or a posted trip
+
+**Riders** can cancel from **My Trips**. A pending request has **Cancel request**, and an accepted seat has **Cancel my seat**. Both ask for confirmation first. Cancelling an accepted seat gives the seat back: seats left goes up, and a full trip shows up in search again. The card then shows **You cancelled**, and the rider can request the same trip again if plans change.
+
+**Drivers** can cancel a trip from **My Trips** (**Cancel trip**) or at the bottom of **Manage requests**. After confirmation, the trip leaves search, takes no new requests or decisions, and can't be edited. Riders who had requested or been accepted see **Trip cancelled** on My Trips and on Trip details.
+
+**What the database enforces** ([the cancel migration](supabase/migrations/20261115000100_cancel_request_or_trip.sql)):
+- Only the rider can cancel their own request (`status` → `cancelled`), and only while it's pending or accepted.
+- Only the driver can cancel their trip (`trips.cancelled_at`). The database stores its own time, not the browser's.
+- Nothing can be cancelled after the trip leaves, and a cancellation can't be undone.
+- Seats left only counts accepted requests, so a cancelled seat is free again. Cancelled trips are left out of `available_trips` and the seat-fill KR.
+- Each rider has one active request per trip. A cancelled request doesn't block a new one.
+
+**Database:** run these once each in the Supabase SQL Editor, in order:
+1. `supabase/migrations/20261115000100_cancel_request_or_trip.sql`
+2. `supabase/migrations/20261115000200_repair_accept_decline.sql`. The live database never got the accept/decline migration (`20261109000100`), so accepting, declining and cancelling were refused with "permission denied for table ride_requests". This adds only the missing pieces: the update grant, the driver policy, the decision trigger, and the private KR summary view. It changes nothing on a database that already had accept/decline. Don't run `20261109000100` itself now; it would fail partway.
+
+Until then the app works as before, and the cancel buttons show a "not turned on in the database yet" message.
+
+**Checks:**
+- `node --test tests/test_cancel.cjs` checks the screens and saving, using a fake database.
+- `python3 scripts/check_cancel_schema.py` runs 28 checks against a throwaway local PostgreSQL.
+- To check it live, paste [the cancel check](database/checks/cancel_live.sql) into the SQL Editor. It rolls back everything it creates and should end with a `PASS` row.
