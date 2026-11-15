@@ -483,3 +483,12 @@ textarea{border-radius:16px}
 .mytrips .mcard .mmeta{justify-content:space-between;gap:6px 10px}
 .mytrips .mcard .driver{gap:8px}
 .mytrips .mcard .row > .btn.sm{min-height:34px}
+
+/* ---------- Cancel a seat request or a posted trip ---------- */
+/* Quiet text button under the card's main actions, so cancelling is available but never the loudest thing. */
+.cancel-link{align-self:flex-start;color:var(--bad-text,var(--bad));font-size:.85rem;font-weight:600;min-height:32px}
+.cancel-link:disabled{opacity:.5;cursor:not-allowed}
+.btn.danger-solid{background:var(--bad);color:#fff;border-color:var(--bad)}
+.btn.danger.block{background:transparent;border-color:color-mix(in srgb,var(--bad) 45%,transparent)}
+.mcard.cancelled{background:var(--surface-2)}
+.mcard.cancelled h3{color:var(--muted)}
