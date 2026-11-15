@@ -1987,10 +1987,33 @@ SCREENS.profile = () => {
   <div class="privacy">${I.lock}<span>Hitch does not collect student IDs or dates of birth in this version.</span></div>
 </div>${nav()}`;
 };
-/* Admin: Hitch stats. Objective 2 KR (seat fill rate), computed live by the database on every load. */
+/* Admin: Hitch stats. Every Key Result, computed live by the database on every load. */
 const pct = x => `${Math.round(Number(x) * 100)}%`;
 const seatWord = n => `${n} seat${n === 1 ? '' : 's'}`, tripWord = n => `${n} trip${n === 1 ? '' : 's'}`;
+const driverWord = n => `${n} driver${n === 1 ? '' : 's'}`;
+// How each Key Result reads on the page. Keep in sync with the README "Key Results" section.
+const KR_INFO = {
+  drivers_verified:{label:'Objective 1 · Key Result 1', noun:'of drivers verified', empty:'No one has posted a trip yet', emptyLine:'Starts once someone posts a trip.',
+    line:r => `${r.numerator} of ${driverWord(r.denominator)} verified.`,
+    how:'Drivers are accounts that have posted at least one trip. Verified means they signed up with a byu.edu email and confirmed it. From <code>trips.driver_id</code> and the account\'s confirmed email in Supabase Auth. New trips already require a verified driver, so anything under 100% comes from older trips.'},
+  trips_linked:{label:'Objective 1 · Key Result 2', noun:'of trips linked to a driver', empty:'No trips posted yet', emptyLine:'Starts once someone posts a trip.',
+    line:r => `${r.numerator} of ${tripWord(r.denominator)} linked to a driver account.`,
+    how:'A trip is linked when <code>trips.driver_id</code> points to a real Supabase Auth account. The database requires this for every trip, so it should stay at 100%.'},
+  seat_fill:{label:'Objective 2 · Key Result', noun:'average seat fill rate', empty:'No departed trips yet', emptyLine:'The average starts once a posted trip has departed.',
+    line:(r, seat) => `Average across ${tripWord(seat ? seat.departed_trips : 0)} that have departed.`,
+    how:'For each posted trip: seats on <b>accepted</b> ride requests ÷ the trip\'s seats, capped at 100%. The Key Result is the average of those trip rates, counting only trips that have departed. Cancelled trips are left out. From <code>trips</code> and <code>ride_requests</code>, so a driver accepting a request or a rider cancelling a seat shows up on the next refresh.'},
+  repeat_drivers:{label:'Objective 2 · Key Result', noun:'of drivers posted again', empty:'No eligible drivers yet', emptyLine:"Starts once a driver's first trip is 30 days old.",
+    line:r => `${r.numerator} of ${driverWord(r.denominator)} posted a second trip within 30 days.`,
+    how:'Eligible drivers posted their first trip at least 30 days ago, so everyone counted has had the full 30 days. A repeat driver posted their second trip within 30 days of the first. From <code>trips.driver_id</code> and <code>trips.created_at</code>.'},
+};
 let statsTimer = null;
+function statsErrorMessage(error){
+  return error.status === 401 ? 'Your sign-in expired. Log in again to see stats.'
+    : error.code === '42501' || error.status === 403 ? 'Only Hitch admins can see stats.'
+    : error.code === 'PGRST202' || error.code === '42883' || error.status === 404 ? "Stats aren't turned on in the database yet. Ask the team to run the stats migrations."
+    : error.status === undefined ? "We couldn't reach the database. Check your connection, then refresh."
+    : 'Something went wrong loading stats. Refresh to try again.';
+}
 async function loadStats(){
   const generation = DB.generation;
   S.stats = {...(S.stats || {}), state:'loading'};
@@ -1999,19 +2022,47 @@ async function loadStats(){
     const api = await loadApi();
     DB.session = await api.getSession();
     if (!DB.session){ const ex = new Error('Signed out'); ex.status = 401; throw ex; }
-    const data = await api.loadSeatFillStats(DB.session.accessToken);
+    const token = DB.session.accessToken;
+    // Both asked fresh every time. Wrapped so a missing function on either side can't break the other.
+    const [okr, seat] = await Promise.allSettled([
+      Promise.resolve().then(() => api.loadOkrStats(token)),
+      Promise.resolve().then(() => api.loadSeatFillStats(token)),
+    ]);
     if (generation !== DB.generation) return;
-    S.stats = {state:'done', data, loadedAt:Date.now()};
+    if (okr.status === 'rejected' && seat.status === 'rejected') throw seat.reason;
+    const okrNote = okr.status === 'fulfilled' ? ''
+      : ['PGRST202', '42883'].includes(okr.reason?.code) || okr.reason?.status === 404 || okr.reason instanceof TypeError
+        ? "Only seat fill is shown: the other Key Results aren't turned on in the database yet. Ask the team to run the OKR stats migration."
+        : `Only seat fill is shown. ${statsErrorMessage(okr.reason)}`;
+    S.stats = {state:'done', data:{okr:okr.status === 'fulfilled' ? okr.value : null, seat:seat.status === 'fulfilled' ? seat.value : null, okrNote}, loadedAt:Date.now()};
   } catch (error) {
     if (generation !== DB.generation) return;
-    S.stats = {...(S.stats || {}), state:'error', loadedAt:Date.now(), message:
-      error.status === 401 ? 'Your sign-in expired. Log in again to see stats.'
-      : error.code === '42501' || error.status === 403 ? 'Only Hitch admins can see stats.'
-      : error.code === 'PGRST202' || error.code === '42883' || error.status === 404 ? "Stats aren't turned on in the database yet. Ask the team to run the seat fill stats migration."
-      : error.status === undefined ? "We couldn't reach the database. Check your connection, then refresh."
-      : 'Something went wrong loading stats. Refresh to try again.'};
+    S.stats = {...(S.stats || {}), state:'error', loadedAt:Date.now(), message:statsErrorMessage(error)};
   }
   if (S.screen === 'stats') render();
+}
+function krCard(r, seat){
+  const info = KR_INFO[r.kr] || {label:`Objective ${r.objective} · Key Result`, noun:'', empty:'No data yet', emptyLine:'', line:() => '', how:''};
+  const has = r.ready && r.current_value !== null && r.current_value !== undefined;
+  const v = has ? Number(r.current_value) : 0, target = Number(r.target), onTarget = has && v >= target;
+  const pill = !r.ready ? '<span class="pill neutral">Not set up yet</span>' : !has ? `<span class="pill neutral">${info.empty}</span>`
+    : onTarget ? '<span class="pill ok">On target</span>' : '<span class="pill warn">Below target</span>';
+  const line = !r.ready ? "This Key Result's view isn't in the database yet. Run its migration (see the README)." : has ? info.line(r, seat) : info.emptyLine;
+  const extra = r.kr === 'seat_fill' && seat ? `<div class="stat-grid">
+      <div class="stat"><div class="eyebrow">Departed trips</div><b class="tnum">${seat.departed_accepted_seats} of ${seatWord(seat.departed_total_seats)}</b>
+        <span class="small muted">filled across ${tripWord(seat.departed_trips)}${seat.departed_total_seats ? ` (${pct(seat.departed_accepted_seats / seat.departed_total_seats)} of all seats)` : ''}</span></div>
+      <div class="stat"><div class="eyebrow">Upcoming trips</div><b class="tnum">${seat.upcoming_accepted_seats} of ${seatWord(seat.upcoming_total_seats)}</b>
+        <span class="small muted">filled so far across ${tripWord(seat.upcoming_trips)}. Not in the Key Result until they depart.</span></div>
+    </div>` : '';
+  return `<section class="card kr-card" aria-labelledby="kr-${r.kr}">
+    <div class="eyebrow">${info.label}</div>
+    <h3 id="kr-${r.kr}">${esc(r.title)}</h3>
+    <div class="kr-num"><b class="tnum">${has ? pct(v) : '—'}</b>${pill}</div>
+    <div class="meter" role="img" aria-label="${has ? `${pct(v)} ${info.noun}` : 'No data yet'}, target ${pct(target)}"><span style="width:${Math.min(100, Math.round(v * 100))}%"></span><i style="left:${Math.round(target * 100)}%"></i></div>
+    <p class="small muted">${line} Target ${pct(target)}.</p>
+    ${extra}
+    ${info.how ? `<details class="how"><summary>How it's calculated</summary><p class="small">${info.how}</p></details>` : ''}
+  </section>`;
 }
 SCREENS.stats = () => {
   const st = S.stats || {state:'loading'}, d = st.data;
@@ -2022,26 +2073,18 @@ SCREENS.stats = () => {
   if (!d && st.state === 'error') body = `<div class="alert bad" role="alert">${esc(st.message)}</div>`;
   else if (!d) body = `<div class="card"><div class="skel" style="height:120px"></div></div>`;
   else {
-    const has = d.avg_fill_rate !== null && d.avg_fill_rate !== undefined, rate = has ? Number(d.avg_fill_rate) : 0, target = Number(d.target_fill_rate);
-    const width = Math.min(100, Math.round(rate * 100)), onTarget = has && rate >= target;
+    const seat = d.seat;
+    // Without the OKR function, show seat fill on its own (from seat_fill_stats).
+    const rows = d.okr || (seat ? [{kr:'seat_fill', objective:2, title:`Posted trips average ${pct(seat.target_fill_rate)} of seats filled`, current_value:seat.avg_fill_rate,
+      target:seat.target_fill_rate, numerator:seat.departed_accepted_seats, denominator:seat.departed_total_seats, ready:true}] : []);
+    const scored = rows.filter(r => r.ready && r.current_value !== null && r.current_value !== undefined);
+    const met = scored.filter(r => Number(r.current_value) >= Number(r.target)).length;
+    const objectives = [...new Set(rows.map(r => r.objective))].sort();
     body = `${st.state === 'error' ? `<div class="alert bad small" role="alert">${esc(st.message)} Showing the last numbers.</div>` : ''}
-    <div class="card kr-card">
-      <div class="eyebrow">Objective 2 · Key Result</div>
-      <h2>Posted trips average ${pct(target)} of seats filled</h2>
-      <div class="kr-num"><b class="tnum">${has ? pct(rate) : '—'}</b>${has ? (onTarget ? '<span class="pill ok">On target</span>' : '<span class="pill warn">Below target</span>') : '<span class="pill neutral">No departed trips yet</span>'}</div>
-      <div class="meter" role="img" aria-label="${has ? `${pct(rate)} average seat fill rate` : 'No data yet'}, target ${pct(target)}"><span style="width:${width}%"></span><i style="left:${Math.round(target * 100)}%"></i></div>
-      <p class="small muted">${has ? `Average across ${tripWord(d.departed_trips)} that have departed.` : 'The average starts once a posted trip has departed.'} Target ${pct(target)}.</p>
-    </div>
-    <div class="stat-grid">
-      <div class="card stat"><div class="eyebrow">Departed trips</div><b class="tnum">${d.departed_accepted_seats} of ${seatWord(d.departed_total_seats)}</b>
-        <span class="small muted">filled across ${tripWord(d.departed_trips)}${d.departed_total_seats ? ` (${pct(d.departed_accepted_seats / d.departed_total_seats)} of all seats)` : ''}</span></div>
-      <div class="card stat"><div class="eyebrow">Upcoming trips</div><b class="tnum">${d.upcoming_accepted_seats} of ${seatWord(d.upcoming_total_seats)}</b>
-        <span class="small muted">filled so far across ${tripWord(d.upcoming_trips)}. Not in the Key Result until they depart.</span></div>
-    </div>
-    <details class="card how"><summary>How it's calculated</summary>
-      <p class="small">For each posted trip: seats on <b>accepted</b> ride requests ÷ the trip's seats, capped at 100%. The Key Result is the average of those trip rates, counting only trips that have departed. Cancelled trips are left out.</p>
-      <p class="small muted">Computed by the database from <code>trips</code> and <code>ride_requests</code> every time this page loads, so a driver accepting a request or a rider cancelling a seat shows up on the next refresh.</p>
-    </details>`;
+    ${d.okrNote ? `<div class="alert info small" role="status">${esc(d.okrNote)}</div>` : ''}
+    ${rows.length > 1 ? `<p class="kr-summary"><b class="tnum">${met} of ${rows.length}</b> Key Results on target${scored.length < rows.length ? ` <span class="muted small">(${rows.length - scored.length} without data yet)</span>` : ''}</p>` : ''}
+    ${objectives.map(o => `<div class="section kr-section"><h2 class="eyebrow">Objective ${o}</h2>${rows.filter(r => r.objective === o).map(r => krCard(r, seat)).join('')}</div>`).join('')}
+    <p class="small muted">Computed by the database every time this page loads. Nothing here is typed in or stored.</p>`;
   }
   return `${topbar('Hitch stats', 'Admin only')}<div class="screen stats">${body}${foot}</div>${nav()}`;
 };

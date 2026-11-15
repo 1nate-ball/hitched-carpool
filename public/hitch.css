@@ -516,3 +516,10 @@ textarea{border-radius:16px}
 .how p{margin:8px 0 0}
 .stats-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .btn .pill{margin-left:4px}
+/* All Key Results on one page */
+.kr-card h3{font-size:1.02rem}
+.kr-section{gap:14px}
+.kr-summary{font-size:1rem}
+.kr-summary b{font-family:var(--f-display);font-size:1.3rem}
+.kr-card .stat-grid .stat{display:flex;flex-direction:column;gap:4px;background:var(--surface-2);border-radius:var(--r-sm);padding:12px}
+.kr-card .how{border-top:1px solid var(--line);padding-top:10px}

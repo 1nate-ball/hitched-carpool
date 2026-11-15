@@ -173,6 +173,14 @@ export async function loadSeatFillStats(accessToken) {
   return row;
 }
 
+// Every Key Result: one row each (kr, objective, title, current_value, target, numerator, denominator,
+// ready). Computed live by the database; refuses non-admins (42501).
+export async function loadOkrStats(accessToken) {
+  const rows = await request('rpc/okr_stats', accessToken, {});
+  if (!Array.isArray(rows)) throw new Error('Could not load Key Results.');
+  return rows;
+}
+
 // ---------- Supabase Auth (email + password) ----------
 // The session is kept in localStorage so a page refresh keeps the user signed in.
 const SESSION_KEY = 'hitch-supabase-session';
