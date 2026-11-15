@@ -125,6 +125,7 @@ export function bindLocationPickers({api, session, form, onChange}) {
         run();
       });
       field.addEventListener('focus', () => { if(!suppressFocus) run(); });
+      field.addEventListener('hitch-draft-applied', hide);
       field.addEventListener('keydown', e => {
         if (e.key==='Escape' && !list.hidden) { e.preventDefault(); e.stopPropagation(); hide(); }
         if (e.key==='ArrowDown' && !list.hidden) { e.preventDefault(); list.querySelector('button')?.focus(); }
@@ -265,6 +266,7 @@ export function bindDestinationPicker({input, hidden, box, status, known, onChan
     }, 400);
   });
   input.addEventListener('change', () => { matchExact(); onChange(); });
+  input.addEventListener('hitch-draft-applied', close);
   input.addEventListener('keydown', e => {
     if (box.hidden) return;
     if (e.key === 'Escape') { e.preventDefault(); close(); }

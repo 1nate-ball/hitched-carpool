@@ -9,7 +9,10 @@ export function applyTripDraft(form, fields, dirty = new Set()) {
   if (!fields || typeof fields !== 'object') throw new Error('AI returned an invalid draft. Try again.');
   const get = id => form.querySelector('#'+id);
   let applied = 0;
-  const change = field => { field.dispatchEvent(new Event('input',{bubbles:true})); field.dispatchEvent(new Event('change',{bubbles:true})); };
+  const change = field => {
+    field.dispatchEvent(new Event('input',{bubbles:true})); field.dispatchEvent(new Event('change',{bubbles:true}));
+    field.dispatchEvent(new Event('hitch-draft-applied'));
+  };
   const checkbox = get('pt-ret');
   if (fields.return_requested === true && !checkbox.checked && !dirty.has('pt-ret')) {
     checkbox.checked = true; change(checkbox); applied++;

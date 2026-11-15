@@ -104,6 +104,12 @@ test('saved-place selection attaches separate pins, updates starting city, and c
     get('pt-pickup-cancel').listeners.click();
     assert.equal(get('pt-pickup').value,'Library, Main Street, Provo');
     assert.deepEqual(picker.pins.pickup,{lat:40.2,lng:-111.6});
+    get('pt-pickup').value='AI supplied meeting point';
+    get('pt-pickup').listeners.input();
+    get('pt-pickup').listeners['hitch-draft-applied']();
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(picker.pins.pickup,null);
+    assert.equal(get('pt-pickup-suggestions').hidden,true);
     picker.destroy();
   } finally {global.document=originalDocument;global.fetch=originalFetch;}
 });
