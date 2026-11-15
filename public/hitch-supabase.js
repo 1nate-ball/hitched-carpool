@@ -159,6 +159,20 @@ export async function decideRequest(accessToken, requestId, status) {
   return rows[0];
 }
 
+// ---------- Admin stats: Objective 2 seat fill rate ----------
+// True only for accounts listed in public.admins (managed in the SQL Editor).
+export async function isAdmin(accessToken) {
+  return (await request('rpc/is_admin', accessToken, {})) === true;
+}
+
+// One row of totals computed live from trips + ride_requests. The database refuses non-admins (42501).
+export async function loadSeatFillStats(accessToken) {
+  const data = await request('rpc/seat_fill_stats', accessToken, {});
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new Error('Could not load stats.');
+  return row;
+}
+
 // ---------- Supabase Auth (email + password) ----------
 // The session is kept in localStorage so a page refresh keeps the user signed in.
 const SESSION_KEY = 'hitch-supabase-session';
