@@ -87,3 +87,46 @@ test('stats is a signed-in screen', () => {
   const f = fixture();
   assert.equal(f.run("AUTH_SCREENS.has('stats')"), true);
 });
+
+// ---------- All Key Results (okr_stats) ----------
+const OKR = [
+  {kr:'drivers_verified', objective:1, title:'100% of drivers are verified', current_value:0.6667, target:1.0, numerator:2, denominator:3, ready:true},
+  {kr:'trips_linked', objective:1, title:'100% of posted trips are linked to a driver account', current_value:1.0, target:1.0, numerator:4, denominator:4, ready:true},
+  {kr:'seat_fill', objective:2, title:'Posted trips average 70% of seats filled', current_value:0.5417, target:0.70, numerator:4, denominator:7, ready:true},
+  {kr:'repeat_drivers', objective:2, title:'50% of drivers post a second trip within 30 days', current_value:0.5, target:0.50, numerator:1, denominator:2, ready:true},
+];
+async function okrScreen(rows, f = fixture()){
+  f.run(`api.loadOkrStats = async () => ${JSON.stringify(rows)}`);
+  await f.signIn(); f.run("S.screen = 'stats'"); await f.run('loadStats()');
+  return f.run('SCREENS.stats()');
+}
+
+test('every Key Result is shown, grouped by objective, with a summary', async () => {
+  const screen = await okrScreen(OKR);
+  assert.match(screen, /<b class="tnum">2 of 4<\/b> Key Results on target/);
+  assert.ok(screen.indexOf('Objective 1</h2>') < screen.indexOf('Objective 2</h2>'));
+  assert.match(screen, /67%<\/b><span class="pill warn">Below target/); assert.match(screen, /2 of 3 drivers verified\. Target 100%/);
+  assert.match(screen, /100%<\/b><span class="pill ok">On target/);   assert.match(screen, /4 of 4 trips linked to a driver account/);
+  assert.match(screen, /54%<\/b><span class="pill warn">Below target/); assert.match(screen, /4 of 7 seats<\/b>/); // seat details kept
+  assert.match(screen, /50%<\/b><span class="pill ok">On target/);    assert.match(screen, /1 of 2 drivers posted a second trip within 30 days/);
+  assert.doesNotMatch(screen, /Only seat fill is shown/);
+});
+
+test('a KR with nothing eligible yet, or not set up yet, does not count as on or below target', async () => {
+  const rows = OKR.map(r => r.kr === 'repeat_drivers' ? {...r, current_value:null, numerator:0, denominator:0}
+    : r.kr === 'trips_linked' ? {...r, current_value:null, numerator:null, denominator:null, ready:false} : r);
+  const screen = await okrScreen(rows);
+  assert.match(screen, /—<\/b><span class="pill neutral">No eligible drivers yet/);
+  assert.match(screen, /Starts once a driver&#39;s first trip is 30 days old|Starts once a driver's first trip is 30 days old/);
+  assert.match(screen, /—<\/b><span class="pill neutral">Not set up yet/);
+  assert.match(screen, /<b class="tnum">0 of 4<\/b> Key Results on target <span class="muted small">\(2 without data yet\)/);
+  assert.doesNotMatch(screen, /NaN|undefined/);
+});
+
+test('without the OKR migration, seat fill still shows with a note', async () => {
+  const f = fixture();
+  f.run("api.loadOkrStats = async () => { throw Object.assign(new Error('not found'), {code:'PGRST202', status:404}); }");
+  await f.signIn(); f.run("S.screen = 'stats'"); await f.run('loadStats()');
+  const screen = f.run('SCREENS.stats()');
+  assert.match(screen, /Only seat fill is shown/); assert.match(screen, /54%/);
+});

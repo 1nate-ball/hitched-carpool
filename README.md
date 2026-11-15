@@ -24,6 +24,27 @@ The table definitions are in [schema.sql](database/schema.sql), and the sample r
 
 ## Key Results
 
+**All four Key Results are shown live on the admin-only Hitch stats page** (Profile → **Hitch stats**). The page shows:
+- Each Key Result's current value against its target, with an "On target" or "Below target" tag.
+- The counts behind each value, plus a "How it's calculated" note.
+- A count of how many Key Results are on target.
+
+The database computes every number from `trips`, `ride_requests`, and Supabase Auth each time the page loads. It also refreshes every minute while open. Nothing is typed in or stored.
+
+| Key Result | Target | Calculated from |
+|---|---|---|
+| Objective 1, KR 1: drivers are verified | 100% | `kr_driver_verification_summary` |
+| Objective 1, KR 2: trips linked to a driver account | 100% | `kr_trip_driver_link_summary` |
+| Objective 2: posted trips average 70% of seats filled | 70% | `kr_seat_fill_rate` |
+| Objective 2: drivers post a second trip within 30 days | 50% | `kr_driver_repeat_rate_summary` |
+
+The page calls `okr_stats()` ([migration](supabase/migrations/20261117000100_okr_stats.sql)), which returns one row per Key Result with counts and rates only (no ids, names, or emails). Only accounts in `admins` can call it (see the seat fill section below for how to add one). If a Key Result's view hasn't been created in the database yet, that card shows "Not set up yet" and the others still load.
+
+**Checks:**
+- `python3 scripts/check_okr_stats_schema.py` runs 9 checks with known data for all four Key Results.
+- `node --test tests/test_stats.cjs` checks the page.
+- To check it live, run [the OKR check](database/checks/okr_stats_live.sql) in the SQL Editor. It confirms all four are set up and match the views, and it names the migration to run if one isn't.
+
 **Objective 1, Key Result 1: 100% of drivers are verified.**
 
 **What "verified" means:** the person signed up with a BYU email address (ending in `byu.edu`) and confirmed it by clicking the link Supabase emailed to that inbox, so they have a working BYU account. It does not check a student ID, driver's license, driving record, or insurance. Student ID review is planned as a later level of verification. The app shows this same explanation under **What does Verified mean?** on Trip details and Profile.
