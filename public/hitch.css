@@ -466,3 +466,20 @@ textarea{border-radius:16px}
   .app[data-screen="forgot"] .screen.auth-layout,.app[data-screen="reset"] .screen.auth-layout{min-height:calc(100dvh - 150px);padding:28px 16px}
   .app[data-screen="forgot"] .auth-form,.app[data-screen="reset"] .auth-form{padding:26px 20px}
 }
+
+/* ---------- My Trips visual hierarchy (design review, Module 06) ----------
+   Finding 1: the rider/driver toggle leads the page; trip cards are compact so they compete less.
+   Finding 3: trips are grouped by departure (Today / This week / This month) with more space between groups. */
+.screen.mytrips{gap:28px}
+.seg.seg-lg{padding:5px;gap:5px;border:1px solid var(--line-strong)}
+.seg.seg-lg button{min-height:52px;font-size:1.05rem;font-weight:700}
+.seg.seg-lg button[aria-selected="true"]{background:var(--brand);color:var(--brand-ink);box-shadow:none}
+.tgroup{display:flex;flex-direction:column;gap:12px}
+.tgroup-head{display:flex;align-items:center;gap:8px;margin:0;font-family:var(--f-body)}
+.tgroup-n{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:var(--r-pill);background:var(--surface-2);color:var(--muted);font-size:.7rem;letter-spacing:0}
+.mytrips .mcard{padding:12px 14px;gap:8px}
+.mytrips .mcard h3{font-size:.95rem}
+.mytrips .mcard .pill{padding:3px 9px;font-size:.72rem}
+.mytrips .mcard .mmeta{justify-content:space-between;gap:6px 10px}
+.mytrips .mcard .driver{gap:8px}
+.mytrips .mcard .row > .btn.sm{min-height:34px}
