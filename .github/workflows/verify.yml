@@ -6,6 +6,7 @@ on:
       - 'public/**'
       - 'database/**'
       - 'server.py'
+      - 'ai_trip_draft.py'
       - 'tests/**'
       - 'scripts/**'
       - '.github/workflows/verify.yml'
