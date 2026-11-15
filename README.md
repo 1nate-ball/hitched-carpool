@@ -304,7 +304,11 @@ Until these run, the app keeps working as before. Destinations and names still l
 - Seats left only counts accepted requests, so a cancelled seat is free again. Cancelled trips are left out of `available_trips` and the seat-fill KR.
 - Each rider has one active request per trip. A cancelled request doesn't block a new one.
 
-**Database:** run `supabase/migrations/20261115000100_cancel_request_or_trip.sql` once in the Supabase SQL Editor. Until then the app works as before, and the cancel buttons show a "not turned on in the database yet" message.
+**Database:** run these once each in the Supabase SQL Editor, in order:
+1. `supabase/migrations/20261115000100_cancel_request_or_trip.sql`
+2. `supabase/migrations/20261115000200_repair_accept_decline.sql`. The live database never got the accept/decline migration (`20261109000100`), so accepting, declining and cancelling were refused with "permission denied for table ride_requests". This adds only the missing pieces: the update grant, the driver policy, the decision trigger, and the private KR summary view. It changes nothing on a database that already had accept/decline. Don't run `20261109000100` itself now; it would fail partway.
+
+Until then the app works as before, and the cancel buttons show a "not turned on in the database yet" message.
 
 **Checks:**
 - `node --test tests/test_cancel.cjs` checks the screens and saving, using a fake database.
