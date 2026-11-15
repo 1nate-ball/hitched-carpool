@@ -1,6 +1,6 @@
 # Sprint 3 AI feature: describe your trip
 
-Status: implemented on `feat/ai-trip-draft`; deployment and real-provider verification pending. Based on GitHub main `3fcc4c704eea32495257520ee65e7e62b504b643`, pulled November 15, 2026. Baseline verification passed: 67 JavaScript tests and 3 Python tests. With the AI tests, 73 JavaScript tests and 12 Python tests pass.
+Status: implementation and tests complete. Includes GitHub main `c8c0995` and the current teammate updates. Verification: 76 JavaScript tests and 12 Python tests pass. See the README for server setup and real-provider release checks.
 
 ## What we are building
 
@@ -65,7 +65,7 @@ Limit input length, output size, request duration, and per-account request frequ
 
 ## External service decision
 
-The user selected OpenAI and configured `OpenAI_Key` in Render. The implementation accepts that setting or `OPENAI_API_KEY`, and uses Responses API Structured Outputs with `gpt-5.6-terra` and reasoning disabled. A real hosted generation still needs to be verified after deployment. No new provider account or paid plan was created by this change.
+The user selected OpenAI and configured `OpenAI_Key` in Render. The implementation accepts that setting or `OPENAI_API_KEY`, and uses Responses API Structured Outputs with `gpt-5.6-terra` and reasoning disabled. A real hosted generation is a required release check after deployment. No new provider account or paid plan was created by this change.
 
 The only external setup dependency is working API access for the chosen provider and its server-side environment configuration on Render. Add a provider spending limit before the class opens the site. Tests can use a fake provider response, but the final smoke test must use the real API.
 
