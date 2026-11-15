@@ -64,6 +64,9 @@ try:
     # The rider cancels their pending request. Seats are unchanged.
     check(set_status(R1, 'cancelled'), R1, rollback=False)
     assert statuses(R1) == 'cancelled' and seats_available() == '2', (statuses(R1), seats_available())
+    # Cancelling again (double-click, second tab) is a no-op, not an error.
+    check(f"update public.ride_requests set status = 'cancelled' where trip_id = '{trip}' and rider_id = '{R1}';", R1, rollback=False)
+    assert statuses(R1) == 'cancelled' and seats_available() == '2', (statuses(R1), seats_available())
     # A cancellation is final, and the driver can't accept a cancelled request.
     check(f"update public.ride_requests set status = 'pending' where trip_id = '{trip}' and rider_id = '{R1}';", R1, '42501')
     check(f"update public.ride_requests set status = 'accepted' where trip_id = '{trip}' and rider_id = '{R1}';", DRIVER, '23514')

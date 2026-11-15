@@ -14,9 +14,12 @@ insert into public.ride_requests (trip_id, rider_id, note, status) values
  ('e81e5a01-7777-4777-8777-777777777777', 'e81e5a01-3333-4333-8333-333333333333', '', 'pending');
 set local role authenticated;
 
--- A rider can't accept their own request (the update matches no rows).
+-- A rider can't accept their own request. Since the cancel migration riders may update their own
+-- request (only to cancel it), so this is refused with an error instead of matching no rows.
 select set_config('request.jwt.claim.sub','e81e5a01-2222-4222-8222-222222222222',true);
-update public.ride_requests set status = 'accepted' where rider_id = 'e81e5a01-2222-4222-8222-222222222222';
+do $$ begin
+  update public.ride_requests set status = 'accepted' where rider_id = 'e81e5a01-2222-4222-8222-222222222222';
+exception when insufficient_privilege then null; end $$;
 do $$ begin
   if exists (select 1 from public.ride_requests where rider_id = 'e81e5a01-2222-4222-8222-222222222222' and status <> 'pending') then
     raise exception 'A rider changed their own request status'; end if;

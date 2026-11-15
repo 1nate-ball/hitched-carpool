@@ -37,11 +37,18 @@ do $$ begin
   if coalesce((select seats_available from public.available_trips where id = 'ca9ce101-7777-4777-8777-777777777777'), 0) <> 1 then
     raise exception 'Cancelled seat was not given back'; end if;
 end $$;
--- Cancelling is final.
+-- Cancelling again (a double-click, a second tab) changes nothing: still cancelled, seat still free.
+update public.ride_requests set status = 'cancelled' where rider_id = 'ca9ce101-2222-4222-8222-222222222222';
 do $$ begin
-  update public.ride_requests set status = 'cancelled' where rider_id = 'ca9ce101-2222-4222-8222-222222222222';
-  raise exception 'Cancelled the same request twice';
-exception when check_violation then null; end $$;
+  if (select status from public.ride_requests where rider_id = 'ca9ce101-2222-4222-8222-222222222222') <> 'cancelled'
+     or coalesce((select seats_available from public.available_trips where id = 'ca9ce101-7777-4777-8777-777777777777'), 0) <> 1 then
+    raise exception 'Cancelling twice changed something'; end if;
+end $$;
+-- Cancelling is final: it can't go back to pending.
+do $$ begin
+  update public.ride_requests set status = 'pending' where rider_id = 'ca9ce101-2222-4222-8222-222222222222';
+  raise exception 'Un-cancelled a request';
+exception when insufficient_privilege then null; end $$;
 
 -- A rider can't cancel the trip (the update matches no rows).
 update public.trips set cancelled_at = now() where id = 'ca9ce101-7777-4777-8777-777777777777';
