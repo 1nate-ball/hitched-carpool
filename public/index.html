@@ -451,6 +451,7 @@ const S = {
 
 let cleanupLocationPickers = () => {};
 let cleanupProfilePhoto = () => {};
+let cleanupTripDraft = () => {};
 
 // ---------- Supabase: Post a Trip ----------
 const DB = {session:null, api:null, profile:null, profileDetails:null, generation:0};
@@ -1226,7 +1227,13 @@ SCREENS.post = () => {
   return `<header class="topbar"><div class="title"><h2>Post a trip</h2><div class="small muted">Offer seats in your car · Posting as ${esc(DB.session?.user.email || '')} · <button class="link" type="button" data-act="logout">Log out</button></div></div></header>
 <div class="screen post-layout">
 <form id="ptForm" novalidate>
-  <div class="fieldset"><div class="eyebrow">Outbound route</div>
+  <div class="fieldset trip-ai"><div class="eyebrow">Optional · AI trip draft</div>
+    <div class="field"><label for="pt-ai-description">Describe your trip</label><textarea id="pt-ai-description" maxlength="2000" rows="3" aria-describedby="pt-ai-hint" placeholder="Provo to Moab on November 20, 2026 at 4 PM. Pickup at the Wilkinson Center. 3 seats, $25 each."></textarea></div>
+    <p id="pt-ai-hint" class="small muted">Your description is sent to OpenAI to fill blank trip fields. Include exact dates and times, then review the result before publishing.</p>
+    <div><button id="pt-ai-fill" class="btn" type="button">Fill trip details</button></div>
+    <p id="pt-ai-status" class="small" role="status" aria-live="polite" aria-atomic="true"></p>
+  </div>
+  <div class="fieldset post-route"><div class="eyebrow">Outbound route</div>
     <div class="field"><label for="pt-dest-name">Destination</label><input id="pt-dest-name" type="text" maxlength="80" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="pt-dest-options" placeholder="Type any city, park, or place" required aria-describedby="pt-desthint pe-dest"><input id="pt-dest" type="hidden" value="">
       <div id="pt-dest-options" class="place-suggestions" role="listbox" aria-label="Destination suggestions" hidden></div>
       <span id="pt-dest-status" class="sr-only" role="status"></span>
@@ -1298,6 +1305,13 @@ function postTips(v){
 BIND.post = () => {
   const $ = id => document.getElementById(id);
   const f = $('ptForm'); if (!f) return;
+  const draftGeneration = DB.generation;
+  import('/hitch-ai.js').then(module => {
+    if (!f.isConnected || S.screen !== 'post' || draftGeneration !== DB.generation) return;
+    cleanupTripDraft = module.bindTripDraft({form:f,
+      getSession:async () => (await loadApi()).getSession(), getAccount:() => DB.session?.user.id,
+      isCurrent:() => f.isConnected && S.screen === 'post' && draftGeneration === DB.generation});
+  }).catch(() => { if (f.isConnected) $('pt-ai-status').textContent = 'AI could not load. You can still enter the trip yourself.'; });
   // Refresh "Your posted trips" from the database when the page opens (at most every 30 seconds).
   if (DB.session && Date.now() - (S.postMineAt || 0) > 30000){
     S.postMineAt = Date.now();
@@ -1971,6 +1985,7 @@ async function boot(){
   try { await loadDbTrips(); if (generation === DB.generation && !['post', 'edit', 'chat'].includes(S.screen)) render(); } catch (error) { console.warn('Could not load saved trips:', error.message); }
 }
 function render(){
+  cleanupTripDraft(); cleanupTripDraft = () => {};
   cleanupLocationPickers(); cleanupLocationPickers = () => {};
   cleanupProfilePhoto(); cleanupProfilePhoto = () => {};
   document.querySelectorAll('.scrim').forEach(x => x.remove());

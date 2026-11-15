@@ -4,6 +4,7 @@ import os
 import sqlite3
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from ai_trip_draft import DraftError, LIMITER, generate_draft, validate_description, verified_driver
 
 ROOT = Path(__file__).resolve().parent
 DB = Path(os.environ.get('HITCH_DB', str(ROOT / 'data/hitch.sqlite3')))
@@ -42,6 +43,9 @@ def profile(db):
     return dict(first=u['FirstName'],last=u['LastName'],hometown=u['Hometown'],bio=u['Bio'],color=u['AvatarColor'],photo=u['ProfilePhotoURL'],verified='verified' if u['IsVerified'] else 'pending',username=u['Username'])
 
 class Handler(BaseHTTPRequestHandler):
+    def supabase_configuration(self):
+        return json.loads((ROOT/'public/supabase-config.json').read_text())
+
     def send_json(self, status, value):
         body=json.dumps(value).encode()
         self.send_response(status)
@@ -57,7 +61,7 @@ class Handler(BaseHTTPRequestHandler):
             body=(ROOT/'public/index.html').read_bytes()
             self.send_response(200); self.send_header('Content-Type','text/html; charset=utf-8')
             self.send_header('Content-Length',str(len(body))); self.end_headers(); self.wfile.write(body)
-        elif self.path in ('/supabase-config.json', '/hitch-supabase.js', '/hitch-locations.js', '/hitch-cities.js', '/hitch-cities.json', '/hitch-photos.js', '/hitch.css'):
+        elif self.path in ('/supabase-config.json', '/hitch-supabase.js', '/hitch-locations.js', '/hitch-cities.js', '/hitch-cities.json', '/hitch-photos.js', '/hitch-ai.js', '/hitch.css'):
             body=(ROOT/'public'/self.path.lstrip('/')).read_bytes()
             content_type={'.json':'application/json','.css':'text/css; charset=utf-8'}.get(Path(self.path).suffix,'text/javascript')
             self.send_response(200); self.send_header('Content-Type',content_type)
@@ -75,6 +79,38 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header('Cache-Control','public, max-age=3600')
             self.send_header('Content-Length',str(len(body))); self.end_headers(); self.wfile.write(body)
         else: self.send_json(404,{'error':'Not found'})
+
+    def do_POST(self):
+        if self.path != '/api/ai/trip-draft':
+            return self.send_json(404, {'error':'Not found'})
+        host = self.headers.get('Host','')
+        if self.headers.get('Origin') not in ('http://'+host, 'https://'+host):
+            return self.send_json(403, {'error':'Open Hitch to draft a trip.'})
+        if self.headers.get('Content-Type','').split(';')[0].strip().lower() != 'application/json':
+            return self.send_json(415, {'error':'Send a JSON trip description.'})
+        active = None
+        try:
+            length = int(self.headers.get('Content-Length','0'))
+            if not 0 < length <= 8192:
+                raise DraftError(413, 'Use a trip description up to 2,000 characters.')
+            self.connection.settimeout(10)
+            value = json.loads(self.rfile.read(length))
+            description = validate_description(value)
+            authorization = self.headers.get('Authorization','')
+            if not authorization.startswith('Bearer '):
+                raise DraftError(401, 'Log in before using AI.')
+            uid = verified_driver(authorization[7:], self.supabase_configuration())
+            active = LIMITER.begin(uid)
+            self.send_json(200, generate_draft(description))
+        except DraftError as error:
+            self.send_json(error.status, {'error':str(error)})
+        except (ValueError, UnicodeError, json.JSONDecodeError):
+            self.send_json(400, {'error':'Send a valid JSON trip description.'})
+        except OSError:
+            self.send_json(503, {'error':'AI drafting is unavailable. You can still enter the trip yourself.'})
+        finally:
+            if active is not None:
+                LIMITER.end(active)
 
     def do_PATCH(self):
         if self.path != '/api/profile': return self.send_json(404,{'error':'Not found'})

@@ -154,7 +154,60 @@ To verify: create an account, refresh (still logged in), log out (back to Log in
 | Database | Supabase for accounts and posted trips; SQLite for the local classroom demo |
 | Version control | GitHub |
 
-We chose this stack because we could keep our existing screens and use Python to connect them to a database. SQLite stores the data in a file on the computer running the app, so there is no paid service or cloud account to set up. Everyone can run the same version and inspect the tables locally. No extra Python packages or API keys are needed, and `.env` files are included in `.gitignore`.
+We chose this stack because we could keep our existing screens and use Python to connect them to a database. SQLite stores the local demo data in a file. Everyone can run the same version and inspect those tables locally. No extra Python packages are needed. The optional AI helper needs a server-side OpenAI key; manual trip posting works without it. `.env` files are included in `.gitignore`.
+
+## AI workflow: describe your trip
+
+On **Post a trip**, we added an optional **Describe your trip** box. A driver writes the route, exact dates and times, seats, and price, then clicks **Fill trip details**. Our Python backend verifies the signed-in driver and sends the description to OpenAI's Responses API. AI extracts structured fields, the backend validates them, and the app fills blank fields for the driver to review. **Publish trip** is still a separate step that saves through our existing Supabase workflow.
+
+We use OpenAI Structured Outputs with `gpt-5.6-terra` by default and no reasoning step, tools, or conversation history. The request uses `store: false`. The model does not receive the driver's account, password, car details, or other trips. The description itself is sent to OpenAI, as explained next to the button. Missing or invalid values stay blank; drivers still need to check the result. AI does not create map pins, verify accounts, or post trips on its own.
+
+### AI setup
+
+In Render's **Environment** settings, add `OPENAI_API_KEY`. The existing `OpenAI_Key` setting is also accepted, so either name works. Never put the real key in `public/`, `supabase-config.json`, or GitHub. For local development, the same setting can go in an ignored `.env` beside `server.py`; the AI helper reads only the requested AI setting from that file. Process environment variables take precedence. `OPENAI_MODEL` optionally selects another compatible structured-output model.
+
+The helper has a 2,000-character input limit, bounded response size and duration, no duplicate generation while a request is pending, and limits of 5 requests per minute and 20 per hour per account, 4 simultaneous requests, and 200 requests per day across this server. These limits are for the class demo and reset when the process restarts; the provider's own project budget is separate. If the key is missing or AI is unavailable, the app explains the problem and leaves manual posting available.
+
+To demonstrate it, sign in with a confirmed BYU email, open **Post a trip**, and enter:
+
+> Driving from Provo to Moab on November 20, 2026 at 4 PM. Pick up at Wilkinson Student Center and drop off at Moab Visitor Center. I have 3 seats at $25 per seat. Returning November 22, 2026 at 6 PM.
+
+Click **Fill trip details**, review or edit the result, then **Publish trip** and show the saved trip after refreshing. Use future explicit dates when rehearsing later. A successful demo must use the real OpenAI connection; a mocked test response is not proof of the live workflow.
+
+### Level 0 data flow diagram
+
+```mermaid
+flowchart LR
+  Student[BYU student] -->|Account, profile, trip and seat actions| Hitch[Hitch Carpool]
+  Hitch -->|Pages, trip details and action results| Student
+  Hitch <-->|Sign-in, profiles, trips, requests and photos| Supabase[Supabase Auth, Database and Storage]
+  Hitch <-->|Trip description and extracted fields| OpenAI[OpenAI API]
+  Hitch <-->|Place searches and map tiles| Maps[Photon and OpenStreetMap]
+```
+
+### Level 1 data flow diagram
+
+```mermaid
+flowchart TD
+  Student[BYU student] -->|Sign in| Auth[1. Authenticate student]
+  Auth <-->|Identity and verification| SA[Supabase Auth and verification check]
+  Student -->|Trip description| Draft[2. Draft trip with AI]
+  SA -->|Verified driver identity| Draft
+  Draft -->|Description and fixed extraction schema| Model[OpenAI API]
+  Model -->|Structured trip fields| Validate[3. Validate and fill blank fields]
+  Validate -->|Editable draft and missing details| Student
+  Student -->|Reviewed trip and Publish trip| Publish[4. Save trip and pickup details]
+  Publish <-->|Destination, trip and private pickup records| DB[(Supabase Database)]
+  Student <-->|Search, request a seat, approve or decline| Rides[5. Find and manage rides]
+  Rides <-->|Available trips and ride requests| DB
+  Student <-->|Edit profile and upload photo| Profile[6. Save profile]
+  Profile <-->|Profile metadata and private photos| SP[Supabase Auth, Profiles and Storage]
+  Student <-->|Search a place or choose a map point| Places[7. Choose locations]
+  Places <-->|Address suggestions and tiles| Maps[Photon and OpenStreetMap]
+  Places -->|Reviewed address and selected coordinates| Publish
+```
+
+Run `python3 -m unittest discover -s tests -v` and `node --test tests/*.cjs` for the automated checks. The AI tests use fake provider replies to cover validation, failures, authentication, duplicate requests, account changes, and preserving manual edits without spending API credits. Browser testing with the real provider is a separate release check.
 
 ## How to Get It Running
 
