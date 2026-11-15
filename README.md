@@ -70,7 +70,49 @@ sqlite3 data/kr-test.sqlite3 "SELECT * FROM kr_seat_fill_rate; SELECT * FROM kr_
 
 Expected results: one trip at 0.75 (3 of 4 seats), one at 0.3333 (1 of 3 seats, plus a declined request), and an average of 0.5417. The future test trip isn't counted.
 
-**For real trips (Supabase):** the event that fills seats is a driver accepting a seat request on **Manage requests**. [The accept/decline migration](supabase/migrations/20261109000100_accept_decline_requests.sql) adds `kr_seat_fill_rate` and `kr_seat_fill_rate_summary` to Supabase with the same definition (one seat per request). They're private views; read them in the SQL Editor:
+**For real trips (Supabase), shown live in the app.** Admins see the number on **Profile → Hitch stats**. The page asks the database every time it opens, refreshes itself every minute while open, and has a Refresh button. No number is typed in or stored.
+
+What the page shows:
+- **Headline (the Key Result):** the average per-trip fill rate across departed trips, compared with the 70% target.
+- **Departed trips:** accepted seats out of total seats, summed across departed trips. This is the plain "accepted ÷ seats" total.
+- **Upcoming trips:** seats filled so far on trips that haven't left. These don't count toward the Key Result until they depart.
+
+**Where the numbers come from:**
+
+| Table | Column | Role in the metric |
+|---|---|---|
+| `trips` | `total_seats` | Seats per trip (the denominator) |
+| `trips` | `departure_at` | Only trips that have departed count toward the KR |
+| `trips` | `cancelled_at` | Cancelled trips are left out |
+| `ride_requests` | `status = 'accepted'` | One accepted seat per request (the numerator) |
+
+**Events that change it:**
+- A driver **posts a trip**: more seats.
+- A driver **accepts** a request on Manage requests: +1 filled seat.
+- A rider **cancels an accepted seat**: −1 filled seat.
+- A driver **cancels a trip**: the trip leaves the metric.
+- A trip's **departure time passes**: it moves from Upcoming into the KR average.
+
+Requesting a seat or declining one doesn't change the number.
+
+**How it's built:**
+- `kr_seat_fill_rate` gives one row per trip, and `kr_seat_fill_rate_summary` gives the average. Both are private: readable in the SQL Editor, never through the API.
+- `seat_fill_stats()` ([migration](supabase/migrations/20261116000100_seat_fill_stats.sql)) is what the app calls. It returns one row of totals with no trip ids, names, or riders, and refuses anyone who isn't an admin.
+
+**Admins** are listed in the `admins` table, which can only be changed from the SQL Editor. To add someone (they need a Hitch account first):
+
+```sql
+insert into public.admins (user_id) select id from auth.users where email = 'someone@byu.edu';
+```
+
+They see the Hitch stats link the next time they log in.
+
+**Checks:**
+- `node --test tests/test_stats.cjs` checks the screen.
+- `python3 scripts/check_seat_fill_stats_schema.py` runs 16 checks against a throwaway PostgreSQL, using the same test data as the SQLite seed (expects 0.5417).
+- To check it live, paste [the stats check](database/checks/seat_fill_stats_live.sql) into the SQL Editor. It should end with a `PASS` row.
+
+You can also read the numbers directly in the SQL Editor:
 
 ```sql
 select * from public.kr_seat_fill_rate_summary;

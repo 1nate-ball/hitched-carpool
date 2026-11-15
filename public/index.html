@@ -294,6 +294,7 @@ function denverISO(wall){
 }
 
 const I = {
+  chart:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
   close:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 6 12 12M6 18 18 6"/></svg>',
   eye:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
   eyeOff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.9 10.9 0 0112 5c6.5 0 10 7 10 7a17.6 17.6 0 01-3.2 4.2M6.6 6.6A17.4 17.4 0 002 12s3.5 7 10 7a10.6 10.6 0 005.4-1.4"/><path d="M9.9 9.9a3 3 0 004.2 4.2"/></svg>',
@@ -764,7 +765,7 @@ const vBadge = u => u.verified === 'verified' ? `<span class="verified">${I.chec
 
 // ---------- navigation ----------
 // Screens that need a signed-in user. Signed out, they send you to Log in and come back after.
-const AUTH_SCREENS = new Set(['mytrips', 'manage', 'post', 'profile', 'edit', 'chat', 'reset']);
+const AUTH_SCREENS = new Set(['mytrips', 'manage', 'post', 'profile', 'edit', 'chat', 'reset', 'stats']);
 const PUBLIC_SCREENS = new Set(['login', 'signup']);
 function go(screen, params={}, push=true){
   if (push && !PUBLIC_SCREENS.has(S.screen)) S.hist.push({screen:S.screen, params:S.params});
@@ -773,7 +774,7 @@ function go(screen, params={}, push=true){
 function back(){ const h = S.hist.pop(); if (h){ S.screen = h.screen; S.params = h.params; render(); window.scrollTo(0,0);} else go('home',{},false); }
 function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, 2600); }
 
-const NAVMAP = {home:'home', results:'home', detail:'home', mytrips:'mytrips', manage:'mytrips', post:'post', profile:'profile', edit:'profile'};
+const NAVMAP = {home:'home', results:'home', detail:'home', mytrips:'mytrips', manage:'mytrips', post:'post', profile:'profile', edit:'profile', stats:'profile'};
 function nav(){
   const cur = NAVMAP[S.screen];
   const b = (id, icon, label) => `<button data-act="nav" data-to="${id}" ${cur===id?'aria-current="page"':''}>${icon}${label}</button>`;
@@ -1689,7 +1690,7 @@ function passwordProblem(p){
 }
 const SAMPLE_COLORS = ['#2F6B5E','#3B6EA8','#B0562F','#7B4FA0','#A8456B','#4F6B2E'];
 function clearAccountDetails(){
-  DB.profile = null; DB.profileDetails = null;
+  DB.profile = null; DB.profileDetails = null; S.isAdmin = false; S.stats = null;
   if (S.me) Object.assign(S.me, {first:'Hitch', last:'student', hometown:'', bio:'', color:SAMPLE_COLORS[0], photo:null});
 }
 function applyProfileDetails(details){
@@ -1703,10 +1704,13 @@ async function loadAccount(){
   clearAccountDetails();
   try {
     const api = await loadApi();
-    const [profile, details, status] = await Promise.allSettled([
+    const [profile, details, status, admin] = await Promise.allSettled([
       api.loadMyProfile(session.accessToken, session.user.id),
       api.loadProfileDetails(session.accessToken),
       api.loadVerification(session.accessToken, [session.user.id]),
+      // Only decides whether to show the Stats link (the database checks again). Wrapped so an older
+      // cached hitch-supabase.js without isAdmin can't break the rest of the profile load.
+      Promise.resolve().then(() => api.isAdmin(session.accessToken)),
     ]);
     if (generation !== DB.generation || session.user.id !== DB.session?.user.id) return;
     if (profile.status === 'fulfilled') DB.profile = profile.value;
@@ -1715,6 +1719,7 @@ async function loadAccount(){
     // value: the database still refuses trips from unverified drivers.
     if (S.me && status.status === 'fulfilled') S.me.verified = status.value[session.user.id] ? 'verified' : 'pending';
     else if (status.status === 'rejected') console.warn('Could not load your verification:', status.reason?.message);
+    S.isAdmin = admin.status === 'fulfilled' && admin.value; // missing migration or error: no link
     applyAccountName();
   }
   catch (error) { console.warn('Could not load your profile:', error.message); }
@@ -1975,11 +1980,79 @@ SCREENS.profile = () => {
     ${isVerified() ? '' : '<p class="small muted" style="text-align:center">Posting a trip unlocks once your BYU email is verified.</p>'}
     <button class="btn secondary block" data-act="mymanage">Manage my trip</button>
     <button class="btn secondary block" data-act="go" data-to="edit" ${hasProfileDetails() ? '' : 'disabled'}>Edit profile</button>
+    ${S.isAdmin ? `<button class="btn secondary block" data-act="openstats">${I.chart}Hitch stats <span class="pill neutral">Admin</span></button>` : ''}
     <button class="btn block logout" data-act="logout">Log out</button>
     ${DB.session ? `<p class="small muted" style="text-align:center">Signed in as ${esc(DB.session.user.email)}</p>` : ''}
   </div>
   <div class="privacy">${I.lock}<span>Hitch does not collect student IDs or dates of birth in this version.</span></div>
 </div>${nav()}`;
+};
+/* Admin: Hitch stats. Objective 2 KR (seat fill rate), computed live by the database on every load. */
+const pct = x => `${Math.round(Number(x) * 100)}%`;
+const seatWord = n => `${n} seat${n === 1 ? '' : 's'}`, tripWord = n => `${n} trip${n === 1 ? '' : 's'}`;
+let statsTimer = null;
+async function loadStats(){
+  const generation = DB.generation;
+  S.stats = {...(S.stats || {}), state:'loading'};
+  if (S.screen === 'stats') render();
+  try {
+    const api = await loadApi();
+    DB.session = await api.getSession();
+    if (!DB.session){ const ex = new Error('Signed out'); ex.status = 401; throw ex; }
+    const data = await api.loadSeatFillStats(DB.session.accessToken);
+    if (generation !== DB.generation) return;
+    S.stats = {state:'done', data, loadedAt:Date.now()};
+  } catch (error) {
+    if (generation !== DB.generation) return;
+    S.stats = {...(S.stats || {}), state:'error', loadedAt:Date.now(), message:
+      error.status === 401 ? 'Your sign-in expired. Log in again to see stats.'
+      : error.code === '42501' || error.status === 403 ? 'Only Hitch admins can see stats.'
+      : error.code === 'PGRST202' || error.code === '42883' || error.status === 404 ? "Stats aren't turned on in the database yet. Ask the team to run the seat fill stats migration."
+      : error.status === undefined ? "We couldn't reach the database. Check your connection, then refresh."
+      : 'Something went wrong loading stats. Refresh to try again.'};
+  }
+  if (S.screen === 'stats') render();
+}
+SCREENS.stats = () => {
+  const st = S.stats || {state:'loading'}, d = st.data;
+  const updated = st.loadedAt ? `Updated ${fTimeD(new Date(st.loadedAt))}` : '';
+  const foot = `<div class="stats-foot small muted" role="status">${st.state === 'loading' ? 'Updating…' : updated}${d ? ' · refreshes every minute' : ''}
+    <button class="btn sm" data-act="refreshstats" ${st.state === 'loading' ? 'disabled' : ''}>Refresh</button></div>`;
+  let body;
+  if (!d && st.state === 'error') body = `<div class="alert bad" role="alert">${esc(st.message)}</div>`;
+  else if (!d) body = `<div class="card"><div class="skel" style="height:120px"></div></div>`;
+  else {
+    const has = d.avg_fill_rate !== null && d.avg_fill_rate !== undefined, rate = has ? Number(d.avg_fill_rate) : 0, target = Number(d.target_fill_rate);
+    const width = Math.min(100, Math.round(rate * 100)), onTarget = has && rate >= target;
+    body = `${st.state === 'error' ? `<div class="alert bad small" role="alert">${esc(st.message)} Showing the last numbers.</div>` : ''}
+    <div class="card kr-card">
+      <div class="eyebrow">Objective 2 · Key Result</div>
+      <h2>Posted trips average ${pct(target)} of seats filled</h2>
+      <div class="kr-num"><b class="tnum">${has ? pct(rate) : '—'}</b>${has ? (onTarget ? '<span class="pill ok">On target</span>' : '<span class="pill warn">Below target</span>') : '<span class="pill neutral">No departed trips yet</span>'}</div>
+      <div class="meter" role="img" aria-label="${has ? `${pct(rate)} average seat fill rate` : 'No data yet'}, target ${pct(target)}"><span style="width:${width}%"></span><i style="left:${Math.round(target * 100)}%"></i></div>
+      <p class="small muted">${has ? `Average across ${tripWord(d.departed_trips)} that have departed.` : 'The average starts once a posted trip has departed.'} Target ${pct(target)}.</p>
+    </div>
+    <div class="stat-grid">
+      <div class="card stat"><div class="eyebrow">Departed trips</div><b class="tnum">${d.departed_accepted_seats} of ${seatWord(d.departed_total_seats)}</b>
+        <span class="small muted">filled across ${tripWord(d.departed_trips)}${d.departed_total_seats ? ` (${pct(d.departed_accepted_seats / d.departed_total_seats)} of all seats)` : ''}</span></div>
+      <div class="card stat"><div class="eyebrow">Upcoming trips</div><b class="tnum">${d.upcoming_accepted_seats} of ${seatWord(d.upcoming_total_seats)}</b>
+        <span class="small muted">filled so far across ${tripWord(d.upcoming_trips)}. Not in the Key Result until they depart.</span></div>
+    </div>
+    <details class="card how"><summary>How it's calculated</summary>
+      <p class="small">For each posted trip: seats on <b>accepted</b> ride requests ÷ the trip's seats, capped at 100%. The Key Result is the average of those trip rates, counting only trips that have departed. Cancelled trips are left out.</p>
+      <p class="small muted">Computed by the database from <code>trips</code> and <code>ride_requests</code> every time this page loads, so a driver accepting a request or a rider cancelling a seat shows up on the next refresh.</p>
+    </details>`;
+  }
+  return `${topbar('Hitch stats', 'Admin only')}<div class="screen stats">${body}${foot}</div>${nav()}`;
+};
+BIND.stats = () => {
+  const st = S.stats;
+  if (!st || (st.state !== 'loading' && Date.now() - (st.loadedAt || 0) > 60000)) loadStats();
+  clearInterval(statsTimer);
+  statsTimer = setInterval(() => { // keep it current while the page is open
+    if (S.screen !== 'stats'){ clearInterval(statsTimer); statsTimer = null; return; }
+    if (!document.hidden && S.stats?.state !== 'loading') loadStats();
+  }, 60000);
 };
 SCREENS.edit = () => {
   if (!hasProfileDetails()) return `${topbar('Edit profile')}<div class="screen"><div class="alert bad" role="alert">Could not load your profile details. Refresh and try again.</div></div>${nav()}`;
@@ -2146,6 +2219,8 @@ document.addEventListener('click', e => {
     case 'auth': S.loginNotice = ''; go(el.dataset.to, {}, false); break;
     case 'togglepass': togglePassword(el); break;
     case 'savepickup': { const t = TRIPS.find(x => x.id === id); if (t && !S.savingPickup) savePickupFromForm(t); break; }
+    case 'openstats': S.stats = null; go('stats'); break;
+    case 'refreshstats': loadStats(); break;
     case 'retrypickup': ensurePickup(TRIPS.find(x => x.id === id), true); break;
   }
 });

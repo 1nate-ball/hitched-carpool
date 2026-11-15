@@ -499,3 +499,20 @@ textarea{border-radius:16px}
 .btn.danger.block{background:transparent;border-color:color-mix(in srgb,var(--bad) 45%,transparent)}
 .mcard.cancelled{background:var(--surface-2)}
 .mcard.cancelled h3{color:var(--muted)}
+
+/* ---------- Admin: Hitch stats (Objective 2 seat fill rate) ---------- */
+.kr-card{gap:10px}
+.kr-card h2{font-size:1.05rem}
+.kr-num{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.kr-num b{font-family:var(--f-display);font-size:3rem;font-weight:800;line-height:1;letter-spacing:-.03em}
+.meter{position:relative;height:12px;border-radius:var(--r-pill);background:var(--surface-2);overflow:visible}
+.meter span{display:block;height:100%;border-radius:inherit;background:var(--brand)}
+.meter i{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink);transform:translateX(-1px)}
+.stat-grid{display:grid;grid-template-columns:1fr;gap:12px}
+@media (min-width:600px){.stat-grid{grid-template-columns:1fr 1fr}}
+.stat{gap:4px}
+.stat b{font-family:var(--f-display);font-size:1.5rem;font-weight:800}
+.how summary{cursor:pointer;font-weight:700}
+.how p{margin:8px 0 0}
+.stats-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.btn .pill{margin-left:4px}
