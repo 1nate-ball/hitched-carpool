@@ -246,8 +246,8 @@ textarea{border-radius:16px}
   /* post a trip: form fills the left, live preview on the right */
   .screen.post-layout{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:40px;align-items:start}
   .post-layout #ptForm{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
-  .post-layout #ptForm > .fieldset:first-child{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:20px;row-gap:16px}
-  .post-layout #ptForm > .fieldset:first-child > .eyebrow,.post-layout #ptForm > .fieldset:first-child > .two-desk{grid-column:1/-1}
+  .post-layout #ptForm > .post-route{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:20px;row-gap:16px}
+  .post-layout #ptForm > .post-route > .eyebrow,.post-layout #ptForm > .post-route > .two-desk{grid-column:1/-1}
   .post-layout #ptForm > .alert,.post-layout #ptForm > .btn{grid-column:1/-1}
   .post-layout .fieldset{padding:28px;gap:16px}
   .two-desk{grid-template-columns:1fr 1fr;gap:20px}
@@ -396,7 +396,7 @@ textarea{border-radius:16px}
 /* Local form polish: leave Explore and the shared navigation unchanged. */
 #ptForm .post-date-time{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:12px}
 #ptForm input[type=date],#ptForm input[type=time]{min-width:0;width:100%;max-width:100%;line-height:1.5;appearance:none;-webkit-appearance:none}
-#ptForm > .fieldset:first-child > .small{grid-column:1/-1}
+#ptForm > .post-route > .small{grid-column:1/-1}
 #ptForm .location-input .iconbtn{width:44px;height:40px;border-radius:var(--r-sm)}
 #ptForm .location-input input{padding-right:56px}
 #ptForm .location-input .iconbtn:hover{background:var(--brand-soft)}
@@ -466,3 +466,10 @@ textarea{border-radius:16px}
   .app[data-screen="forgot"] .screen.auth-layout,.app[data-screen="reset"] .screen.auth-layout{min-height:calc(100dvh - 150px);padding:28px 16px}
   .app[data-screen="forgot"] .auth-form,.app[data-screen="reset"] .auth-form{padding:26px 20px}
 }
+
+/* Optional AI helper, scoped to Post a trip. */
+#ptForm > .trip-ai{grid-column:1/-1;border-color:var(--brand);gap:12px}
+#ptForm .trip-ai textarea{min-height:100px;resize:vertical}
+#ptForm .trip-ai p:empty{display:none}
+#ptForm .trip-ai #pt-ai-status{overflow-wrap:anywhere}
+#ptForm .trip-ai .btn{min-height:44px}
