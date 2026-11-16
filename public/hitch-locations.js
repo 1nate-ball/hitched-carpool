@@ -36,8 +36,10 @@ export function bindLocationPickers({api, session, form, onChange}) {
   const $ = id => form.querySelector('#' + id);
   for (const kind of ['pickup', 'dropoff']) {
     const input = $(`pt-${kind}`), dialog = $(`pt-${kind}-dialog`), search = $(`pt-${kind}-search`);
-    const status = $(`pt-${kind}-status`), mapStatus = $(`pt-${kind}-map-status`);
+    const status = $(`pt-${kind}-status`), mapStatus = $(`pt-${kind}-map-status`), confirm = $(`pt-${kind}-confirm`);
     let map, marker, draft = {pin:null, name:'', city:''};
+    const syncConfirm = () => { confirm.disabled = !validPin(draft.pin); };
+    syncConfirm();
     const nearbyPlace = () => {
       const dest = $('pt-dest'), typed = $('pt-dest-name');
       if (kind === 'dropoff' && dest?.dataset.lat && dest?.dataset.lng) { // typed destination picked from search
@@ -57,6 +59,7 @@ export function bindLocationPickers({api, session, form, onChange}) {
     function setDraftPin(pin) {
       if (!validPin(pin)) return;
       draft.pin = {lat:pin.lat,lng:pin.lng};
+      syncConfirm();
       if (marker) marker.setLatLng([pin.lat,pin.lng]); else moveMarker(draft.pin);
       mapStatus.textContent = 'Pin selected. Drag it to adjust the meeting point.';
     }
@@ -120,7 +123,7 @@ export function bindLocationPickers({api, session, form, onChange}) {
         },500);
       }
       field.addEventListener('input', () => {
-        if (isDialog) { draft.name=field.value; draft.city=''; draft.pin=null; moveMarker(null); mapStatus.textContent='Choose a suggestion or tap the map.'; }
+        if (isDialog) { draft.name=field.value; draft.city=''; draft.pin=null; syncConfirm(); moveMarker(null); mapStatus.textContent='Choose a suggestion or tap the map.'; }
         else { pins[kind]=null; status.textContent=''; }
         run();
       });
@@ -144,10 +147,12 @@ export function bindLocationPickers({api, session, form, onChange}) {
     const inline = bindSearch(input,$(`pt-${kind}-suggestions`),(place,label) => commit({lat:place.latitude,lng:place.longitude},label,place.city),false);
     const modal = bindSearch(search,$(`pt-${kind}-places`),(place,label) => {
       draft = {pin:{lat:place.latitude,lng:place.longitude}, name:label, city:place.city};
+      syncConfirm();
       search.value = label; moveMarker(draft.pin); mapStatus.textContent='Pin selected. Drag it to adjust the meeting point.';
     },true);
     $(`pt-${kind}-open`).addEventListener('click',async () => {
       inline.hide(); draft={pin:pins[kind],name:input.value,city:''}; search.value=input.value;
+      syncConfirm();
       dialog.showModal(); await placesPromise;
       if (destroyed || !dialog.open) return;
       if (!map && typeof L !== 'undefined') {
@@ -169,7 +174,8 @@ export function bindLocationPickers({api, session, form, onChange}) {
     $(`pt-${kind}-cancel`).addEventListener('click',close);
     dialog.addEventListener('cancel', () => modal.hide());
     $(`pt-${kind}-center`).addEventListener('click', () => { if(map) setDraftPin(map.getCenter()); });
-    $(`pt-${kind}-confirm`).addEventListener('click', () => {
+    confirm.addEventListener('click', () => {
+      if (!validPin(draft.pin)) return;
       const name=search.value.trim() || (draft.pin ? `Map pin at ${draft.pin.lat.toFixed(5)}, ${draft.pin.lng.toFixed(5)}` : '');
       if (!name) { mapStatus.textContent='Choose a place or a map point first.'; search.focus(); return; }
       commit(draft.pin,name,draft.city); close();
@@ -278,5 +284,8 @@ export function bindDestinationPicker({input, hidden, box, status, known, onChan
     if (e.key === 'ArrowDown') { e.preventDefault(); buttons[Math.min(i + 1, buttons.length - 1)]?.focus(); }
     if (e.key === 'ArrowUp') { e.preventDefault(); i <= 0 ? input.focus() : buttons[i - 1].focus(); }
   });
-  return {choose, destroy: close};
+  const leave = e => { if (e.relatedTarget !== input && !box.contains(e.relatedTarget)) close(); };
+  input.addEventListener('blur', leave);
+  box.addEventListener('focusout', leave);
+  return {choose, destroy(){ close(); input.removeEventListener('blur', leave); box.removeEventListener('focusout', leave); }};
 }

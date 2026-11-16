@@ -256,7 +256,7 @@ The app opens to a **Log in** screen. New users choose **Create an account** and
 - **Weak password:** the form checks it before sending, and also shows Supabase's own password message if Supabase rejects it.
 - **Email confirmation:** if the Supabase project requires it, sign-up tells the user to check their email. The link brings them back already logged in. If confirmation is off, they are logged in right away.
 - **Staying signed in:** the session is saved in the browser and refreshed automatically, so a page refresh keeps you logged in (and on the same tab).
-- **Log out** (on Profile and Post a trip) clears the session and returns to the Log in screen.
+- **Log out** on Profile clears the session and returns to the Log in screen.
 - **Protected pages:** My Trips, Manage requests, Post a trip, Profile, Edit profile, and Group chat send signed-out users to Log in, then back to the page they wanted. Explore, search results, and trip details stay public; requesting a seat asks you to log in.
 
 Signup also offers an optional hometown and short bio. On signup and under **Edit profile**, search for a U.S. hometown and choose a result to save it as `City, ST`. The list comes from the [2025 U.S. Census Gazetteer](https://www.census.gov/geographies/reference-files/time-series/geo/gazetteer-files.2025.html). Profile details are saved to the signed-in account. An existing hometown stays as entered until you replace or clear it.
@@ -276,7 +276,7 @@ We chose this stack because we could keep our existing screens and use Python to
 
 ## AI workflow: describe your trip
 
-On **Post a trip**, we added an optional **Describe your trip** box. A driver writes the route, exact dates and times, seats, and price, then clicks **Fill trip details**. Our Python backend verifies the signed-in driver and sends the description to OpenAI's Responses API. AI extracts structured fields, the backend validates them, and the app fills blank fields for the driver to review. **Publish trip** is still a separate step that saves through our existing Supabase workflow.
+On **Post a trip**, expand **Auto-fill with AI**. A driver writes the route, exact dates and times, seats, and price, then clicks **Fill trip details**. Our Python backend verifies the signed-in driver and sends the description to OpenAI's Responses API. AI extracts structured fields, the backend validates them, and the app fills blank fields for the driver to review. **Publish trip** is still a separate step that saves through our existing Supabase workflow. On mobile, a compact review above that button shows the route, dates, seats, and price.
 
 We use OpenAI Structured Outputs with `gpt-5.6-terra` by default and no reasoning step, tools, or conversation history. The request uses `store: false`. The model does not receive the driver's account, password, car details, or other trips. The description itself is sent to OpenAI, as explained next to the button. Missing or invalid values stay blank; drivers still need to check the result. AI does not create map pins, verify accounts, or post trips on its own.
 
@@ -286,7 +286,7 @@ In Render's **Environment** settings, add `OPENAI_API_KEY`. The existing `OpenAI
 
 The helper has a 2,000-character input limit, bounded response size and duration, no duplicate generation while a request is pending, and limits of 5 requests per minute and 20 per hour per account, 4 simultaneous requests, and 200 requests per day across this server. These limits are for the class demo and reset when the process restarts; the provider's own project budget is separate. If the key is missing or AI is unavailable, the app explains the problem and leaves manual posting available.
 
-To demonstrate it, sign in with a confirmed BYU email, open **Post a trip**, and enter:
+To demonstrate it, sign in with a confirmed BYU email, open **Post a trip → Auto-fill with AI**, and enter:
 
 > Driving from Provo to Moab on November 20, 2026 at 4 PM. Pick up at Wilkinson Student Center and drop off at Moab Visitor Center. I have 3 seats at $25 per seat. Returning November 22, 2026 at 6 PM.
 

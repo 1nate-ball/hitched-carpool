@@ -18,15 +18,16 @@ function app() {
   return code => vm.runInContext(code, context);
 }
 
-test('sample trips are grouped Today / This week / This month / Later / Past against the prototype date', () => {
-  const run = app(); // prototype NOW is Sat Oct 3 2026, 10:00
-  const g = depart => run(`tripGroup({depart:'${depart}'})`);
+test('all trips use calendar groups; old sample trips are not presented as upcoming', () => {
+  const run = app();
+  const g = depart => run(`tripGroup({depart:'${depart}'}, new Date(2026, 9, 3, 10, 0))`);
   assert.equal(g('2026-10-03T18:00'), 'Today');
   assert.equal(g('2026-10-04T08:00'), 'This week');
   assert.equal(g('2026-10-09T23:59'), 'This week');
   assert.equal(g('2026-10-10T08:00'), 'This month');
   assert.equal(g('2026-11-02T08:00'), 'Later');
   assert.equal(g('2026-10-03T07:00'), 'Past');
+  assert.equal(run("tripGroup({depart:'2026-10-09T15:30'}, new Date(2026, 10, 16))"), 'Past');
 });
 
 test('database trips are grouped against the real current time', () => {
@@ -49,5 +50,6 @@ test('My Trips renders a heading per group, in order, with every trip still show
     const cards = (html.match(/class="mcard"/g) || []).length;
     if (cards) assert.ok(groups.length > 0, `${tab}: cards sit inside a group`);
     assert.match(html, /class="seg seg-lg"/);
+    if (tab === 'rider') assert.match(html, /Sample trip/);
   }
 });
