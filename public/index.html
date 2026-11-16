@@ -321,8 +321,14 @@ const I = {
   lock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>',
   chat:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></svg>',
   bell:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0112 0v5l2 2H4z"/><path d="M10 20a2 2 0 004 0"/></svg>',
+  route:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="5" r="2"/><circle cx="18" cy="19" r="2"/><path d="M6 7v6a6 6 0 006 6h4"/></svg>',
+  fuel:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h12M5 21V4a1 1 0 011-1h6a1 1 0 011 1v17M5 10h8M13 13h2a2 2 0 012 2v3a2 2 0 004 0V9l-3-3M19 7v4h2"/></svg>',
+  returnTrip:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 3-4 4 4 4M3 7h12a6 6 0 010 12h-4"/></svg>',
   road:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3L4 21M16 3l4 18M12 5v2M12 11v2M12 17v2"/></svg>',
 };
+
+// Decorative companions to visible labels; never replace the label with an icon.
+const uiIcon = name => `<span class="ui-symbol" aria-hidden="true">${I[name].replace('<svg', '<svg focusable="false"')}</span>`;
 
 // ---------- brand: Peak H logo + mountain banner (colors come from hitch.css) ----------
 const LOGO = '<svg viewBox="0 0 48 48" aria-hidden="true"><rect class="mark-leg" x="5" y="6" width="9" height="36" rx="3"/><rect class="mark-leg" x="34" y="6" width="9" height="36" rx="3"/><path class="mark-road" d="M13 28 C21 28 27 20 35 20"/><path class="mark-dash" d="M14 28 C21 28 27 20 34 20"/></svg>';
@@ -1108,7 +1114,7 @@ function rememberedCar(){ try { return JSON.parse(localStorage.getItem(CAR_KEY()
 
 // A download only; adding it to a calendar is the student's choice.
 function calendarAllowed(t){ return !!t?.dbTrip && !t.cancelled && ['driver','confirmed'].includes(myStatus(t)) && Date.parse(t.departureAt)>Date.now(); }
-function calendarButton(t){ return calendarAllowed(t) ? `<button class="btn sm" type="button" data-act="calendar" data-id="${t.id}">Add to calendar</button>` : ''; }
+function calendarButton(t){ return calendarAllowed(t) ? `<button class="btn sm" type="button" data-act="calendar" data-id="${t.id}">${uiIcon('cal')}Add to calendar</button>` : ''; }
 async function exportTripCalendar(t, button){
   if (!calendarAllowed(t) || button.disabled) return;
   const generation=DB.generation; button.disabled=true; button.textContent='Preparing…';
@@ -1118,7 +1124,7 @@ async function exportTripCalendar(t, button){
     module.downloadCalendar({id:t.id,origin:t.origin || 'Provo',destination:D(t.dest).name,pickup:t.pickup,dropoff:t.dropoff,departureAt:t.departureAt,returnAt:t.returnAt || (t.ret ? denverISO(t.ret).iso : null)});
     toast('Open the calendar file to add your trip.');
   } catch { toast('Could not create the calendar file. Refresh and try again.'); }
-  finally {button.disabled=false;button.textContent='Add to calendar';}
+  finally {button.disabled=false;button.innerHTML=uiIcon('cal')+'Add to calendar';}
 }
 
 /* Screen 5: Trip details / request a seat */
@@ -1403,7 +1409,7 @@ SCREENS.post = () => {
       <p id="pt-ai-status" class="small" role="status" aria-live="polite" aria-atomic="true"></p>
     </div>
   </details>
-  <div class="fieldset post-route"><div class="eyebrow">Outbound route</div>
+  <div class="fieldset post-route"><div class="eyebrow">${uiIcon('route')}Outbound route</div>
     <div class="field"><label for="pt-origin">Starting city</label><input id="pt-origin" type="text" maxlength="80" value="Provo" required aria-describedby="pe-origin"><div class="err" id="pe-origin"></div></div>
     <div class="field"><label for="pt-dest-name">Destination city</label><input id="pt-dest-name" type="text" maxlength="80" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="pt-dest-options" placeholder="City, park, or place" required aria-describedby="pe-dest"><input id="pt-dest" type="hidden" value="">
       <div id="pt-dest-options" class="place-suggestions" role="listbox" aria-label="Destination suggestions" hidden></div>
@@ -1413,13 +1419,13 @@ SCREENS.post = () => {
     <div class="field"><label for="pt-dropoff">Drop-off address</label>${locationPicker('dropoff')}<div class="small muted" id="pt-drophint">Where riders get out at your destination.</div><div class="err" id="pe-dropoff"></div></div></div>
     <div class="small muted">Address data © <a class="link" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></div>
   </div>
-  <div class="fieldset post-schedule"><div class="eyebrow">Departure · Mountain Time</div>
+  <div class="fieldset post-schedule"><div class="eyebrow">${uiIcon('clock')}Departure · Mountain Time</div>
     <div class="post-date-time"><div class="field"><label for="pt-depart">Departure date</label><input id="pt-depart" type="date" required aria-describedby="pe-depart"><div class="err" id="pe-depart"></div></div>
     <div class="field"><label for="pt-time">Departure time</label><input id="pt-time" type="time" required aria-describedby="pe-time"><div class="err" id="pe-time"></div></div></div>
     <div class="two post-pricing"><div class="field"><label for="pt-seats">Available seats</label><input id="pt-seats" type="number" min="1" max="7" step="1" inputmode="numeric" placeholder="1–7" required><div class="err" id="pe-seats"></div></div>
     <div class="field"><label for="pt-price" id="pt-price-label">Price per seat ($)</label><input id="pt-price" type="number" min="1" max="150" step="1" inputmode="numeric" placeholder="1–150" required><div class="err" id="pe-price"></div></div></div>
   </div>
-  <details class="fieldset post-disclosure gas-estimate" id="pt-gas"><summary>Estimate gas per seat <span class="small muted">Optional</span></summary>
+  <details class="fieldset post-disclosure gas-estimate" id="pt-gas"><summary>${uiIcon('fuel')}Estimate gas per seat <span class="small muted">Optional</span></summary>
     <div class="post-disclosure-body">
       <div class="two"><div class="field"><label for="gas-year">Vehicle year</label><select id="gas-year">${Array.from({length:new Date().getFullYear()-1982},(_,i)=>new Date().getFullYear()+1-i).map(y=>`<option ${y===2020?'selected':''}>${y}</option>`).join('')}</select></div><div class="field"><label for="gas-make">Make</label><select id="gas-make" disabled><option value="">Choose make</option></select></div></div>
       <div class="two"><div class="field"><label for="gas-model">Model</label><select id="gas-model" disabled><option value="">Choose model</option></select></div><div class="field"><label for="gas-option">Engine / transmission</label><select id="gas-option" disabled><option value="">Choose option</option></select></div></div>
@@ -1435,12 +1441,12 @@ SCREENS.post = () => {
     </div>
   </details>
   <div class="fieldset post-return">
-    <label class="check"><input type="checkbox" id="pt-ret" aria-describedby="pt-covers"><span><b>Include a return trip</b></span></label>
+    <label class="check"><input type="checkbox" id="pt-ret" aria-describedby="pt-covers"><span>${uiIcon('returnTrip')}<b>Include a return trip</b></span></label>
     <div id="pt-retfields" hidden><div class="post-date-time"><div class="field"><label for="pt-return">Return pickup date</label><input id="pt-return" type="date" aria-describedby="pe-return"><div class="err" id="pe-return"></div></div>
     <div class="field"><label for="pt-return-time">Return pickup time</label><input id="pt-return-time" type="time" aria-describedby="pe-returnTime"><div class="err" id="pe-returnTime"></div></div></div></div>
     <p class="small muted" id="pt-covers"></p>
   </div>
-  <details class="fieldset post-disclosure post-car" id="pt-car-details"><summary>Car details <span class="small muted">Optional</span></summary>
+  <details class="fieldset post-disclosure post-car" id="pt-car-details"><summary>${uiIcon('car')}Car details <span class="small muted">Optional</span></summary>
     <div class="post-disclosure-body">
       <p class="small muted">Only riders you accept can see these details.</p>
       <div class="two-desk"><div class="field"><label for="pt-car">Make &amp; model</label><input id="pt-car" type="text" maxlength="60" placeholder="e.g. Honda Civic"></div>
