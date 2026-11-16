@@ -114,6 +114,7 @@ a{color:var(--accent)}
 /* ---------- Logo (Peak H) ---------- */
 .logo{width:36px;height:36px;background:none;border-radius:0;display:grid;place-items:center;flex:none}
 .logo svg{width:36px;height:36px}
+.topbar .logo,.topbar .logo svg{width:28px;height:28px}
 .mark-leg{fill:var(--mark)}
 .mark-road{fill:none;stroke:var(--mark);stroke-width:8}
 .mark-dash{fill:none;stroke:var(--bg);stroke-width:1.4;stroke-dasharray:2.6 2.2}
@@ -220,7 +221,7 @@ textarea{border-radius:16px}
   .nav button{flex-direction:row;gap:8px;font-size:.95rem;padding:10px 16px;border-radius:var(--r-pill)}
   .nav button[aria-current="page"]{background:var(--brand-soft)}
   .nav .nav-brand{display:flex;align-items:center;margin-right:auto;padding:0;gap:10px;color:var(--ink);font-size:1.5rem;font-weight:800;letter-spacing:-.02em;background:none}
-  .nav .nav-brand svg{width:40px;height:40px;color:inherit}
+  .nav .nav-brand svg{width:30px;height:30px;color:inherit}
   .nav .nav-me{display:flex;margin-left:12px}
   .app[data-screen="home"] > .topbar{display:none}
 
