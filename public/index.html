@@ -460,6 +460,7 @@ const S = {
   filters:{max:'', round:false}, dbSearch:{key:'', state:'idle', ids:[]}, dbBase:{key:'', ids:[]}, tripsTab:'rider', homeLoaded:false, loginNotice:'', loginUser:'', after:null,
 };
 
+let cleanupCountdowns = () => {};
 let cleanupLocationPickers = () => {};
 let cleanupProfilePhoto = () => {};
 let cleanupGasEstimate = () => {};
@@ -553,7 +554,7 @@ async function decideDbRequest(t, requestId, decision){
     if (decision === 'accepted'){
       t.passengers.push(r.uid); t.requests = t.requests.filter(x => x !== r);
       if (Number.isInteger(t.available)) t.available = Math.max(0, t.available - 1);
-      toast(`${u.first} is confirmed. ${seatsLeft(t)} of ${t.seats} seats left.`);
+      toast(`${u.first} is confirmed. ${seatsLeft(t)} of ${t.seats} seats left.`, true);
     } else { r.status = 'declined'; toast(`Declined ${u.first}'s request`); }
   } catch (error) {
     toast(decideErrorMessage(error));
@@ -783,7 +784,7 @@ function go(screen, params={}, push=true){
   S.screen = screen; S.params = params; render(); window.scrollTo(0,0);
 }
 function back(){ const h = S.hist.pop(); if (h){ S.screen = h.screen; S.params = h.params; render(); window.scrollTo(0,0);} else go('home',{},false); }
-function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, 2600); }
+function toast(msg, success=false){ const t = document.getElementById('toast'); t.classList?.toggle('success', success); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, 2600); }
 
 const NAVMAP = {home:'home', results:'home', detail:'home', mytrips:'mytrips', manage:'mytrips', post:'post', profile:'profile', edit:'profile', stats:'profile', notes:'notes'};
 function nav(){
@@ -1088,7 +1089,7 @@ async function savePickupFromForm(t){
     if (!DB.session) throw Object.assign(new Error('Signed out'), {status:401});
     PICKUP[t.id] = {state:'done', row:await api.savePickupDetails(DB.session.accessToken, t.id, fields)};
     rememberCar(fields); saved = true;
-    toast('Car details saved. Confirmed riders can see them now.');
+    toast('Car details saved. Confirmed riders can see them now.', true);
   } catch (error) {
     toast(error.status === 401 ? 'Your sign-in expired. Log in again, then save.'
       : error.code === '42P01' || error.status === 404 ? "Pickup details aren't turned on in the database yet."
@@ -1248,7 +1249,7 @@ function openRequestDialog(){
     const btn = wrap.querySelector('[data-x="yes"]'), err = wrap.querySelector('#rq-err');
     busy = true; stopTimer(); btn.disabled = true; btn.setAttribute('aria-busy', 'true'); btn.textContent = 'Sending…'; err.hidden = true;
     const res = await sendSeatRequest(t, wrap.querySelector('#rq-note').value.trim());
-    if (res.ok){ close(); S.tripsTab = 'rider'; go('mytrips'); toast(t.dbTrip ? 'Seat request sent. Waiting on the driver.' : `Request sent to ${u.first}`); return; }
+    if (res.ok){ close(); S.tripsTab = 'rider'; go('mytrips'); toast(t.dbTrip ? 'Seat request sent. Waiting on the driver.' : `Request sent to ${u.first}`, true); return; }
     if (res.already){ close(); render(); toast("You've already requested a seat on this trip."); return; }
     err.textContent = res.message; err.hidden = false;
     busy = false; btn.disabled = false; btn.removeAttribute('aria-busy'); btn.textContent = 'Confirm request';
@@ -1264,6 +1265,20 @@ function myDriverTrips(){
 // Cancelling is possible until the trip leaves, and only once.
 const canCancel = t => !t.cancelled && tripGroup(t) !== 'Past';
 const cancelBtn = (t, act, label) => `<button class="link cancel-link" type="button" data-act="${act}" data-id="${t.id}" ${S.cancelling ? 'disabled' : ''} ${S.cancelling === t.id ? 'aria-busy="true"' : ''}>${S.cancelling === t.id ? 'Cancelling…' : label}</button>`;
+// Keep the saved date visible; this is a live, approximate time until departure.
+function departureLabel(iso, now = Date.now()){
+  const ms = Date.parse(iso) - now;
+  if (!Number.isFinite(ms)) return '';
+  if (ms <= 0) return 'Departure time passed';
+  if (ms < 60000) return 'Leaving in less than a minute';
+  if (ms < 3600000){ const mins = Math.ceil(ms / 60000); return `Leaves in ${mins} minute${mins === 1 ? '' : 's'}`; }
+  if (ms < 86400000){ const h = Math.floor(ms / 3600000), m = Math.floor(ms % 3600000 / 60000); return m ? `Leaves in ${h}h ${m}m` : `Leaves in ${h} hour${h === 1 ? '' : 's'}`; }
+  const days = Math.floor(ms / 86400000); return `Leaves in ${days} day${days === 1 ? '' : 's'}`;
+}
+function departureCountdown(t){
+  if (!t.dbTrip || t.cancelled || !['driver','confirmed'].includes(myStatus(t)) || !(Date.parse(t.departureAt) > Date.now())) return '';
+  return `<span class="departure-countdown small" data-departure="${esc(t.departureAt)}">${departureLabel(t.departureAt)}</span>`;
+}
 function driverTripCard(t, compact){
   const d = D(t.dest), pend = t.requests.filter(r => r.status === 'pending').length;
   const head = `<div class="mtop"><div><h3>${esc(d.name)}</h3><div class="small muted tnum">${fDT(t.depart)}</div>${t.dbTrip ? '' : '<div class="small muted">Sample trip</div>'}</div>`;
@@ -1271,6 +1286,7 @@ function driverTripCard(t, compact){
     <p class="small muted">You cancelled this trip. Riders see it as cancelled in My Trips.</p>
     <div class="row"><button class="btn sm" data-act="trip" data-id="${t.id}">View trip</button></div></div>`;
   return `<div class="mcard${compact ? ' mini' : ''}">${head}${pend ? `<span class="pill warn">${pend} pending</span>` : '<span class="pill neutral">No pending</span>'}</div>
+    ${compact ? '' : departureCountdown(t)}
     <div class="small tnum"><b>${seatsLeft(t)}</b> of ${t.seats} seats left · ${money(t.price)} per seat${t.ret ? ' · round trip' : ''}</div>
     <div class="row"><button class="btn sm primary" data-act="manage" data-id="${t.id}">Manage requests</button>${compact ? `<button class="btn sm" data-act="trip" data-id="${t.id}">View as rider</button>` : `<button class="btn sm" data-act="chat" data-id="${t.id}">Group chat</button>`}</div>
     ${!compact && canCancel(t) ? cancelBtn(t, 'canceltrip', 'Cancel trip') : ''}</div>`;
@@ -1321,6 +1337,7 @@ SCREENS.mytrips = () => {
           <div class="row">${canCancel(t) ? `<button class="btn sm" data-act="trip" data-id="${t.id}">View trip</button>` : ''}<button class="btn sm primary" data-act="dest" data-id="${t.dest}">Find another ride</button></div>`
         : `<p class="small muted">${esc(u.first)} couldn't take you on this trip.</p>${findAnother}`;
       return `<div class="mcard${t.cancelled || st === 'cancelled' ? ' cancelled' : ''}"><div class="mtop"><div><h3>${esc(d.name)}</h3><div class="small muted tnum">${fDT(t.depart)}</div>${t.dbTrip ? '' : '<div class="small muted">Sample trip</div>'}</div>${pill}</div>
+        ${departureCountdown(t)}
         <div class="row mmeta"><div class="driver">${av(u,22)}<span class="small">${esc(fullName(u))}</span></div><span class="tnum small"><b>${money(t.price)}</b> · ${t.ret?'round trip':'one way'}</span></div>${acts}</div>`;
     }) : `<div class="empty">${I.ticket}<h2>No trips yet</h2><p class="muted small">Seat requests and confirmed rides will show up here.</p><button class="btn primary" data-act="nav" data-to="home">Find a ride</button></div>`;
   } else {
@@ -1332,6 +1349,16 @@ SCREENS.mytrips = () => {
   <div class="seg seg-lg" role="tablist" aria-label="Show my trips"><button role="tab" aria-selected="${tab==='rider'}" data-act="tab" data-t="rider">As a rider</button><button role="tab" aria-selected="${tab==='driver'}" data-act="tab" data-t="driver">As a driver</button></div>
   ${body}
 </div>${nav()}`;
+};
+
+BIND.mytrips = () => {
+  const update = () => {
+    if (document.hidden) return;
+    document.querySelectorAll('.departure-countdown').forEach(el => { el.textContent = departureLabel(el.dataset.departure); });
+  };
+  const timer = setInterval(update, 30000);
+  document.addEventListener('visibilitychange', update);
+  cleanupCountdowns = () => { clearInterval(timer); document.removeEventListener('visibilitychange', update); };
 };
 
 // Ride cards keep their labels; Post can supply a shorter drop-off label.
@@ -2379,6 +2406,7 @@ const PRESENT_BAR = `<aside class="present-bar" aria-label="Open Hitch on your p
   <a class="present-url" href="https://hitched-carpool.onrender.com/">hitched-carpool.onrender.com</a></div>
 </aside>`;
 function render(){
+  cleanupCountdowns(); cleanupCountdowns = () => {};
   cleanupGasEstimate(); cleanupGasEstimate = () => {};
   cleanupTripDraft(); cleanupTripDraft = () => {};
   cleanupLocationPickers(); cleanupLocationPickers = () => {};

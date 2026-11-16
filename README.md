@@ -537,3 +537,7 @@ Gas cost = one-way miles × (2 for a return, otherwise 1) ÷ MPG × gas price. W
 ### Add a trip to your calendar
 
 Drivers can download a calendar file from Manage requests or Trip details. Confirmed riders can download it from Trip details. **Add to calendar** exports an `.ics` file with the departure and, when included, a separate return pickup event. The times retain their correct time-zone offsets. The file includes meeting details but no private pickup codes or license plates. Import it into your calendar app; it is a one-time export and does not sync later changes or cancellations. No calendar account connection is required.
+
+### Departure countdowns and motion
+
+My Trips shows a live departure countdown on upcoming saved trips for drivers and confirmed riders, alongside the original date. Labels refresh every 30 seconds and when the page becomes visible; cancelled, past, and sample trips do not get countdowns. Publishing has a short checkmark animation, successful seat requests and confirmations get a checked toast, and My Trips cards enter softly. All motion respects the device's reduced-motion preference.
