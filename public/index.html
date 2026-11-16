@@ -6,6 +6,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 48 48%27%3E%3Crect x=%275%27 y=%276%27 width=%279%27 height=%2736%27 rx=%273%27 fill=%27%232F6B55%27/%3E%3Crect x=%2734%27 y=%276%27 width=%279%27 height=%2736%27 rx=%273%27 fill=%27%232F6B55%27/%3E%3Cpath d=%27M13 28 C21 28 27 20 35 20%27 fill=%27none%27 stroke=%27%232F6B55%27 stroke-width=%278%27/%3E%3Cpath d=%27M14 28 C21 28 27 20 34 20%27 fill=%27none%27 stroke=%27%23fff%27 stroke-width=%271.4%27 stroke-dasharray=%272.6 2.2%27/%3E%3C/svg%3E">
 <title>Hitch Carpool</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -316,7 +317,7 @@ const I = {
 };
 
 // ---------- brand: Peak H logo + mountain banner (colors come from hitch.css) ----------
-const LOGO = '<svg viewBox="0 0 48 48" aria-hidden="true"><rect class="mark-leg" x="9" y="8" width="7" height="32" rx="2"/><rect class="mark-leg" x="32" y="8" width="7" height="32" rx="2"/><path class="mark-peak" d="M16 31 L24 20 L32 31"/><circle class="mark-sun" cx="24" cy="11" r="3"/></svg>';
+const LOGO = '<svg viewBox="0 0 48 48" aria-hidden="true"><rect class="mark-leg" x="5" y="6" width="9" height="36" rx="3"/><rect class="mark-leg" x="34" y="6" width="9" height="36" rx="3"/><path class="mark-road" d="M13 28 C21 28 27 20 35 20"/><path class="mark-dash" d="M14 28 C21 28 27 20 34 20"/></svg>';
 const RIDGES = '<svg class="rg-wide" viewBox="0 0 1440 400" preserveAspectRatio="xMidYMax slice" aria-hidden="true"><circle class="r-sun" cx="1180" cy="170" r="54"/><path class="r-1" d="M0 280 L160 200 L290 250 L470 145 L620 235 L780 175 L960 260 L1110 170 L1260 230 L1440 185 V400 H0 Z"/><path class="r-2" d="M0 325 L200 255 L370 305 L540 235 L720 315 L900 248 L1080 320 L1260 260 L1440 305 V400 H0 Z"/><path class="r-3" d="M0 365 L220 320 L420 355 L630 315 L850 365 L1050 325 L1260 360 L1440 335 V400 H0 Z"/></svg><svg class="rg-phone" viewBox="0 0 460 250" preserveAspectRatio="xMidYMax slice" aria-hidden="true"><circle class="r-sun" cx="360" cy="118" r="24"/><path class="r-1" d="M0 170 L60 132 L120 158 L200 106 L270 148 L340 120 L460 160 V250 H0 Z"/><path class="r-2" d="M0 202 L90 170 L170 192 L250 162 L340 198 L460 176 V250 H0 Z"/><path class="r-3" d="M0 232 L100 212 L190 228 L280 208 L370 230 L460 218 V250 H0 Z"/></svg>';
 
 // ---------- destination art (stand-in "photos") ----------
@@ -779,7 +780,7 @@ const NAVMAP = {home:'home', results:'home', detail:'home', mytrips:'mytrips', m
 function nav(){
   const cur = NAVMAP[S.screen];
   const b = (id, icon, label) => `<button data-act="nav" data-to="${id}" ${cur===id?'aria-current="page"':''}>${icon}${label}</button>`;
-  return `<nav class="nav" aria-label="Main"><button class="nav-brand" data-act="nav" data-to="home" aria-label="Hitch home"><span class="logo">${LOGO}</span>Hitch</button>${b('home',I.compass,'Explore')}${b('mytrips',I.ticket,'My Trips')}${b('post',I.plus,'Post a trip')}${DB.session ? noteBell(cur) : ''}<button class="nav-profile" data-act="nav" data-to="profile" aria-label="Profile" ${cur==='profile'?'aria-current="page"':''}>${S.me && DB.session ? av(S.me, 30) : I.user}<span>Profile</span></button></nav>`;
+  return `<nav class="nav" aria-label="Main"><button class="nav-brand" data-act="nav" data-to="home" aria-label="Hitch home"><span class="logo">${LOGO}</span>Hitch</button>${b('home',I.compass,'Explore')}${b('mytrips',I.ticket,'My Trips')}${b('post',I.plus,'Post a trip')}${DB.session ? noteBell(cur) : ''}<button class="nav-profile" data-act="nav" data-to="profile" ${cur==='profile'?'aria-current="page"':''}><span aria-hidden="true" style="display:contents">${S.me && DB.session ? av(S.me, 30) : I.user}</span><span>Profile</span></button></nav>`;
 }
 // Bell with the unread count. The number comes from the database (see loadNotes), so it survives a refresh.
 function noteBell(cur){
@@ -977,7 +978,7 @@ SCREENS.results = () => {
   const from = S.search.from || (S.me.location === 'allowed' ? 'Current location' : 'Provo');
   return `${topbar(d.name, `${esc(from)} → ${esc(d.name)} · ${S.search.date ? fDate(S.search.date) : 'Any date'}`)}
 <div class="screen">
-  <div class="hero rhero">${destArt(d)}<button class="iconbtn" data-act="back" aria-label="Back">${I.back}</button><div class="cap"><div class="small" style="opacity:.9">${esc(from)} →</div><h1>${esc(d.name)}</h1><div class="small" style="opacity:.9">${S.search.date ? fDate(S.search.date) : 'Any date'}</div></div></div>
+  <div class="hero rhero">${destArt(d)}<button class="iconbtn" data-act="back" aria-label="Back">${I.back}</button><div class="cap"><div class="small" style="opacity:.9">${esc(from)} →</div><h1>${esc(d.name)}</h1><div class="small" style="opacity:.9">${S.search.date ? fDate(S.search.date) : 'Any date'}</div></div></div><h2 class="sr-only">Trips to ${esc(d.name)}</h2>
   <div class="row" style="justify-content:space-between"><div class="filters">
     <label class="fdate"><span class="sr-only">Travel date</span><input id="f-date" type="date" value="${esc(S.search.date)}" aria-label="Travel date"></label>
     ${priceSlider()}
@@ -1116,7 +1117,7 @@ SCREENS.detail = () => {
   else action = `<button class="btn primary" data-act="request">Request a seat</button>`;
   return `${topbar('Trip details')}
 <div class="screen detail-layout">
-  <div class="hero">${destArt(d)}<div class="cap"><div class="small" style="opacity:.85">${esc(t.origin || 'Provo')} → </div><h1>${esc(d.name)}</h1></div></div>
+  <div class="hero">${destArt(d)}<div class="cap"><div class="small" style="opacity:.85">${esc(t.origin || 'Provo')} → </div><h1>${esc(d.name)}</h1></div></div><h2 class="sr-only">Trip details</h2>
   ${t.cancelled ? `<div class="alert bad" role="status"><b>This trip was cancelled.</b><span>${st === 'driver' ? 'You cancelled it, so riders can no longer request or ride.' : `${esc(u.first)} cancelled it. Find another ride to ${esc(d.name)}.`}</span></div>` : ''}
   ${!isVerified() && !st && !t.cancelled ? `<div class="alert warn">${I.lock.replace('<svg','<svg width="18" height="18"')}<span>You need a confirmed BYU email before you can request a seat.</span></div>` : ''}
   <div class="dmain">
