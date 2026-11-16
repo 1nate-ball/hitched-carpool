@@ -1,6 +1,59 @@
 # Hitch Carpool
 
-[Live site](https://hitched-carpool.onrender.com) · [Demo video](https://github.com/1nate-ball/hitched-carpool/raw/refs/heads/main/docs/demo.mp4) · [Submission links](SUBMISSION.md)
+**Live URL: https://hitched-carpool.onrender.com**
+
+The free server sleeps when unused, so the first visit can take about a minute. Sign up with a `@byu.edu` email to use everything.
+
+[Demo video](https://github.com/1nate-ball/hitched-carpool/raw/refs/heads/main/docs/demo.mp4) · [Submission links](SUBMISSION.md) · [Features](#features) · [Run it locally](#how-to-get-it-running)
+
+## Features
+
+What a user can do on the live site, as of Sprint 3. **Complete** means it works end to end and saves to the real database. **Not complete** means it isn't built yet, or the screen exists only as a prototype that doesn't save.
+
+**Accounts and profiles**
+
+| Feature | Status |
+|---|---|
+| Sign up with a BYU email (`@byu.edu`), confirmed by an emailed link | Complete |
+| Log in, log out, and stay logged in after a refresh | Complete |
+| Reset a forgotten password by email | Complete |
+| Show or hide passwords, and type the password twice on sign up | Complete |
+| Edit profile: hometown, bio, avatar color, and profile photo | Complete |
+| "Verified" badge for accounts with a confirmed BYU email | Complete |
+| Student ID or driver's license verification | Not complete (planned) |
+
+**Drivers**
+
+| Feature | Status |
+|---|---|
+| Post a trip: route, dates and times, seats, price, and an optional return trip | Complete |
+| Only verified drivers can post (enforced by the database) | Complete |
+| Describe your trip in plain words and let AI fill in the form | Complete |
+| Any destination, with address suggestions and map pins | Complete |
+| Accept or decline seat requests; seats left updates | Complete |
+| Car details and a 4-digit pickup code, shown only to accepted riders | Complete |
+| Cancel a posted trip | Complete |
+| Auto-generated pictures for new destinations | Not complete (new places show a drawn picture) |
+
+**Riders**
+
+| Feature | Status |
+|---|---|
+| Find rides by destination, starting city, and date | Complete |
+| Request a seat with a note | Complete |
+| Cancel a seat request or a confirmed seat (the seat goes back to the trip) | Complete |
+| My Trips: rider and driver views, grouped by Today, This week, and This month | Complete |
+| Full and cancelled trips leave search | Complete |
+| Women-only rides | Not complete ([proposal only](docs/women-only-rides-proposal.md)) |
+
+**Notifications, chat, and admin**
+
+| Feature | Status |
+|---|---|
+| In-app notifications: new seat requests to the driver, accept/decline to the rider | Complete (see [Notifications](#notifications-seat-requests-and-decisions)) |
+| Email and push notifications | Not complete (later work) |
+| Trip group chat | Not complete (the screen is a prototype; messages aren't saved) |
+| Admin-only Hitch stats page with all four Key Results, computed live | Complete |
 
 ## App Summary
 
@@ -307,6 +360,10 @@ Run `python3 -m unittest discover -s tests -v` and `node --test tests/*.cjs` for
 
 4. Open **http://127.0.0.1:8000** in your browser.
 5. The app opens to the Log in screen. Create an account or log in, or choose **Browse trips without logging in**.
+6. Optional: to use **Describe your trip** (AI), copy `.env.example` to `.env` and add your `OPENAI_API_KEY` (see [AI setup](#ai-setup)). Everything else works without it.
+7. Optional: run the automated checks with `python3 -m unittest discover -s tests -v` and `node --test tests/*.cjs` (Node 22).
+
+There is nothing to install: the server uses only Python's standard library. Your local copy connects to the team's Supabase project through `public/supabase-config.json`, which holds only the publishable key, so accounts and trips are the same as on the live site.
 
 Keep the terminal running while using the app. Press **Ctrl+C** to stop it. The database is saved at `data/hitch.sqlite3` and will be used again the next time you start the server.
 
@@ -445,3 +502,26 @@ Until then the app works as before, and the cancel buttons show a "not turned on
 - `node --test tests/test_cancel.cjs` checks the screens and saving, using a fake database.
 - `python3 scripts/check_cancel_schema.py` runs 28 checks against a throwaway local PostgreSQL.
 - To check it live, paste [the cancel check](database/checks/cancel_live.sql) into the SQL Editor. It rolls back everything it creates and should end with a `PASS` row.
+
+## Notifications: seat requests and decisions
+
+Signed-in users get in-app alerts. A bell labelled **Alerts** in the menu shows how many are unread.
+- **Drivers** get one when a rider requests a seat on their trip ("Riley requested a seat on your trip to Moab").
+- **Riders** get one when the driver accepts or declines their request.
+
+Open **Alerts** to see the newest 50. Unread ones are highlighted. Clicking one marks it read and opens **Manage requests** for that trip (driver) or the trip's details (rider). **Mark all read** clears the badge. The list and badge come from the database, so they're the same after a refresh or on another device. While the app is open it checks for new alerts every minute, and shows a short message when one arrives.
+
+**What the database enforces** ([the notifications migration](supabase/migrations/20261118000100_notifications.sql)):
+- Alerts are created by database triggers, only after the request or the accept/decline is actually saved. A refused request (a duplicate, your own trip, a full trip, someone who isn't the driver) creates nothing.
+- One alert per request per event (a unique constraint), so retries never send the same alert twice.
+- Only the recipient can read their alerts or mark them read. Nobody can create, edit, or delete alerts through the API.
+- Alerts hold ids and timestamps only. The list shows the other person's first name, never an email.
+
+Cancelling a request or a trip doesn't send an alert yet. Email and push notifications are later work.
+
+**Database:** run `supabase/migrations/20261118000100_notifications.sql` once in the Supabase SQL Editor. Until then the app works as before, and the Alerts page says notifications aren't turned on yet.
+
+**Checks:**
+- `node --test tests/test_notifications.cjs` checks the bell, the list, opening an alert, and mark read, using a fake database.
+- `python3 scripts/check_notifications_schema.py` runs 36 checks against a throwaway local PostgreSQL.
+- To check it live, paste [the notifications check](database/checks/notifications_live.sql) into the SQL Editor. It rolls back everything it creates and should end with a `PASS` row.
