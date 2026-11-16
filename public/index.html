@@ -147,6 +147,14 @@ input[readonly]{background:var(--surface-2);color:var(--muted)}
 .skel{background:linear-gradient(90deg,var(--surface-2),var(--line),var(--surface-2));background-size:200% 100%;animation:sh 1.2s linear infinite;border-radius:8px}
 @keyframes sh{to{background-position:-200% 0}}
 @media (prefers-reduced-motion:reduce){.skel{animation:none}}
+.present-bar{display:none}
+@media (min-width:960px){
+  .present-bar{order:-2;display:flex;align-items:center;justify-content:center;gap:28px;padding:16px 40px;background:var(--brand-soft);border-bottom:1px solid var(--line)}
+  .present-bar img{width:132px;height:132px;border-radius:8px;background:#fff;padding:6px}
+  .present-kicker{font-size:1.05rem;font-weight:600;color:var(--ink)}
+  .present-url{display:block;font-family:var(--f-display);font-size:2.4rem;font-weight:800;letter-spacing:-.02em;color:var(--brand);text-decoration:none;line-height:1.15}
+  .present-url:hover{text-decoration:underline}
+}
 .banner{display:flex;gap:12px;align-items:flex-start;background:var(--warn-bg);color:var(--warn);border-radius:14px;padding:12px 14px;font-size:.88rem}
 .banner svg{width:20px;height:20px;flex:none;margin-top:1px}
 .banner .link{color:inherit;font-size:.82rem}
@@ -2327,6 +2335,13 @@ async function boot(){
   const generation = DB.generation;
   try { await loadDbTrips(); if (generation === DB.generation && !['post', 'edit', 'chat'].includes(S.screen)) render(); } catch (error) { console.warn('Could not load saved trips:', error.message); }
 }
+// Class presentation: QR code and short link at the top so the room can open Hitch on their phones.
+// Shown on wide screens (the projector) only; phones already have the site open.
+const PRESENT_BAR = `<aside class="present-bar" aria-label="Open Hitch on your phone">
+  <img src="images/hitch-qr.jpeg" width="132" height="132" alt="QR code that opens hitched-carpool.onrender.com">
+  <div><div class="present-kicker">Scan to try Hitch on your phone</div>
+  <a class="present-url" href="https://hitched-carpool.onrender.com/">hitched-carpool.onrender.com</a></div>
+</aside>`;
 function render(){
   cleanupTripDraft(); cleanupTripDraft = () => {};
   cleanupLocationPickers(); cleanupLocationPickers = () => {};
@@ -2337,7 +2352,7 @@ function render(){
   }
   rememberScreen();
   app.dataset.screen = S.screen;
-  app.innerHTML = '<div class="banner small" role="status">Classroom demo · Accounts, profile saving, Post a trip, and seat requests on posted trips use real databases. Other rides, verification, and chat are prototype interactions.</div>' + SCREENS[S.screen]();
+  app.innerHTML = PRESENT_BAR + SCREENS[S.screen]();
   BIND[S.screen]?.();
 }
 document.addEventListener('click', e => {
