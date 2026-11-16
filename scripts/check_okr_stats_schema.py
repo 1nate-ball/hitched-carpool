@@ -56,8 +56,8 @@ try:
 
     # ---------- Known data ----------
     # D1 (verified): trip 1 posted 40 days ago, trip 2 posted 35 days ago -> repeat driver.
-    # D2 (verified): one trip posted 40 days ago -> eligible, not a repeat.
-    # D3 (gmail, not verified): one trip posted today -> not yet eligible for the repeat KR.
+    # D2 (verified): one trip posted 40 days ago -> not a repeat.
+    # D3 (gmail, not verified): one trip posted today -> counted as a driver, not a repeat (yet).
     def trip(driver, seats, posted):
         return sql(f"insert into public.trips (driver_id, destination_id, departure_at, pickup_location, dropoff_location, total_seats, price_per_seat, created_at) values ('{driver}', 'moab', now() + interval '1 day', 'P', 'Moab', {seats}, 20, now() - interval '{posted} days') returning id;").stdout.split()[0]
     A, B, C, E = trip(D1, 4, 40), trip(D1, 2, 35), trip(D2, 3, 40), trip(D3, 2, 0)
@@ -70,7 +70,14 @@ try:
     assert k['drivers_verified'][:4] == ['0.6667', '2', '3', 't'], k   # 2 of 3 drivers verified
     assert k['trips_linked'][:4] == ['1.0000', '4', '4', 't'], k       # every trip has a driver account
     assert k['seat_fill'][:4] == ['0.5417', '4', '7', 't'], k          # average of 0.75 and 0.3333
-    assert k['repeat_drivers'][:4] == ['0.5000', '1', '2', 't'], k     # D1 repeats, D2 doesn't
+    assert k['repeat_drivers'][:4] == ['0.3333', '1', '3', 't'], k     # D1 repeats, D2 and D3 don't
+    count += 1
+
+    # ---------- Live: a driver's second trip makes them a repeat driver on the next call ----------
+    F = trip(D2, 2, 0)
+    assert okr()['repeat_drivers'][:3] == ['0.6667', '2', '3'], okr()  # D1 and D2 now repeat
+    trip(D2, 2, 0)                                                     # a third trip changes nothing
+    assert okr()['repeat_drivers'][:3] == ['0.6667', '2', '3'], okr()
     count += 1
 
     # ---------- Live: an accept changes the seat fill on the next call ----------

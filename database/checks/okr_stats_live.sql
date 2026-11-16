@@ -18,7 +18,7 @@ declare
     "drivers_verified": "20261108000100_driver_verification.sql",
     "trips_linked": "20261108000200_kr_trips_linked_to_driver.sql",
     "seat_fill": "20261115000100_cancel_request_or_trip.sql",
-    "repeat_drivers": "20261101000100_kr_driver_repeat_rate.sql"}';
+    "repeat_drivers": "20261101000100_kr_driver_repeat_rate.sql, then 20261119000100_kr_repeat_drivers_any.sql"}';
 begin
   -- What the stats page gets, read as the admin through the same function the app calls.
   perform set_config('request.jwt.claim.sub','0c4e5a11-1111-4111-8111-111111111111',true);

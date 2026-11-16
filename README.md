@@ -89,7 +89,7 @@ The database computes every number from `trips`, `ride_requests`, and Supabase A
 | Objective 1, KR 1: drivers are verified | 100% | `kr_driver_verification_summary` |
 | Objective 1, KR 2: trips linked to a driver account | 100% | `kr_trip_driver_link_summary` |
 | Objective 2: posted trips average 70% of seats filled | 70% | `kr_seat_fill_rate` |
-| Objective 2: drivers post a second trip within 30 days | 50% | `kr_driver_repeat_rate_summary` |
+| Objective 2: drivers post a second trip | 50% | `kr_driver_repeat_rate_summary` |
 
 The page calls `okr_stats()` ([migration](supabase/migrations/20261117000100_okr_stats.sql)), which returns one row per Key Result with counts and rates only (no ids, names, or emails). Only accounts in `admins` can call it (see the seat fill section below for how to add one). If a Key Result's view hasn't been created in the database yet, that card shows "Not set up yet" and the others still load.
 
@@ -206,14 +206,16 @@ The database enforces the rules, not just the buttons:
 
 Locally, `python3 scripts/check_accept_decline_schema.py` runs 18 checks against a throwaway PostgreSQL, including two accepts racing for the last seat, and `node --test tests/test_accept_decline.cjs` checks the Manage requests screen. To check it live, run [the accept/decline check](database/checks/accept_decline_live.sql) in the SQL Editor; it rolls back everything it creates and should end with a `PASS` row.
 
-**Objective 2, Key Result: 50% of drivers post a second trip within 30 days of their first.**
+**Objective 2, Key Result: 50% of drivers post a second trip.**
 
-This one uses the Supabase `trips` table, where the Post a Trip form saves trips. Each driver's first and second trips are found by `trips.created_at`. A driver counts as a repeat driver if their second trip was posted no more than 30 days after their first. Only drivers whose first trip was at least 30 days ago are counted, so new drivers who haven't had a full 30 days yet don't pull the rate down.
+This one uses the Supabase `trips` table, where the Post a Trip form saves trips. A driver is anyone who has posted at least one trip. A driver counts as a repeat driver as soon as they post their second trip, so the number changes on the next refresh.
 
-Two views in [the repeat-rate migration](supabase/migrations/20261101000100_kr_driver_repeat_rate.sql) compute it:
+We first measured "a second trip within 30 days, counting only drivers whose first trip is at least 30 days old." That couldn't show any data until a driver's first trip was a month old, which is longer than the sprint. [The redefinition](supabase/migrations/20261119000100_kr_repeat_drivers_any.sql) counts every driver and keeps the same view names and columns.
 
-- `kr_driver_repeat_rate` has one row per eligible driver: `driver_id`, `first_trip_at`, `second_trip_at`, and `is_repeat`.
-- `kr_driver_repeat_rate_summary` has one row: `eligible_drivers`, `repeat_drivers`, and `repeat_rate` (a percent).
+Two views, created in [the repeat-rate migration](supabase/migrations/20261101000100_kr_driver_repeat_rate.sql) and redefined in the migration above, compute it:
+
+- `kr_driver_repeat_rate` has one row per driver: `driver_id`, `first_trip_at`, `second_trip_at`, and `is_repeat`.
+- `kr_driver_repeat_rate_summary` has one row: `eligible_drivers` (every driver), `repeat_drivers`, and `repeat_rate` (a percent).
 
 Both views are private. They can be read from the Supabase SQL Editor but not through the app's public API, so driver activity isn't exposed to the browser. To check the current number, run this in the SQL Editor:
 
@@ -221,9 +223,9 @@ Both views are private. They can be read from the Supabase SQL Editor but not th
 select * from public.kr_driver_repeat_rate_summary;
 ```
 
-`repeat_rate` is empty until at least one driver's first trip is 30 days old.
+`repeat_rate` is empty until someone posts a trip.
 
-To check the math, paste [the repeat-rate check](database/checks/kr_driver_repeat_rate_seed.sql) into the SQL Editor and run it. It adds four test drivers inside a transaction, checks for 3 eligible drivers, 1 repeat driver, and 33.3%, and then rolls everything back. It should end with a `PASS` row.
+To check the math, paste [the repeat-rate check](database/checks/kr_driver_repeat_rate_seed.sql) into the SQL Editor and run it. It adds four test drivers inside a transaction, checks for 4 drivers, 2 repeat drivers, and 50.0%, and then rolls everything back. It should end with a `PASS` row.
 
 **Objective 1, Key Result 2: 100% of posted trips are linked to a signed-in driver account (no anonymous trips).**
 

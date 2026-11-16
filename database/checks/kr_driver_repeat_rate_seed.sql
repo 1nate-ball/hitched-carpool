@@ -1,11 +1,12 @@
 -- Test data for the driver repeat-rate KR. Run as postgres in the Supabase SQL Editor
--- after 20261101000100_kr_driver_repeat_rate.sql. Synthetic drivers and trips exist
--- ONLY inside this transaction; ROLLBACK removes them. Real trips are ignored by the check.
---   A: first trip 60 days ago, second 45 days ago -> repeat
---   B: first trip 50 days ago, second 10 days ago -> not repeat (gap > 30 days)
---   C: one trip 40 days ago                       -> not repeat
---   D: first trip 5 days ago                      -> not eligible yet
--- Expected: 3 eligible, 1 repeat, 33.3%.
+-- after 20261101000100_kr_driver_repeat_rate.sql and 20261119000100_kr_repeat_drivers_any.sql.
+-- Synthetic drivers and trips exist ONLY inside this transaction; ROLLBACK removes them.
+-- Real trips are ignored by the check.
+--   A: two trips (60 and 45 days ago)  -> repeat
+--   B: two trips (50 and 10 days ago)  -> repeat (any gap counts)
+--   C: one trip 40 days ago            -> not repeat
+--   D: one trip 5 days ago             -> counted, not repeat
+-- Expected: 4 drivers, 2 repeat, 50.0%.
 begin;
 insert into auth.users (id, email) values
  ('00000000-0000-4000-8000-00000000000a', 'hitch-kr-a@example.invalid'),
@@ -30,16 +31,16 @@ begin
   select count(*), count(*) filter (where is_repeat) into eligible, repeats
   from public.kr_driver_repeat_rate
   where driver_id::text like '00000000-0000-4000-8000-00000000000_';
-  if eligible <> 3 or repeats <> 1 or round(100.0 * repeats / eligible, 1) <> 33.3 then
-    raise exception 'Expected 3 eligible, 1 repeat, 33.3%%; got %, %', eligible, repeats;
+  if eligible <> 4 or repeats <> 2 or round(100.0 * repeats / eligible, 1) <> 50.0 then
+    raise exception 'Expected 4 drivers, 2 repeat, 50.0%%; got %, %', eligible, repeats;
   end if;
   if not (select is_repeat from public.kr_driver_repeat_rate where driver_id = '00000000-0000-4000-8000-00000000000a') then
     raise exception 'Driver A should be a repeat driver';
   end if;
-  if exists (select 1 from public.kr_driver_repeat_rate where driver_id = '00000000-0000-4000-8000-00000000000d') then
-    raise exception 'Driver D should not be eligible yet';
+  if (select is_repeat from public.kr_driver_repeat_rate where driver_id = '00000000-0000-4000-8000-00000000000d') then
+    raise exception 'Driver D has one trip and should not be a repeat driver';
   end if;
 end $$;
 
 rollback;
-select 'PASS: 3 eligible, 1 repeat, 33.3%; all synthetic rows rolled back' as verification;
+select 'PASS: 4 drivers, 2 repeat, 50.0%; all synthetic rows rolled back' as verification;
