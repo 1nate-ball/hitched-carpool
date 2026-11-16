@@ -533,3 +533,7 @@ Cancelling a request or a trip doesn't send an alert yet. Email and push notific
 Expand **Estimate gas per seat** and choose the vehicle year, make, model, and engine/transmission. FuelEconomy.gov supplies EPA combined MPG and a national fuel-price starting point. Miles, MPG, and gas price are editable; manual entry still works when the service is unavailable. Selected pickup/drop-off pins can prefill rough road miles (straight-line distance × 1.2); drivers should adjust this for their route.
 
 Gas cost = one-way miles × (2 for a return, otherwise 1) ÷ MPG × gas price. We split it equally between the driver and all offered seats. **Use estimated price** rounds up to whole dollars and updates the existing price field; it never publishes the trip. This estimates fuel only, assumes every offered seat fills, and needs no AI key or paid service. Electric and plug-in vehicles do not receive a gasoline MPG estimate.
+
+### Add a trip to your calendar
+
+Drivers can download a calendar file from Manage requests or Trip details. Confirmed riders can download it from Trip details. **Add to calendar** exports an `.ics` file with the departure and, when included, a separate return pickup event. The times retain their correct time-zone offsets. The file includes meeting details but no private pickup codes or license plates. Import it into your calendar app; it is a one-time export and does not sync later changes or cancellations. No calendar account connection is required.

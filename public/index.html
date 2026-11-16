@@ -477,7 +477,7 @@ function fromRow(r){ // Supabase trips row -> the trip shape the screens already
   return {id:r.id, dest:r.destination_id, driver, depart:denverWall(new Date(r.departure_at)),
     ret:r.return_at ? denverWall(new Date(r.return_at)) : null, seats:r.total_seats, price:r.price_per_seat,
     pickup:r.pickup_location, dropoff:r.dropoff_location, vehicle:null, // no vehicle column yet: hide the line
-    passengers:[], requests:[], departureAt:r.departure_at, origin:r.origin_city || 'Provo',
+    passengers:[], requests:[], departureAt:r.departure_at, returnAt:r.return_at, origin:r.origin_city || 'Provo',
     pickupPin:r.pickup_latitude == null ? null : {lat:r.pickup_latitude,lng:r.pickup_longitude},
     dropoffPin:r.dropoff_latitude == null ? null : {lat:r.dropoff_latitude,lng:r.dropoff_longitude},
     available:r.seats_available, cancelled:!!r.cancelled_at, dbTrip:true}; // requests, passengers and seats left are filled in by loadDbTrips
@@ -1105,6 +1105,21 @@ const CAR_KEY = () => `hitch-car-${DB.session?.user.id || ''}`;
 function rememberCar(fields){ try { localStorage.setItem(CAR_KEY(), JSON.stringify(fields)); } catch { /* storage blocked */ } }
 function rememberedCar(){ try { return JSON.parse(localStorage.getItem(CAR_KEY())) || {}; } catch { return {}; } }
 
+// A download only; adding it to a calendar is the student's choice.
+function calendarAllowed(t){ return !!t?.dbTrip && !t.cancelled && ['driver','confirmed'].includes(myStatus(t)) && Date.parse(t.departureAt)>Date.now(); }
+function calendarButton(t){ return calendarAllowed(t) ? `<button class="btn sm" type="button" data-act="calendar" data-id="${t.id}">Add to calendar</button>` : ''; }
+async function exportTripCalendar(t, button){
+  if (!calendarAllowed(t) || button.disabled) return;
+  const generation=DB.generation; button.disabled=true; button.textContent='Preparing…';
+  try {
+    const module=await import('/hitch-calendar.js');
+    if(generation!==DB.generation || !calendarAllowed(t)) return;
+    module.downloadCalendar({id:t.id,origin:t.origin || 'Provo',destination:D(t.dest).name,pickup:t.pickup,dropoff:t.dropoff,departureAt:t.departureAt,returnAt:t.returnAt || (t.ret ? denverISO(t.ret).iso : null)});
+    toast('Open the calendar file to add your trip.');
+  } catch { toast('Could not create the calendar file. Refresh and try again.'); }
+  finally {button.disabled=false;button.textContent='Add to calendar';}
+}
+
 /* Screen 5: Trip details / request a seat */
 SCREENS.detail = () => {
   const t = TRIPS.find(x => x.id === S.params.id), load = S.detailLoad || {};
@@ -1135,7 +1150,7 @@ SCREENS.detail = () => {
       <dt>Leaves</dt><dd>${fDT(t.depart)}</dd>
       <dt>Pickup</dt><dd>${esc(t.pickup)} ${pinLink(t.pickupPin, 'pickup')}</dd>
       <dt>${DROP_LABEL}</dt><dd>${esc(t.dropoff)} ${pinLink(t.dropoffPin, 'arrival')}</dd>
-    </dl></div>
+    </dl>${calendarButton(t)}</div>
   <div class="card"><div class="section-head"><h3>Return trip</h3>${t.ret ? '<span class="pill accent">Included</span>' : '<span class="pill neutral">Not included</span>'}</div>
     ${t.ret ? `<dl class="kv wide tnum" style="margin:0"><dt>Return pickup</dt><dd>${fDT(t.ret)}</dd><dt>Route</dt><dd>${esc(d.name)} → ${esc(t.origin || 'Provo')}</dd></dl><p class="small muted" style="margin:8px 0 0">Confirm the return meeting spot with the driver.</p>` : '<p class="small muted" style="margin:0">One-way trip. Riders arrange their own ride back.</p>'}</div>
   <div class="card"><h3>Driver</h3>
@@ -1652,7 +1667,7 @@ SCREENS.manage = () => {
   ${t.cancelled ? '<div class="alert bad" role="status"><b>You cancelled this trip.</b><span>Requests can no longer be accepted, and riders see it as cancelled in My Trips.</span></div>' : ''}
   ${demo ? `<div class="alert info small"><b>Prototype driver view.</b> You're seeing this trip as ${esc(fullName(drv))} so you can accept or decline your own request.</div>` : ''}
   <div class="card"><div class="mtop"><div><h3>${esc(d.name)}</h3><div class="small muted tnum">${fDT(t.depart)}</div></div><span class="tnum"><b>${money(t.price)}</b><span class="small muted"> / seat</span></span></div>
-    <div class="small tnum"><b>${left}</b> of ${t.seats} seats left · ${t.ret ? `Returns ${fDT(t.ret)}` : 'One-way'}</div></div>
+    <div class="small tnum"><b>${left}</b> of ${t.seats} seats left · ${t.ret ? `Returns ${fDT(t.ret)}` : 'One-way'}</div>${calendarButton(t)}</div>
   ${!demo && t.driver === 'me' ? pickupEditor(t) : ''}
   <div class="section"><div class="section-head"><h2>Pending requests</h2><span class="small muted">${pend.length}</span></div>
     ${pend.length ? pend.map(r => { const u = U(r.uid); return `<div class="rq"><div class="driver">${av(u,44)}<div style="min-width:0"><div class="nm">${esc(fullName(u))}${r.uid==='me'?' (you)':''}</div><div class="small muted">${esc(u.hometown || '')}</div></div><span style="margin-left:auto">${vBadge(u)}</span></div>
@@ -2390,6 +2405,7 @@ document.addEventListener('click', e => {
     case 'retrysearch': searchDbTrips(); break;
     case 'viewmytrips': S.tripsTab = 'driver'; S.hist = []; go('mytrips',{},false); break;
     case 'clearf': S.filters = {max:'', round:false}; S.search.date = ''; render(); break;
+    case 'calendar': exportTripCalendar(TRIPS.find(t => t.id === id), el); break;
     case 'trip': S.detailLoad = null; go('detail', {id}); break;
     case 'request': openRequestDialog(); break;
     case 'tab': S.tripsTab = el.dataset.t; render(); break;
