@@ -468,12 +468,38 @@ textarea{border-radius:16px}
   .app[data-screen="forgot"] .auth-form,.app[data-screen="reset"] .auth-form{padding:26px 20px}
 }
 
-/* Optional AI helper, scoped to Post a trip. */
-#ptForm > .trip-ai{grid-column:1/-1;border-color:var(--brand);gap:12px}
+/* Keep optional tools quiet and the route easy to scan on a phone. */
+#ptForm > .post-disclosure{grid-column:1/-1;display:block;padding:8px 16px}
+#ptForm .post-disclosure summary{display:flex;align-items:center;gap:10px;min-height:44px;list-style:none;font-weight:700;cursor:pointer}
+#ptForm .post-disclosure summary::-webkit-details-marker{display:none}
+#ptForm .post-disclosure summary .small{margin-left:auto;font-weight:500}
+#ptForm .post-disclosure summary::after{content:"";width:7px;height:7px;flex:none;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg);margin:0 3px 4px 0}
+#ptForm .post-disclosure[open] summary::after{transform:rotate(225deg);margin-top:6px}
+#ptForm .post-disclosure-body{display:flex;flex-direction:column;gap:14px;padding:12px 0 8px}
+#ptForm .post-disclosure-body p,#ptForm #pt-covers{margin:0}
 #ptForm .trip-ai textarea{min-height:100px;resize:vertical}
 #ptForm .trip-ai p:empty{display:none}
 #ptForm .trip-ai #pt-ai-status{overflow-wrap:anywhere}
 #ptForm .trip-ai .btn{min-height:44px}
+#ptForm .post-pricing{align-items:end}
+#ptForm .post-review{gap:12px}
+#ptForm .post-review p{margin:0}
+#ptForm .review-route{overflow-wrap:anywhere}
+#ptForm .review-stops{display:grid;grid-template-columns:64px minmax(0,1fr);gap:6px 12px;margin:12px 0}
+#ptForm .review-stops dt{color:var(--muted)}
+#ptForm .review-stops dd{margin:0;overflow-wrap:anywhere}
+#ptForm .review-price{border-top:1px solid var(--line);padding-top:12px}
+#ptForm .post-return{gap:12px}
+#pt-tips:empty{display:none}
+#pt-tips p{margin:0}
+@media (min-width:960px){
+  .post-layout #ptForm{grid-template-columns:minmax(0,1fr)}
+  #ptForm .post-review{display:none}
+}
+@media (min-width:1200px){
+  #ptForm > .post-schedule{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:end;gap:16px 20px}
+  #ptForm > .post-schedule > .eyebrow{grid-column:1/-1}
+}
 
 /* ---------- My Trips visual hierarchy (design review, Module 06) ----------
    Finding 1: the rider/driver toggle leads the page; trip cards are compact so they compete less.

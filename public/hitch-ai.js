@@ -80,11 +80,11 @@ export function bindTripDraft({form, getSession, getAccount, isCurrent}) {
       const count = applyTripDraft(form,result.fields,dirty);
       applying = false;
       status.textContent = count
-        ? 'AI filled '+count+' detail'+(count===1?'':'s')+'. Review the form, complete anything missing, then publish. Your existing entries were kept.'
+        ? 'AI filled '+count+' detail'+(count===1?'':'s')+'. Review the form before publishing.'
         : 'No blank fields were filled. Try a more specific description, or complete the form yourself.';
       if (Array.isArray(result.missing) && result.missing.length) {
         const missing = result.missing.filter(x => typeof x === 'string' && x.length <= 40).slice(0,10);
-        if (missing.length) status.textContent += ' Not supplied by AI: '+missing.join(', ')+'.';
+        if (missing.length) status.textContent += ' Still needed: '+missing.join(', ')+'.';
       }
     } catch(error) {
       if (active && isCurrent() && request === version && getAccount() === owner) {

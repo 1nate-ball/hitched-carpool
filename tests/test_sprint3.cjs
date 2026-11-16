@@ -169,12 +169,12 @@ test('profile photos (Nathan\'s upload) still show; no photo shows initials', ()
   assert.match(run("av({first:'Robbie',last:'McVey',color:'#000',photo:null})"), />RM</);
 });
 
-test('"Drop off" is renamed to "Arrival destination" on cards, details, and the form', () => {
+test('Post uses a clear drop-off address label while existing ride cards keep their wording', () => {
   const {run} = fixture();
   assert.match(run("routeHTML('A','B')"), /Arrival destination/);
   run("S.me.verified = 'verified'; DB.session = {user:{email:'r@byu.edu'}};");
   const form = run('SCREENS.post()');
-  assert.match(form, /<label for="pt-dropoff">Arrival destination<\/label>/);
+  assert.match(form, /<label for="pt-dropoff">Drop-off address<\/label>/);
   assert.match(form, /Return pickup date<\/label>/);
   assert.doesNotMatch(form + run("routeHTML('A','B')"), /Drop-off at destination/);
 });

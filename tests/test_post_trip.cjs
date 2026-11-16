@@ -78,6 +78,29 @@ test('separate date and time fields preserve Mountain Time and the return timest
   assert.equal(f.rows[0].return_at,'2099-11-07T18:30:00-07:00');
 });
 
+test('mobile review follows edited route and return values, escapes addresses, and explains the total price',()=>{
+  const f=fixture();
+  f.get('pt-origin').value='Orem'; f.get('pt-pickup').value='<script>unsafe</script>';
+  f.get('pt-ret').checked=true; f.get('pt-return').value='2099-11-07'; f.get('pt-return-time').value='18:30';
+  f.get('pt-ret').listeners.change(); f.get('ptForm').listeners.change();
+  const review=f.get('pt-mobile-review').innerHTML;
+  assert.match(review,/Orem → Moab/); assert.match(review,/&lt;script&gt;unsafe&lt;\/script&gt;/);
+  assert.doesNotMatch(review,/<script>/); assert.match(review,/Returns/);
+  assert.match(review,/3 seats · \$25 per seat · round trip/);
+  assert.equal(f.get('pt-price-label').textContent,'Round-trip price per seat ($)');
+  f.get('pt-ret').checked=false; f.get('pt-ret').listeners.change(); f.get('ptForm').listeners.change();
+  assert.doesNotMatch(f.get('pt-mobile-review').innerHTML,/Returns/);
+  assert.match(f.get('pt-mobile-review').innerHTML,/one way/);
+  assert.equal(f.get('pt-price-label').textContent,'Price per seat ($)');
+});
+
+test('invalid car details reopen their disclosure and prevent publishing',async()=>{
+  const f=fixture(); f.get('pt-car-details').open=false; f.get('pt-plate').value='!invalid!';
+  await f.submit();
+  assert.equal(f.rows.length,0); assert.equal(f.get('pt-car-details').open,true);
+  assert.equal(f.get('pt-plate').focused,true);
+});
+
 test('save waits for confirmation and suppresses concurrent submissions',async()=>{
   const f=fixture(); let resolve, calls=0;
   const publish=f.api.publishTrip;

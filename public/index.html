@@ -1242,7 +1242,7 @@ const canCancel = t => !t.cancelled && tripGroup(t) !== 'Past';
 const cancelBtn = (t, act, label) => `<button class="link cancel-link" type="button" data-act="${act}" data-id="${t.id}" ${S.cancelling ? 'disabled' : ''} ${S.cancelling === t.id ? 'aria-busy="true"' : ''}>${S.cancelling === t.id ? 'Cancelling…' : label}</button>`;
 function driverTripCard(t, compact){
   const d = D(t.dest), pend = t.requests.filter(r => r.status === 'pending').length;
-  const head = `<div class="mtop"><div><h3>${esc(d.name)}</h3><div class="small muted tnum">${fDT(t.depart)}</div></div>`;
+  const head = `<div class="mtop"><div><h3>${esc(d.name)}</h3><div class="small muted tnum">${fDT(t.depart)}</div>${t.dbTrip ? '' : '<div class="small muted">Sample trip</div>'}</div>`;
   if (t.cancelled) return `<div class="mcard cancelled${compact ? ' mini' : ''}">${head}<span class="pill bad">Trip cancelled</span></div>
     <p class="small muted">You cancelled this trip. Riders see it as cancelled in My Trips.</p>
     <div class="row"><button class="btn sm" data-act="trip" data-id="${t.id}">View trip</button></div></div>`;
@@ -1256,13 +1256,12 @@ function postedTripsSection(){
   return `<h2 id="pt-mine-h">Your posted trips <span class="muted small" style="font-weight:600">${mine.length ? `· ${mine.length}` : ''}</span></h2>
     ${mine.length ? `<div class="mine-grid">${mine.map(t => driverTripCard(t, true)).join('')}</div>
       <button class="link" type="button" data-act="viewmytrips">See everything in My Trips</button>`
-    : `<p class="muted small">Trips you publish show up here, so you can manage requests without leaving this page.</p>`}`;
+    : `<p class="muted small">Your trips will appear here.</p>`}`;
 }
 // Group trips by when they leave: Today / This week / This month / Later / Past.
-// Sample trips are measured against the prototype NOW; real (database) trips against the current Utah time.
+// Sample and saved trips use the same current Utah time.
 const TRIP_GROUPS = ['Today', 'This week', 'This month', 'Later', 'Past'];
-function tripGroup(t){
-  const now = t.dbTrip ? parse(denverWall(new Date())) : NOW;
+function tripGroup(t, now = parse(denverWall(new Date()))){
   const dep = parse(t.depart);
   const day = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   if (dep < now) return 'Past';
@@ -1297,7 +1296,7 @@ SCREENS.mytrips = () => {
         : st === 'cancelled' ? `<p class="small muted">You cancelled this request${canCancel(t) ? '. You can request it again if plans change.' : '.'}</p>
           <div class="row">${canCancel(t) ? `<button class="btn sm" data-act="trip" data-id="${t.id}">View trip</button>` : ''}<button class="btn sm primary" data-act="dest" data-id="${t.dest}">Find another ride</button></div>`
         : `<p class="small muted">${esc(u.first)} couldn't take you on this trip.</p>${findAnother}`;
-      return `<div class="mcard${t.cancelled || st === 'cancelled' ? ' cancelled' : ''}"><div class="mtop"><div><h3>${esc(d.name)}</h3><div class="small muted tnum">${fDT(t.depart)}</div></div>${pill}</div>
+      return `<div class="mcard${t.cancelled || st === 'cancelled' ? ' cancelled' : ''}"><div class="mtop"><div><h3>${esc(d.name)}</h3><div class="small muted tnum">${fDT(t.depart)}</div>${t.dbTrip ? '' : '<div class="small muted">Sample trip</div>'}</div>${pill}</div>
         <div class="row mmeta"><div class="driver">${av(u,22)}<span class="small">${esc(fullName(u))}</span></div><span class="tnum small"><b>${money(t.price)}</b> · ${t.ret?'round trip':'one way'}</span></div>${acts}</div>`;
     }) : `<div class="empty">${I.ticket}<h2>No trips yet</h2><p class="muted small">Seat requests and confirmed rides will show up here.</p><button class="btn primary" data-act="nav" data-to="home">Find a ride</button></div>`;
   } else {
@@ -1311,14 +1310,14 @@ SCREENS.mytrips = () => {
 </div>${nav()}`;
 };
 
-// Outbound route with labelled stops. Same wording on cards, preview, details, and the request dialog.
+// Ride cards keep their labels; Post can supply a shorter drop-off label.
 const DROP_LABEL = 'Arrival destination';
-function routeHTML(pickup, dropoff){
-  return `<div class="route" aria-label="Outbound trip"><span class="dot"></span><span><span class="lbl">Pickup</span>${pickup}</span><span class="line"></span><span></span><span class="dot end"></span><span><span class="lbl">${DROP_LABEL}</span>${dropoff}</span></div>`;
+function routeHTML(pickup, dropoff, dropLabel = DROP_LABEL){
+  return `<div class="route" aria-label="Outbound trip"><span class="dot"></span><span><span class="lbl">Pickup</span>${pickup}</span><span class="line"></span><span></span><span class="dot end"></span><span><span class="lbl">${dropLabel}</span>${dropoff}</span></div>`;
 }
 
 function locationPicker(kind){
-  const label = kind === 'pickup' ? 'pickup' : 'arrival';
+  const label = kind === 'pickup' ? 'pickup' : 'drop-off';
   return `<div id="pt-${kind}-picker" class="location-field">
     <div class="location-input"><input id="pt-${kind}" type="text" maxlength="120" autocomplete="off" placeholder="Search an address or place" required aria-describedby="${kind === 'dropoff' ? 'pt-drophint ' : ''}pe-${kind}">
       <button id="pt-${kind}-open" class="iconbtn" type="button" aria-label="Choose ${label} on map" aria-haspopup="dialog">${I.pin}</button></div>
@@ -1331,7 +1330,7 @@ function locationPicker(kind){
       <div id="pt-${kind}-places" class="place-suggestions"></div>
       <div id="pt-${kind}-map" class="location-map" aria-label="${label} map"></div>
       <div class="location-map-actions"><button class="btn sm" type="button" id="pt-${kind}-center">Use map center</button><span id="pt-${kind}-map-status" class="small muted" role="status">Search a place or tap the map.</span></div>
-      <div class="row"><button id="pt-${kind}-cancel" class="btn" type="button">Cancel</button><button id="pt-${kind}-confirm" class="btn primary" type="button">Use this location</button></div>
+      <div class="row"><button id="pt-${kind}-cancel" class="btn" type="button">Cancel</button><button id="pt-${kind}-confirm" class="btn primary" type="button" disabled>Use this location</button></div>
     </dialog>
   </div>`;
 }
@@ -1342,43 +1341,48 @@ function pinLink(pin, label){
 SCREENS.post = () => {
   if (!isVerified()) return `<header class="topbar"><div class="title"><h2>Post a trip</h2></div></header>
 <div class="screen">${pendingBanner()}<div class="empty">${I.lock}<h2>Verify your BYU email to post trips</h2><p class="muted small">Only verified drivers can offer rides. Posting unlocks once your account has a confirmed byu.edu email.</p><button class="btn" data-act="nav" data-to="home">Browse trips instead</button></div></div>${nav()}`;
-  return `<header class="topbar"><div class="title"><h2>Post a trip</h2><div class="small muted">Offer seats in your car · Posting as ${esc(DB.session?.user.email || '')} · <button class="link" type="button" data-act="logout">Log out</button></div></div></header>
+  return `<header class="topbar"><div class="title"><h2>Post a trip</h2></div></header>
 <div class="screen post-layout">
 <form id="ptForm" novalidate>
-  <div class="fieldset trip-ai"><div class="eyebrow">Optional · AI trip draft</div>
-    <div class="field"><label for="pt-ai-description">Describe your trip</label><textarea id="pt-ai-description" maxlength="2000" rows="3" aria-describedby="pt-ai-hint" placeholder="Provo to Moab on November 20, 2026 at 4 PM. Pickup at the Wilkinson Center. 3 seats, $25 each."></textarea></div>
-    <p id="pt-ai-hint" class="small muted">Your description is sent to OpenAI to fill blank trip fields. Include exact dates and times, then review the result before publishing.</p>
-    <div><button id="pt-ai-fill" class="btn" type="button">Fill trip details</button></div>
-    <p id="pt-ai-status" class="small" role="status" aria-live="polite" aria-atomic="true"></p>
-  </div>
+  <details class="fieldset post-disclosure trip-ai"><summary>Auto-fill with AI <span class="small muted">Optional</span></summary>
+    <div class="post-disclosure-body">
+      <div class="field"><label for="pt-ai-description">Describe your trip</label><textarea id="pt-ai-description" maxlength="2000" rows="3" aria-describedby="pt-ai-hint" placeholder="Provo to Moab, November 20, 2026 at 4 PM. 3 seats, $25 each."></textarea></div>
+      <p id="pt-ai-hint" class="small muted">Sends this description to OpenAI to fill blank fields. Use exact dates and times.</p>
+      <div><button id="pt-ai-fill" class="btn" type="button">Fill trip details</button></div>
+      <p id="pt-ai-status" class="small" role="status" aria-live="polite" aria-atomic="true"></p>
+    </div>
+  </details>
   <div class="fieldset post-route"><div class="eyebrow">Outbound route</div>
-    <div class="field"><label for="pt-dest-name">Destination</label><input id="pt-dest-name" type="text" maxlength="80" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="pt-dest-options" placeholder="Type any city, park, or place" required aria-describedby="pt-desthint pe-dest"><input id="pt-dest" type="hidden" value="">
+    <div class="field"><label for="pt-origin">Starting city</label><input id="pt-origin" type="text" maxlength="80" value="Provo" required aria-describedby="pe-origin"><div class="err" id="pe-origin"></div></div>
+    <div class="field"><label for="pt-dest-name">Destination city</label><input id="pt-dest-name" type="text" maxlength="80" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="pt-dest-options" placeholder="City, park, or place" required aria-describedby="pe-dest"><input id="pt-dest" type="hidden" value="">
       <div id="pt-dest-options" class="place-suggestions" role="listbox" aria-label="Destination suggestions" hidden></div>
       <span id="pt-dest-status" class="sr-only" role="status"></span>
-      <div class="small muted" id="pt-desthint">Pick a suggestion or type your own. New places are added for other riders to search.</div><div class="err" id="pe-dest"></div></div>
-    <div class="field"><label for="pt-origin">Starting city</label><input id="pt-origin" type="text" maxlength="80" value="Provo" required aria-describedby="pe-origin"><div class="err" id="pe-origin"></div></div>
-    <div class="two-desk"><div class="field"><label for="pt-pickup">Pickup location</label>${locationPicker('pickup')}<div class="err" id="pe-pickup"></div></div>
-    <div class="field"><label for="pt-dropoff">Arrival destination</label>${locationPicker('dropoff')}<div class="small muted" id="pt-drophint">Where riders get out when you <b>arrive</b> on the way there. Driving them back later? That is the <b>return</b> trip below.</div><div class="err" id="pe-dropoff"></div></div></div>
+      <div class="err" id="pe-dest"></div></div>
+    <div class="two-desk"><div class="field"><label for="pt-pickup">Pickup address</label>${locationPicker('pickup')}<div class="err" id="pe-pickup"></div></div>
+    <div class="field"><label for="pt-dropoff">Drop-off address</label>${locationPicker('dropoff')}<div class="small muted" id="pt-drophint">Where riders get out at your destination.</div><div class="err" id="pe-dropoff"></div></div></div>
     <div class="small muted">Address data © <a class="link" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></div>
   </div>
   <div class="fieldset post-schedule"><div class="eyebrow">Departure · Mountain Time</div>
     <div class="post-date-time"><div class="field"><label for="pt-depart">Departure date</label><input id="pt-depart" type="date" required aria-describedby="pe-depart"><div class="err" id="pe-depart"></div></div>
     <div class="field"><label for="pt-time">Departure time</label><input id="pt-time" type="time" required aria-describedby="pe-time"><div class="err" id="pe-time"></div></div></div>
-    <div class="two"><div class="field"><label for="pt-seats">Available seats</label><input id="pt-seats" type="number" min="1" max="7" step="1" inputmode="numeric" placeholder="1–7" required><div class="err" id="pe-seats"></div></div>
-    <div class="field"><label for="pt-price">Price per seat ($)</label><input id="pt-price" type="number" min="1" max="150" step="1" inputmode="numeric" placeholder="1–150" required><div class="err" id="pe-price"></div></div></div>
+    <div class="two post-pricing"><div class="field"><label for="pt-seats">Available seats</label><input id="pt-seats" type="number" min="1" max="7" step="1" inputmode="numeric" placeholder="1–7" required><div class="err" id="pe-seats"></div></div>
+    <div class="field"><label for="pt-price" id="pt-price-label">Price per seat ($)</label><input id="pt-price" type="number" min="1" max="150" step="1" inputmode="numeric" placeholder="1–150" required><div class="err" id="pe-price"></div></div></div>
   </div>
-  <div class="fieldset"><div class="eyebrow">Your car (optional) · for pickup</div>
-    <p class="small muted" style="margin:0">Only riders you accept can see these, along with a pickup code we create for this trip. They are not shown on trip cards.</p>
-    <div class="two-desk"><div class="field"><label for="pt-car">Make &amp; model</label><input id="pt-car" type="text" maxlength="60" placeholder="e.g. Honda Civic"></div>
-    <div class="field"><label for="pt-color">Color</label><input id="pt-color" type="text" maxlength="30" placeholder="e.g. Gray"></div></div>
-    <div class="field"><label for="pt-plate">License plate</label><input id="pt-plate" type="text" maxlength="10" autocapitalize="characters" placeholder="e.g. ABC 123" aria-describedby="pe-plate"><div class="err" id="pe-plate"></div></div>
-  </div>
-  <div class="fieldset"><div class="eyebrow">Return trip (optional)</div>
-    <label class="check"><input type="checkbox" id="pt-ret" aria-describedby="pt-rethint"><span><b>Include a return trip</b><br><span class="small muted" id="pt-rethint">Arrival is where you drop riders off on the way there. The return trip is when you pick them back up and drive home to your starting city.</span></span></label>
+  <div class="fieldset post-return">
+    <label class="check"><input type="checkbox" id="pt-ret" aria-describedby="pt-covers"><span><b>Include a return trip</b></span></label>
     <div id="pt-retfields" hidden><div class="post-date-time"><div class="field"><label for="pt-return">Return pickup date</label><input id="pt-return" type="date" aria-describedby="pe-return"><div class="err" id="pe-return"></div></div>
     <div class="field"><label for="pt-return-time">Return pickup time</label><input id="pt-return-time" type="time" aria-describedby="pe-returnTime"><div class="err" id="pe-returnTime"></div></div></div></div>
-    <div class="alert info small" id="pt-covers"></div>
+    <p class="small muted" id="pt-covers"></p>
   </div>
+  <details class="fieldset post-disclosure post-car" id="pt-car-details"><summary>Car details <span class="small muted">Optional</span></summary>
+    <div class="post-disclosure-body">
+      <p class="small muted">Only riders you accept can see these details.</p>
+      <div class="two-desk"><div class="field"><label for="pt-car">Make &amp; model</label><input id="pt-car" type="text" maxlength="60" placeholder="e.g. Honda Civic"></div>
+      <div class="field"><label for="pt-color">Color</label><input id="pt-color" type="text" maxlength="30" placeholder="e.g. Gray"></div></div>
+      <div class="field"><label for="pt-plate">License plate</label><input id="pt-plate" type="text" maxlength="10" autocapitalize="characters" placeholder="e.g. ABC 123" aria-describedby="pe-plate"><div class="err" id="pe-plate"></div></div>
+    </div>
+  </details>
+  <section class="card post-review" aria-labelledby="pt-review-title"><h3 id="pt-review-title">Review your trip</h3><div id="pt-mobile-review"></div></section>
   <div class="alert bad" id="pt-sum" role="alert" hidden>Check the highlighted fields before publishing.</div>
   <div class="alert bad" id="pt-dberr" role="alert" hidden></div>
   <button class="btn primary block" type="submit" id="pt-submit">Publish trip</button>
@@ -1391,7 +1395,7 @@ SCREENS.post = () => {
 <section class="pt-mine" id="pt-mine" aria-labelledby="pt-mine-h">${postedTripsSection()}</section>
 </div>${nav()}`;
 };
-// Live preview for the desktop Post a trip layout (display only; does not affect saving)
+// Live reviews are display only; publishing still uses the validated form values.
 // The destination as typed: a known place, or a new one that will be created on publish.
 function typedDest(v){
   if (v.dest) return D(v.dest);
@@ -1406,19 +1410,22 @@ function postPreview(v){
   return `<div class="dart${d ? '' : ' blank'}">${d ? destArt(d) : RIDGES}<span class="count pill ${v.ret ? 'accent' : 'neutral'}" style="background:var(--surface)">${v.ret ? 'Round trip' : 'One-way'}</span></div>
   <div class="ttop"><div style="min-width:0"><h3>${d ? esc(d.name) : ph('Choose a destination')}</h3><div class="small muted tnum">${when ? esc(when) : 'Pick a date and time'}</div></div>
     <div class="tprice"><b class="tnum">${+v.price ? money(+v.price) : '$–'}</b><div>per seat</div></div></div>
-  ${routeHTML(v.pickup ? esc(v.pickup) : ph('Pickup location'), v.dropoff ? esc(v.dropoff) : ph('Arrival destination'))}
+  ${routeHTML(v.pickup ? esc(v.pickup) : ph('Pickup address'), v.dropoff ? esc(v.dropoff) : ph('Drop-off address'), 'Drop-off')}
   <div class="leg-return">${v.ret ? `<span class="pill accent">Return trip</span><span class="tnum">${v.retAt ? `Leaves ${d ? esc(d.name) : 'destination'} ${esc(fDT(v.retAt))}` : ph('Pick a return date and time')}</span>` : `<span class="pill neutral">No return trip</span><span class="small muted">One-way</span>`}</div>
   <div class="tfoot"><div class="driver">${av(S.me,28)}<span class="small"><b>You</b></span>${vBadge(S.me)}</div><span class="pill ok">${seats ? `${seats} seat${seats > 1 ? 's' : ''} open` : 'Seats open'}</span></div>`;
 }
+function postMobileReview(v){
+  const d = typedDest(v), text = (value, fallback) => value ? esc(value) : `<span class="muted">${fallback}</span>`;
+  const seats = +v.seats, price = +v.price;
+  return `<p class="review-route"><b>${text(v.origin, 'Starting city')} → ${text(d?.name, 'Destination')}</b></p>
+    <dl class="review-stops"><dt>Leaves</dt><dd class="tnum">${text(v.depart ? fDT(v.depart) : '', 'Date and time not set')}</dd>
+      <dt>Pickup</dt><dd>${text(v.pickup, 'Not set')}</dd><dt>Drop-off</dt><dd>${text(v.dropoff, 'Not set')}</dd>
+      ${v.ret ? `<dt>Returns</dt><dd class="tnum">${text(v.retAt ? fDT(v.retAt) : '', 'Date and time not set')}</dd>` : ''}</dl>
+    <p class="review-price small">${seats ? `${seats} seat${seats === 1 ? '' : 's'}` : 'Seats not set'} · ${price ? `${money(price)} per seat` : 'Price not set'} · ${v.ret ? 'round trip' : 'one way'}</p>`;
+}
 function postTips(v){
   const d = typedDest(v);
-  const price = !d ? 'Price close to the estimate for your destination.'
-    : d.est ? `Riders expect about <b>${money(d.est)}</b> per seat to ${esc(d.name)}${d.custom ? ' (estimated from distance)' : ''}.`
-    : `Pick ${esc(d.name)} from the suggestions to see a price estimate, or price it to split your gas.`;
-  return `<h3>Fill your seats faster</h3><ul>
-    <li>Post at least 3 days before you leave.</li>
-    <li>Pick a pickup spot everyone knows, like a dorm or campus lot.</li>
-    <li>${price}</li></ul>`;
+  return d?.est ? `<p class="small muted">Typical one-way price to ${esc(d.name)}: <b>${money(d.est)} per seat</b>${d.custom ? ' (distance estimate)' : ''}.</p>` : '';
 }
 BIND.post = () => {
   const $ = id => document.getElementById(id);
@@ -1440,12 +1447,17 @@ BIND.post = () => {
     if (!$('pt-preview')) return;
     const val = id => $(id).value.trim();
     const dh = $('pt-dest');
-    const v = {dest:val('pt-dest'), destName:val('pt-dest-name'), destLat:dh.dataset?.lat ? Number(dh.dataset.lat) : NaN, destLng:dh.dataset?.lng ? Number(dh.dataset.lng) : NaN, depart:val('pt-depart') && val('pt-time') ? val('pt-depart')+'T'+val('pt-time') : '', pickup:val('pt-pickup'), dropoff:val('pt-dropoff'), seats:val('pt-seats'), price:val('pt-price'), ret:$('pt-ret').checked, retAt:val('pt-return') && val('pt-return-time') ? val('pt-return')+'T'+val('pt-return-time') : ''};
+    const v = {origin:val('pt-origin'), dest:val('pt-dest'), destName:val('pt-dest-name'), destLat:dh.dataset?.lat ? Number(dh.dataset.lat) : NaN, destLng:dh.dataset?.lng ? Number(dh.dataset.lng) : NaN, depart:val('pt-depart') && val('pt-time') ? val('pt-depart')+'T'+val('pt-time') : '', pickup:val('pt-pickup'), dropoff:val('pt-dropoff'), seats:val('pt-seats'), price:val('pt-price'), ret:$('pt-ret').checked, retAt:val('pt-return') && val('pt-return-time') ? val('pt-return')+'T'+val('pt-return-time') : ''};
     $('pt-preview').innerHTML = postPreview(v);
     $('pt-tips').innerHTML = postTips(v);
+    $('pt-mobile-review').innerHTML = postMobileReview(v);
   };
   f.addEventListener('input', refresh); f.addEventListener('change', refresh); refresh();
-  const covers = () => { $('pt-covers').textContent = $('pt-ret').checked ? 'Your price per seat covers the trip there and back.' : 'One-way trip. Your price per seat covers the outbound ride.'; };
+  const covers = () => {
+    const ret = $('pt-ret').checked;
+    $('pt-price-label').textContent = ret ? 'Round-trip price per seat ($)' : 'Price per seat ($)';
+    $('pt-covers').textContent = ret ? 'Price includes both directions.' : 'One-way ride. Riders arrange their own return.';
+  };
   const setMins = () => { $('pt-depart').min = denverWall(new Date()).slice(0,10); $('pt-return').min = $('pt-depart').value || $('pt-depart').min; };
   $('pt-ret').addEventListener('change', () => { $('pt-retfields').hidden = !$('pt-ret').checked; covers(); });
   $('pt-depart').addEventListener('change', setMins);
@@ -1512,6 +1524,7 @@ BIND.post = () => {
       }
     }
     Object.keys(FIELDS).forEach(k => { const el = $('pe-'+k); el.textContent = err[k] || ''; el.closest('.field').classList.toggle('invalid', !!err[k]); $(FIELDS[k]).setAttribute('aria-invalid', err[k] ? 'true' : 'false'); });
+    if (err.plate) $('pt-car-details').open = true;
     $('pt-sum').hidden = !Object.keys(err).length;
     if (Object.keys(err).length){ $(FIELDS[Object.keys(err)[0]]).focus(); return null; }
     pendingDest = newDest;
@@ -1986,7 +1999,7 @@ SCREENS.profile = () => {
   <div style="display:flex;flex-direction:column;gap:10px">
     <button class="btn primary block" data-act="nav" data-to="post" ${isVerified()?'':'disabled'}>Post a trip</button>
     ${isVerified() ? '' : '<p class="small muted" style="text-align:center">Posting a trip unlocks once your BYU email is verified.</p>'}
-    <button class="btn secondary block" data-act="mymanage">Manage my trip</button>
+    <button class="btn secondary block" data-act="nav" data-to="mytrips">My Trips</button>
     <button class="btn secondary block" data-act="go" data-to="edit" ${hasProfileDetails() ? '' : 'disabled'}>Edit profile</button>
     ${S.isAdmin ? `<button class="btn secondary block" data-act="openstats">${I.chart}Hitch stats <span class="pill neutral">Admin</span></button>` : ''}
     <button class="btn block logout" data-act="logout">Log out</button>

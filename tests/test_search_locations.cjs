@@ -4,6 +4,25 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const moduleURL = file => 'data:text/javascript;base64,' + Buffer.from(fs.readFileSync(file,'utf8')).toString('base64');
 
+test('destination suggestions close when leaving the picker but remain usable by keyboard',async()=>{
+  const {bindDestinationPicker}=await import(moduleURL('public/hitch-locations.js'));
+  const element=()=>({value:'',dataset:{},listeners:{},children:[],hidden:true,isConnected:true,
+    addEventListener(name,fn){this.listeners[name]=fn;},removeEventListener(name){delete this.listeners[name];},
+    setAttribute(){},replaceChildren(){this.children=[];},append(...children){this.children.push(...children);},
+    contains(target){return this.children.includes(target);},focus(){}});
+  const input=element(), hidden=element(), box=element(), status=element(), old=global.document;
+  global.document={createElement:element};
+  try {
+    const picker=bindDestinationPicker({input,hidden,box,status,known:()=>[{id:'moab',name:'Moab',alias:[]}],onChange(){}});
+    input.value='Mo'; input.listeners.input(); assert.equal(box.hidden,false);
+    input.listeners.blur({relatedTarget:box.children[0]}); assert.equal(box.hidden,false,'Tab into a suggestion keeps it open');
+    box.listeners.focusout({relatedTarget:{}}); assert.equal(box.hidden,true,'Tab out closes the list');
+    input.listeners.input(); box.children[0].listeners.click();
+    assert.equal(input.value,'Moab'); assert.equal(hidden.value,'moab'); assert.equal(box.hidden,true);
+    picker.destroy();
+  } finally {global.document=old;}
+});
+
 test('city, date, price filters query only the open-trip view; payload cannot spoof identity',async()=>{
   const requests=[];
   const prior=global.fetch;
@@ -72,7 +91,11 @@ test('saved-place selection attaches separate pins, updates starting city, and c
   try {
     const picker=bindLocationPickers({api,session:{accessToken:'test'},form:{querySelector:selector=>get(selector.slice(1)),addEventListener(){},removeEventListener(){}},onChange(){changes++;}});
     await get('pt-pickup-open').listeners.click();
+    assert.equal(get('pt-pickup-confirm').disabled,true);
+    get('pt-pickup-confirm').listeners.click();
+    assert.equal(changes,0,'a dialog without a selected pin cannot commit');
     get('pt-pickup-places').children[0].listeners.click();
+    assert.equal(get('pt-pickup-confirm').disabled,false);
     assert.equal(picker.pins.pickup,null, 'choosing in the dialog is only a draft');
     get('pt-pickup-confirm').listeners.click();
     assert.equal(picker.pins.pickup.lat,40.2786); assert.equal(picker.pins.dropoff,null);
@@ -100,7 +123,9 @@ test('saved-place selection attaches separate pins, updates starting city, and c
     assert.equal(get('pt-origin').value,'Provo');
     assert.equal(get('pt-pickup-suggestions').hidden,true);
     await get('pt-pickup-open').listeners.click();
+    assert.equal(get('pt-pickup-confirm').disabled,false,'the saved pin remains selected on reopening');
     get('pt-pickup-search').value='Unsaved change'; get('pt-pickup-search').listeners.input();
+    assert.equal(get('pt-pickup-confirm').disabled,true,'editing the search clears the old pin');
     get('pt-pickup-cancel').listeners.click();
     assert.equal(get('pt-pickup').value,'Library, Main Street, Provo');
     assert.deepEqual(picker.pins.pickup,{lat:40.2,lng:-111.6});
