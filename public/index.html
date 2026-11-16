@@ -2103,9 +2103,9 @@ const KR_INFO = {
   seat_fill:{label:'Objective 2 · Key Result', noun:'average seat fill rate', empty:'No departed trips yet', emptyLine:'The average starts once a posted trip has departed.',
     line:(r, seat) => `Average across ${tripWord(seat ? seat.departed_trips : 0)} that have departed.`,
     how:'For each posted trip: seats on <b>accepted</b> ride requests ÷ the trip\'s seats, capped at 100%. The Key Result is the average of those trip rates, counting only trips that have departed. Cancelled trips are left out. From <code>trips</code> and <code>ride_requests</code>, so a driver accepting a request or a rider cancelling a seat shows up on the next refresh.'},
-  repeat_drivers:{label:'Objective 2 · Key Result', noun:'of drivers posted again', empty:'No eligible drivers yet', emptyLine:"Starts once a driver's first trip is 30 days old.",
-    line:r => `${r.numerator} of ${driverWord(r.denominator)} posted a second trip within 30 days.`,
-    how:'Eligible drivers posted their first trip at least 30 days ago, so everyone counted has had the full 30 days. A repeat driver posted their second trip within 30 days of the first. From <code>trips.driver_id</code> and <code>trips.created_at</code>.'},
+  repeat_drivers:{label:'Objective 2 · Key Result', noun:'of drivers posted again', empty:'No one has posted a trip yet', emptyLine:'Starts once someone posts a trip.',
+    line:r => `${r.numerator} of ${driverWord(r.denominator)} posted a second trip.`,
+    how:'Drivers are accounts that have posted at least one trip. A repeat driver has posted two or more, so a driver posting their second trip shows up on the next refresh. From <code>trips.driver_id</code>.'},
 };
 let statsTimer = null;
 function statsErrorMessage(error){
