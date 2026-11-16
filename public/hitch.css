@@ -523,3 +523,26 @@ textarea{border-radius:16px}
 .kr-summary b{font-family:var(--f-display);font-size:1.3rem}
 .kr-card .stat-grid .stat{display:flex;flex-direction:column;gap:4px;background:var(--surface-2);border-radius:var(--r-sm);padding:12px}
 .kr-card .how{border-top:1px solid var(--line);padding-top:10px}
+
+/* ---------- Notifications ---------- */
+/* The phone menu sizes itself to its buttons, so the Alerts bell fits as a fifth item when signed in. */
+.nav{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:1fr}
+.nav-bell .bell-wrap{position:relative;display:inline-flex}
+.note-badge{position:absolute;top:-6px;right:-9px;min-width:18px;height:18px;padding:0 5px;border-radius:var(--r-pill);background:var(--bad);color:var(--surface);font-size:.68rem;font-weight:800;line-height:18px;text-align:center;box-shadow:0 0 0 2px var(--surface)}
+.note-badge[hidden]{display:none}
+.note-head{justify-content:space-between;align-items:center}
+.note-head .btn{flex:0 0 auto;width:auto}
+.notes{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.note{width:100%;display:flex;align-items:center;gap:12px;text-align:left;font:inherit;color:inherit;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;cursor:pointer}
+.note:hover{border-color:var(--line-strong)}
+.note:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.note-dot{flex:none;width:9px;height:9px;border-radius:50%;background:transparent}
+.note.unread{background:var(--brand-soft);border-color:var(--brand)}
+.note.unread .note-dot{background:var(--brand)}
+.note:not(.unread) .note-text b{font-weight:600}
+.note-body{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.note-go{flex:none;color:var(--accent);font-weight:700}
+@media (min-width:960px){
+  .nav{display:flex}
+  .nav .nav-bell .bell-wrap{margin-right:4px}
+}

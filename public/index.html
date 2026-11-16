@@ -311,6 +311,7 @@ const I = {
   clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
   lock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>',
   chat:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></svg>',
+  bell:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0112 0v5l2 2H4z"/><path d="M10 20a2 2 0 004 0"/></svg>',
   road:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3L4 21M16 3l4 18M12 5v2M12 11v2M12 17v2"/></svg>',
 };
 
@@ -765,7 +766,7 @@ const vBadge = u => u.verified === 'verified' ? `<span class="verified">${I.chec
 
 // ---------- navigation ----------
 // Screens that need a signed-in user. Signed out, they send you to Log in and come back after.
-const AUTH_SCREENS = new Set(['mytrips', 'manage', 'post', 'profile', 'edit', 'chat', 'reset', 'stats']);
+const AUTH_SCREENS = new Set(['mytrips', 'manage', 'post', 'profile', 'edit', 'chat', 'reset', 'stats', 'notes']);
 const PUBLIC_SCREENS = new Set(['login', 'signup']);
 function go(screen, params={}, push=true){
   if (push && !PUBLIC_SCREENS.has(S.screen)) S.hist.push({screen:S.screen, params:S.params});
@@ -774,11 +775,16 @@ function go(screen, params={}, push=true){
 function back(){ const h = S.hist.pop(); if (h){ S.screen = h.screen; S.params = h.params; render(); window.scrollTo(0,0);} else go('home',{},false); }
 function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, 2600); }
 
-const NAVMAP = {home:'home', results:'home', detail:'home', mytrips:'mytrips', manage:'mytrips', post:'post', profile:'profile', edit:'profile', stats:'profile'};
+const NAVMAP = {home:'home', results:'home', detail:'home', mytrips:'mytrips', manage:'mytrips', post:'post', profile:'profile', edit:'profile', stats:'profile', notes:'notes'};
 function nav(){
   const cur = NAVMAP[S.screen];
   const b = (id, icon, label) => `<button data-act="nav" data-to="${id}" ${cur===id?'aria-current="page"':''}>${icon}${label}</button>`;
-  return `<nav class="nav" aria-label="Main"><button class="nav-brand" data-act="nav" data-to="home" aria-label="Hitch home"><span class="logo">${LOGO}</span>Hitch</button>${b('home',I.compass,'Explore')}${b('mytrips',I.ticket,'My Trips')}${b('post',I.plus,'Post a trip')}<button class="nav-profile" data-act="nav" data-to="profile" aria-label="Profile" ${cur==='profile'?'aria-current="page"':''}>${S.me && DB.session ? av(S.me, 30) : I.user}<span>Profile</span></button></nav>`;
+  return `<nav class="nav" aria-label="Main"><button class="nav-brand" data-act="nav" data-to="home" aria-label="Hitch home"><span class="logo">${LOGO}</span>Hitch</button>${b('home',I.compass,'Explore')}${b('mytrips',I.ticket,'My Trips')}${b('post',I.plus,'Post a trip')}${DB.session ? noteBell(cur) : ''}<button class="nav-profile" data-act="nav" data-to="profile" aria-label="Profile" ${cur==='profile'?'aria-current="page"':''}>${S.me && DB.session ? av(S.me, 30) : I.user}<span>Profile</span></button></nav>`;
+}
+// Bell with the unread count. The number comes from the database (see loadNotes), so it survives a refresh.
+function noteBell(cur){
+  const n = unreadNotes();
+  return `<button class="nav-bell" data-act="nav" data-to="notes" aria-label="${n ? `Notifications, ${n} unread` : 'Notifications'}" ${cur==='notes'?'aria-current="page"':''}><span class="bell-wrap">${I.bell}<span class="note-badge" data-note-badge ${n ? '' : 'hidden'}>${n > 9 ? '9+' : n}</span></span>Alerts</button>`;
 }
 function topbar(title, sub=''){
   return `<header class="topbar"><button class="iconbtn" data-act="back" aria-label="Back">${I.back}</button><div class="title"><h2>${esc(title)}</h2>${sub?`<div class="small muted">${sub}</div>`:''}</div></header>`;
@@ -1659,7 +1665,7 @@ BIND.chat = () => {
 /* Screens 1-2: Log in / Sign up (Supabase Auth) */
 const SCHOOL_EMAIL = /^[^\s@]+@([a-z0-9-]+\.)*byu\.edu$/i; // BYU email addresses only
 const SCREEN_KEY = 'hitch-last-screen';
-const RESTORABLE = new Set(['home', 'mytrips', 'post', 'profile']);
+const RESTORABLE = new Set(['home', 'mytrips', 'post', 'profile', 'notes']);
 function rememberScreen(){ // so a refresh returns to the same tab instead of always Explore
   if (!DB.session || !RESTORABLE.has(S.screen)) return;
   try { sessionStorage.setItem(SCREEN_KEY, S.screen); } catch { /* storage blocked */ }
@@ -1690,7 +1696,7 @@ function passwordProblem(p){
 }
 const SAMPLE_COLORS = ['#2F6B5E','#3B6EA8','#B0562F','#7B4FA0','#A8456B','#4F6B2E'];
 function clearAccountDetails(){
-  DB.profile = null; DB.profileDetails = null; S.isAdmin = false; S.stats = null;
+  DB.profile = null; DB.profileDetails = null; S.isAdmin = false; S.stats = null; S.notes = null; S.openingNote = null;
   if (S.me) Object.assign(S.me, {first:'Hitch', last:'student', hometown:'', bio:'', color:SAMPLE_COLORS[0], photo:null});
 }
 function applyProfileDetails(details){
@@ -1721,6 +1727,7 @@ async function loadAccount(){
     else if (status.status === 'rejected') console.warn('Could not load your verification:', status.reason?.message);
     S.isAdmin = admin.status === 'fulfilled' && admin.value; // missing migration or error: no link
     applyAccountName();
+    loadNotes({quiet:true}); startNotePoll(); // the bell's count; not awaited so a slow load can't hold up sign-in
   }
   catch (error) { console.warn('Could not load your profile:', error.message); }
 }
@@ -1987,6 +1994,100 @@ SCREENS.profile = () => {
   <div class="privacy">${I.lock}<span>Hitch does not collect student IDs or dates of birth in this version.</span></div>
 </div>${nav()}`;
 };
+/* Notifications: in-app alerts for seat requests (to the driver) and decisions (to the rider).
+   The database creates them when the request or decision is saved; the app only reads and marks
+   them read, so the badge and list come back the same after a refresh. */
+const NOTE_POLL_MS = 60000;
+let notePoll = null;
+const unreadNotes = () => (S.notes?.list || []).filter(n => !n.read_at).length;
+function noteText(n){
+  const who = esc((n.other_name || '').trim().split(/\s+/)[0] || (n.kind === 'seat_requested' ? 'A rider' : 'The driver'));
+  const where = esc(D(n.destination_id)?.name || 'your destination');
+  return n.kind === 'seat_requested' ? `<b>${who}</b> requested a seat on your trip to ${where}`
+    : n.kind === 'request_accepted' ? `<b>${who}</b> accepted your seat request for ${where}`
+    : `<b>${who}</b> declined your seat request for ${where}`;
+}
+function ago(iso){
+  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return 'Just now';
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)} hr ago`;
+  const d = Math.floor(s / 86400); return d === 1 ? 'Yesterday' : `${d} days ago`;
+}
+function notesErrorMessage(error){
+  return error.status === 401 ? 'Your sign-in expired. Log in again to see notifications.'
+    : error.code === 'PGRST202' || error.code === '42883' || error.status === 404 || error instanceof TypeError ? "Notifications aren't turned on in the database yet. Ask the team to run the notifications migration."
+    : error.status === undefined ? "We couldn't reach the database. Check your connection, then try again."
+    : 'Something went wrong loading notifications. Try again.';
+}
+// Keep the bell's number current without re-rendering (so a half-typed form isn't wiped).
+function paintNoteBadge(){
+  const n = unreadNotes();
+  document.querySelectorAll('[data-note-badge]').forEach(b => { b.textContent = n > 9 ? '9+' : String(n); b.hidden = !n; });
+  document.querySelectorAll('[data-to="notes"]').forEach(b => b.setAttribute('aria-label', n ? `Notifications, ${n} unread` : 'Notifications'));
+}
+async function loadNotes({quiet = false} = {}){
+  const generation = DB.generation;
+  if (!DB.session) return;
+  const before = new Set((S.notes?.list || []).map(n => n.id)), first = !S.notes?.loadedAt;
+  S.notes = {...(S.notes || {list:[]}), state:'loading'};
+  try {
+    const api = await loadApi();
+    const list = await Promise.resolve().then(() => api.loadNotifications(DB.session.accessToken));
+    if (generation !== DB.generation) return;
+    S.notes = {state:'done', list, loadedAt:Date.now()};
+    const fresh = list.filter(n => !n.read_at && !before.has(n.id));
+    if (!first && fresh.length && !quiet) toast(`New: ${noteText(fresh[0]).replace(/<\/?b>/g, '')}`);
+  } catch (error) {
+    if (generation !== DB.generation) return;
+    S.notes = {...(S.notes || {list:[]}), state:'error', loadedAt:Date.now(), message:notesErrorMessage(error)};
+  }
+  if (S.screen === 'notes') render(); else paintNoteBadge();
+}
+function startNotePoll(){
+  clearInterval(notePoll);
+  notePoll = setInterval(() => { if (DB.session && !document.hidden && S.notes?.state !== 'loading') loadNotes(); }, NOTE_POLL_MS);
+}
+async function markNotesRead(ids = null){
+  const list = S.notes?.list || [], now = new Date().toISOString();
+  const targets = list.filter(n => !n.read_at && (!ids || ids.includes(n.id)));
+  if (!targets.length || !DB.session) return;
+  targets.forEach(n => { n.read_at = now; }); // shows as read right away
+  if (S.screen === 'notes') render(); else paintNoteBadge();
+  try { await (await loadApi()).markNotificationsRead(DB.session.accessToken, ids); }
+  catch (error) { console.warn('Could not mark notifications read:', error.message); targets.forEach(n => { n.read_at = null; }); paintNoteBadge(); if (S.screen === 'notes') render(); }
+}
+// Opening an alert marks it read, reloads trips so the new request or decision is there, then opens
+// Manage requests (driver) or the trip (rider).
+async function openNote(id){
+  const n = (S.notes?.list || []).find(x => x.id === id);
+  if (!n || S.openingNote) return;
+  markNotesRead([n.id]);
+  S.openingNote = n.id; render();
+  try { await loadDbTrips(); } catch (error) { console.warn('Could not reload trips:', error.message); }
+  S.openingNote = null;
+  const t = TRIPS.find(x => x.id === n.trip_id);
+  if (n.kind === 'seat_requested' && t && t.driver === 'me') go('manage', {id:t.id});
+  else if (n.kind === 'seat_requested'){ render(); toast("This trip isn't available anymore."); }
+  else { S.detailLoad = null; go('detail', {id:n.trip_id}); }
+}
+SCREENS.notes = () => {
+  const st = S.notes || {state:'loading', list:[]}, list = st.list || [], unread = unreadNotes();
+  let body;
+  if (!st.loadedAt && st.state !== 'error') body = `<div class="card"><div class="skel" style="height:60px"></div></div>`;
+  else if (!list.length && st.state === 'error') body = `<div class="alert bad" role="alert">${esc(st.message)}</div><button class="btn sm" data-act="refreshnotes">Try again</button>`;
+  else if (!list.length) body = `<div class="empty">${I.bell}<h2>No notifications yet</h2><p class="muted small">You'll see an alert here when a rider requests a seat on your trip, or when a driver accepts or declines your request.</p></div>`;
+  else body = `${st.state === 'error' ? `<div class="alert bad small" role="alert">${esc(st.message)} Showing the last list.</div>` : ''}
+    <div class="row note-head"><span class="small muted" role="status">${unread ? `${unread} unread` : 'All caught up'}</span>${unread ? '<button class="btn sm" data-act="readallnotes">Mark all read</button>' : ''}</div>
+    <ul class="notes" aria-label="Notifications">${list.map(n => `<li><button class="note${n.read_at ? '' : ' unread'}" data-act="opennote" data-id="${esc(n.id)}" ${S.openingNote ? 'disabled' : ''} ${S.openingNote === n.id ? 'aria-busy="true"' : ''}>
+      <span class="note-dot" aria-hidden="true"></span>
+      <span class="note-body"><span class="note-text">${noteText(n)}</span>
+        <span class="small muted tnum">${n.departure_at ? `${esc(fDT(denverWall(new Date(n.departure_at))))} · ` : ''}${esc(ago(n.created_at))}${n.read_at ? '' : '<span class="sr-only"> · Unread</span>'}</span></span>
+      <span class="note-go small">${S.openingNote === n.id ? 'Opening…' : n.kind === 'seat_requested' ? 'Review' : 'View trip'}</span></button></li>`).join('')}</ul>`;
+  return `<header class="topbar"><div class="title"><h2>Notifications</h2></div></header><div class="screen">${body}</div>${nav()}`;
+};
+BIND.notes = () => { if (!S.notes || (S.notes.state !== 'loading' && Date.now() - (S.notes.loadedAt || 0) > 10000)) loadNotes({quiet:true}); };
+
 /* Admin: Hitch stats. Every Key Result, computed live by the database on every load. */
 const pct = x => `${Math.round(Number(x) * 100)}%`;
 const seatWord = n => `${n} seat${n === 1 ? '' : 's'}`, tripWord = n => `${n} trip${n === 1 ? '' : 's'}`;
@@ -2264,9 +2365,13 @@ document.addEventListener('click', e => {
     case 'savepickup': { const t = TRIPS.find(x => x.id === id); if (t && !S.savingPickup) savePickupFromForm(t); break; }
     case 'openstats': S.stats = null; go('stats'); break;
     case 'refreshstats': loadStats(); break;
+    case 'opennote': openNote(id); break;
+    case 'readallnotes': markNotesRead(); break;
+    case 'refreshnotes': loadNotes({quiet:true}); break;
     case 'retrypickup': ensurePickup(TRIPS.find(x => x.id === id), true); break;
   }
 });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && DB.session && S.notes?.state !== 'loading') loadNotes(); });
 boot();
 
 </script>

@@ -1,6 +1,59 @@
 # Hitch Carpool
 
-[Live site](https://hitched-carpool.onrender.com) · [Demo video](https://github.com/1nate-ball/hitched-carpool/raw/refs/heads/main/docs/demo.mp4) · [Submission links](SUBMISSION.md)
+**Live URL: https://hitched-carpool.onrender.com**
+
+The free server sleeps when unused, so the first visit can take about a minute. Sign up with a `@byu.edu` email to use everything.
+
+[Demo video](https://github.com/1nate-ball/hitched-carpool/raw/refs/heads/main/docs/demo.mp4) · [Submission links](SUBMISSION.md) · [Features](#features) · [Run it locally](#how-to-get-it-running)
+
+## Features
+
+What a user can do on the live site, as of Sprint 3. **Complete** means it works end to end and saves to the real database. **Not complete** means it isn't built yet, or the screen exists only as a prototype that doesn't save.
+
+**Accounts and profiles**
+
+| Feature | Status |
+|---|---|
+| Sign up with a BYU email (`@byu.edu`), confirmed by an emailed link | Complete |
+| Log in, log out, and stay logged in after a refresh | Complete |
+| Reset a forgotten password by email | Complete |
+| Show or hide passwords, and type the password twice on sign up | Complete |
+| Edit profile: hometown, bio, avatar color, and profile photo | Complete |
+| "Verified" badge for accounts with a confirmed BYU email | Complete |
+| Student ID or driver's license verification | Not complete (planned) |
+
+**Drivers**
+
+| Feature | Status |
+|---|---|
+| Post a trip: route, dates and times, seats, price, and an optional return trip | Complete |
+| Only verified drivers can post (enforced by the database) | Complete |
+| Describe your trip in plain words and let AI fill in the form | Complete |
+| Any destination, with address suggestions and map pins | Complete |
+| Accept or decline seat requests; seats left updates | Complete |
+| Car details and a 4-digit pickup code, shown only to accepted riders | Complete |
+| Cancel a posted trip | Complete |
+| Auto-generated pictures for new destinations | Not complete (new places show a drawn picture) |
+
+**Riders**
+
+| Feature | Status |
+|---|---|
+| Find rides by destination, starting city, and date | Complete |
+| Request a seat with a note | Complete |
+| Cancel a seat request or a confirmed seat (the seat goes back to the trip) | Complete |
+| My Trips: rider and driver views, grouped by Today, This week, and This month | Complete |
+| Full and cancelled trips leave search | Complete |
+| Women-only rides | Not complete ([proposal only](docs/women-only-rides-proposal.md)) |
+
+**Notifications, chat, and admin**
+
+| Feature | Status |
+|---|---|
+| In-app notifications: new seat requests to the driver, accept/decline to the rider | Complete (see [Notifications](#notifications-seat-requests-and-decisions)) |
+| Email and push notifications | Not complete (later work) |
+| Trip group chat | Not complete (the screen is a prototype; messages aren't saved) |
+| Admin-only Hitch stats page with all four Key Results, computed live | Complete |
 
 ## App Summary
 
@@ -239,36 +292,51 @@ Click **Fill trip details**, review or edit the result, then **Publish trip** an
 
 ### Level 0 data flow diagram
 
+The whole system as one process, with everything outside it. The Level 1 diagram below opens it up.
+
 ```mermaid
 flowchart LR
-  Student[BYU student] -->|Account, profile, trip and seat actions| Hitch[Hitch Carpool]
-  Hitch -->|Pages, trip details and action results| Student
-  Hitch <-->|Sign-in, profiles, trips, requests and photos| Supabase[Supabase Auth, Database and Storage]
-  Hitch <-->|Trip description and extracted fields| OpenAI[OpenAI API]
-  Hitch <-->|Place searches and map tiles| Maps[Photon and OpenStreetMap]
+  Driver[Driver]
+  Rider[Rider]
+  Email[Email service<br/>Supabase Auth email]
+  AI[AI model<br/>OpenAI Responses API]
+  Maps[Maps<br/>Photon and OpenStreetMap]
+  Hitch((0. Hitch Carpool))
+
+  Driver -- "sign-up, trip description, reviewed trip, accept or decline" --> Hitch
+  Hitch -- "AI draft, trip requests, results" --> Driver
+  Rider -- "sign-up, searches, seat requests, cancellations" --> Hitch
+  Hitch -- "trips, request status" --> Rider
+  Hitch -- "confirmation and reset requests" --> Email
+  Email -- "confirmation and reset links" --> Driver
+  Email -- "confirmation and reset links" --> Rider
+  Hitch -- "trip description, instructions, schema" --> AI
+  AI -- "structured trip fields" --> Hitch
+  Hitch -- "place searches" --> Maps
+  Maps -- "address suggestions, map tiles" --> Hitch
 ```
 
-### Level 1 data flow diagram
+### Level 1 data flow diagram: the AI workflow
 
-```mermaid
-flowchart TD
-  Student[BYU student] -->|Sign in| Auth[1. Authenticate student]
-  Auth <-->|Identity and verification| SA[Supabase Auth and verification check]
-  Student -->|Trip description| Draft[2. Draft trip with AI]
-  SA -->|Verified driver identity| Draft
-  Draft -->|Description and fixed extraction schema| Model[OpenAI API]
-  Model -->|Structured trip fields| Validate[3. Validate and fill blank fields]
-  Validate -->|Editable draft and missing details| Student
-  Student -->|Reviewed trip and Publish trip| Publish[4. Save trip and pickup details]
-  Publish <-->|Destination, trip and private pickup records| DB[(Supabase Database)]
-  Student <-->|Search, request a seat, approve or decline| Rides[5. Find and manage rides]
-  Rides <-->|Available trips and ride requests| DB
-  Student <-->|Edit profile and upload photo| Profile[6. Save profile]
-  Profile <-->|Profile metadata and private photos| SP[Supabase Auth, Profiles and Storage]
-  Student <-->|Search a place or choose a map point| Places[7. Choose locations]
-  Places <-->|Address suggestions and tiles| Maps[Photon and OpenStreetMap]
-  Places -->|Reviewed address and selected coordinates| Publish
-```
+How a driver's typed description becomes a posted trip that riders can request. Rectangles are external entities, rounded boxes are processes, and cylinders are data stores. D1–D3 are Supabase tables; D4 is in the Python server's memory.
+
+![Level 1 data flow diagram of the AI workflow. External entities: Driver, Rider, Email service, AI model, Maps. Processes: 1.0 Sign up and confirm BYU email, 2.0 Check driver and AI limits, 3.0 Extract trip fields with AI, 4.0 Validate draft and fill blank fields, 5.0 Review and publish trip, 6.0 Find a ride and request a seat, 7.0 Accept or decline requests. Data stores: D1 users, D2 trips, D3 ride_requests, D4 AI usage counts. The process table below lists every step.](docs/ai-workflow-dfd-level1.png)
+
+The diagram's source is [docs/ai-workflow-dfd-level1.mmd](docs/ai-workflow-dfd-level1.mmd). After editing it, regenerate the image with the command at the top of that file.
+
+| # | Process | What happens | Code |
+|---|---|---|---|
+| 1.0 | Sign up and confirm BYU email | Supabase Auth creates the account in D1 and asks the email service to send a confirmation link. Clicking it marks the BYU email confirmed, which is what "verified" means. | `hitch-supabase.js` `signUp` |
+| 2.0 | Check driver and AI limits | The Python server checks the sign-in token and BYU verification against D1, then the per-account and per-day limits in D4. | `ai_trip_draft.py` `verified_driver`, `DraftLimiter` |
+| 3.0 | Extract trip fields with AI | Sends only the description, fixed instructions, and a strict JSON schema to the AI model (`store: false`). No account details, car details, or other trips. | `generate_draft` |
+| 4.0 | Validate draft, fill blank fields | Drops any value that isn't literally in the description, is in the past, or is out of range. The browser then fills only blank fields the driver hasn't touched, and lists what's missing. | `validate_draft`, `hitch-ai.js` |
+| 5.0 | Review and publish trip | The driver checks and edits the form, picks map pins, and clicks **Publish trip**. The database refuses trips from unverified drivers. | `publishTrip` |
+| 6.0 | Find a ride and request a seat | Riders search open trips (D2) and send or cancel seat requests (D3). | `searchTrips`, `requestSeat`, `cancelRequest` |
+| 7.0 | Accept or decline requests | The driver decides on pending requests in D3. Accepted requests lower the seats left. | `decideRequest` |
+
+**What the AI cannot do:** there is no flow from 3.0 or 4.0 to any data store. The AI model never sees D1–D3, and its output only reaches the driver's form. Only the driver's own **Publish trip** (5.0) writes a trip.
+
+**Left out to keep this readable:** profile editing and photos, password reset (another email-service flow), pickup codes, and drivers cancelling trips. They don't pass through the AI workflow. Password reset and maps are shown at Level 0.
 
 Run `python3 -m unittest discover -s tests -v` and `node --test tests/*.cjs` for the automated checks. The AI tests use fake provider replies to cover validation, failures, authentication, duplicate requests, account changes, and preserving manual edits without spending API credits. Browser testing with the real provider is a separate release check.
 
@@ -292,6 +360,10 @@ Run `python3 -m unittest discover -s tests -v` and `node --test tests/*.cjs` for
 
 4. Open **http://127.0.0.1:8000** in your browser.
 5. The app opens to the Log in screen. Create an account or log in, or choose **Browse trips without logging in**.
+6. Optional: to use **Describe your trip** (AI), copy `.env.example` to `.env` and add your `OPENAI_API_KEY` (see [AI setup](#ai-setup)). Everything else works without it.
+7. Optional: run the automated checks with `python3 -m unittest discover -s tests -v` and `node --test tests/*.cjs` (Node 22).
+
+There is nothing to install: the server uses only Python's standard library. Your local copy connects to the team's Supabase project through `public/supabase-config.json`, which holds only the publishable key, so accounts and trips are the same as on the live site.
 
 Keep the terminal running while using the app. Press **Ctrl+C** to stop it. The database is saved at `data/hitch.sqlite3` and will be used again the next time you start the server.
 
@@ -430,3 +502,26 @@ Until then the app works as before, and the cancel buttons show a "not turned on
 - `node --test tests/test_cancel.cjs` checks the screens and saving, using a fake database.
 - `python3 scripts/check_cancel_schema.py` runs 28 checks against a throwaway local PostgreSQL.
 - To check it live, paste [the cancel check](database/checks/cancel_live.sql) into the SQL Editor. It rolls back everything it creates and should end with a `PASS` row.
+
+## Notifications: seat requests and decisions
+
+Signed-in users get in-app alerts. A bell labelled **Alerts** in the menu shows how many are unread.
+- **Drivers** get one when a rider requests a seat on their trip ("Riley requested a seat on your trip to Moab").
+- **Riders** get one when the driver accepts or declines their request.
+
+Open **Alerts** to see the newest 50. Unread ones are highlighted. Clicking one marks it read and opens **Manage requests** for that trip (driver) or the trip's details (rider). **Mark all read** clears the badge. The list and badge come from the database, so they're the same after a refresh or on another device. While the app is open it checks for new alerts every minute, and shows a short message when one arrives.
+
+**What the database enforces** ([the notifications migration](supabase/migrations/20261118000100_notifications.sql)):
+- Alerts are created by database triggers, only after the request or the accept/decline is actually saved. A refused request (a duplicate, your own trip, a full trip, someone who isn't the driver) creates nothing.
+- One alert per request per event (a unique constraint), so retries never send the same alert twice.
+- Only the recipient can read their alerts or mark them read. Nobody can create, edit, or delete alerts through the API.
+- Alerts hold ids and timestamps only. The list shows the other person's first name, never an email.
+
+Cancelling a request or a trip doesn't send an alert yet. Email and push notifications are later work.
+
+**Database:** run `supabase/migrations/20261118000100_notifications.sql` once in the Supabase SQL Editor. Until then the app works as before, and the Alerts page says notifications aren't turned on yet.
+
+**Checks:**
+- `node --test tests/test_notifications.cjs` checks the bell, the list, opening an alert, and mark read, using a fake database.
+- `python3 scripts/check_notifications_schema.py` runs 36 checks against a throwaway local PostgreSQL.
+- To check it live, paste [the notifications check](database/checks/notifications_live.sql) into the SQL Editor. It rolls back everything it creates and should end with a `PASS` row.
