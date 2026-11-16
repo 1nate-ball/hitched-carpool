@@ -115,8 +115,8 @@ a{color:var(--accent)}
 .logo{width:36px;height:36px;background:none;border-radius:0;display:grid;place-items:center;flex:none}
 .logo svg{width:36px;height:36px}
 .mark-leg{fill:var(--mark)}
-.mark-peak{fill:none;stroke:var(--mark);stroke-width:6;stroke-linejoin:round}
-.mark-sun{fill:var(--mark-sun)}
+.mark-road{fill:none;stroke:var(--mark);stroke-width:8}
+.mark-dash{fill:none;stroke:var(--bg);stroke-width:1.4;stroke-dasharray:2.6 2.2}
 .brand-name{font-family:var(--f-display);font-weight:800;font-size:1.45rem;letter-spacing:-.02em}
 
 /* ---------- Mountain banner ---------- */
@@ -127,8 +127,8 @@ a{color:var(--accent)}
 .ridge-hero p{color:var(--hero-sub);font-size:1rem;max-width:30ch}
 /* Real photo behind the Explore banner (falls back to the drawn ridges if missing) */
 .hero-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 25%}
-.ridge-hero:has(.hero-photo)::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(10,16,14,.55) 0%,rgba(10,16,14,.2) 55%,rgba(10,16,14,.05) 100%)}
-.ridge-hero:has(.hero-photo) > h1,.ridge-hero:has(.hero-photo) > p{z-index:1;color:#fff;text-shadow:0 1px 12px rgba(0,0,0,.35)}
+.ridge-hero:has(.hero-photo)::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(10,16,14,.62) 0%,rgba(10,16,14,.42) 55%,rgba(10,16,14,.15) 100%)}
+.ridge-hero:has(.hero-photo) > h1,.ridge-hero:has(.hero-photo) > p{z-index:1;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.45),0 1px 14px rgba(0,0,0,.4)}
 .ridge-hero > .hero-photo{position:absolute}
 .ridge-hero + .searchcard{margin-top:-60px;position:relative;z-index:1;box-shadow:var(--shadow-lift)}
 .r-sun{fill:var(--sun)} .r-1{fill:var(--ridge-1)} .r-2{fill:var(--ridge-2)} .r-3{fill:var(--ridge-3)}
