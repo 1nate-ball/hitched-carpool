@@ -547,3 +547,12 @@ textarea{border-radius:16px}
   .nav{display:flex}
   .nav .nav-bell .bell-wrap{margin-right:4px}
 }
+
+/* Wide banners (search results + trip details): show the best part of each photo instead of the middle */
+.hero .dphoto[src$="dest-slc.jpg"]{object-position:50% 64%}
+.hero .dphoto[src$="dest-bearlake.jpg"]{object-position:50% 76%}
+.hero .dphoto[src$="dest-jackson.jpg"]{object-position:50% 2%}
+.hero .dphoto[src$="dest-moab.jpg"]{object-position:50% 50%}
+.hero .dphoto[src$="dest-stgeorge.jpg"]{object-position:50% 58%}
+.hero .dphoto[src$="dest-zion.jpg"]{object-position:50% 85%}
+.hero .dphoto[src$="dest-parkcity.jpg"]{object-position:50% 55%}
