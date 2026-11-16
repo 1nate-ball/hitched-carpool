@@ -239,36 +239,51 @@ Click **Fill trip details**, review or edit the result, then **Publish trip** an
 
 ### Level 0 data flow diagram
 
+The whole system as one process, with everything outside it. The Level 1 diagram below opens it up.
+
 ```mermaid
 flowchart LR
-  Student[BYU student] -->|Account, profile, trip and seat actions| Hitch[Hitch Carpool]
-  Hitch -->|Pages, trip details and action results| Student
-  Hitch <-->|Sign-in, profiles, trips, requests and photos| Supabase[Supabase Auth, Database and Storage]
-  Hitch <-->|Trip description and extracted fields| OpenAI[OpenAI API]
-  Hitch <-->|Place searches and map tiles| Maps[Photon and OpenStreetMap]
+  Driver[Driver]
+  Rider[Rider]
+  Email[Email service<br/>Supabase Auth email]
+  AI[AI model<br/>OpenAI Responses API]
+  Maps[Maps<br/>Photon and OpenStreetMap]
+  Hitch((0. Hitch Carpool))
+
+  Driver -- "sign-up, trip description, reviewed trip, accept or decline" --> Hitch
+  Hitch -- "AI draft, trip requests, results" --> Driver
+  Rider -- "sign-up, searches, seat requests, cancellations" --> Hitch
+  Hitch -- "trips, request status" --> Rider
+  Hitch -- "confirmation and reset requests" --> Email
+  Email -- "confirmation and reset links" --> Driver
+  Email -- "confirmation and reset links" --> Rider
+  Hitch -- "trip description, instructions, schema" --> AI
+  AI -- "structured trip fields" --> Hitch
+  Hitch -- "place searches" --> Maps
+  Maps -- "address suggestions, map tiles" --> Hitch
 ```
 
-### Level 1 data flow diagram
+### Level 1 data flow diagram: the AI workflow
 
-```mermaid
-flowchart TD
-  Student[BYU student] -->|Sign in| Auth[1. Authenticate student]
-  Auth <-->|Identity and verification| SA[Supabase Auth and verification check]
-  Student -->|Trip description| Draft[2. Draft trip with AI]
-  SA -->|Verified driver identity| Draft
-  Draft -->|Description and fixed extraction schema| Model[OpenAI API]
-  Model -->|Structured trip fields| Validate[3. Validate and fill blank fields]
-  Validate -->|Editable draft and missing details| Student
-  Student -->|Reviewed trip and Publish trip| Publish[4. Save trip and pickup details]
-  Publish <-->|Destination, trip and private pickup records| DB[(Supabase Database)]
-  Student <-->|Search, request a seat, approve or decline| Rides[5. Find and manage rides]
-  Rides <-->|Available trips and ride requests| DB
-  Student <-->|Edit profile and upload photo| Profile[6. Save profile]
-  Profile <-->|Profile metadata and private photos| SP[Supabase Auth, Profiles and Storage]
-  Student <-->|Search a place or choose a map point| Places[7. Choose locations]
-  Places <-->|Address suggestions and tiles| Maps[Photon and OpenStreetMap]
-  Places -->|Reviewed address and selected coordinates| Publish
-```
+How a driver's typed description becomes a posted trip that riders can request. Rectangles are external entities, rounded boxes are processes, and cylinders are data stores. D1–D3 are Supabase tables; D4 is in the Python server's memory.
+
+![Level 1 data flow diagram of the AI workflow. External entities: Driver, Rider, Email service, AI model, Maps. Processes: 1.0 Sign up and confirm BYU email, 2.0 Check driver and AI limits, 3.0 Extract trip fields with AI, 4.0 Validate draft and fill blank fields, 5.0 Review and publish trip, 6.0 Find a ride and request a seat, 7.0 Accept or decline requests. Data stores: D1 users, D2 trips, D3 ride_requests, D4 AI usage counts. The process table below lists every step.](docs/ai-workflow-dfd-level1.png)
+
+The diagram's source is [docs/ai-workflow-dfd-level1.mmd](docs/ai-workflow-dfd-level1.mmd). After editing it, regenerate the image with the command at the top of that file.
+
+| # | Process | What happens | Code |
+|---|---|---|---|
+| 1.0 | Sign up and confirm BYU email | Supabase Auth creates the account in D1 and asks the email service to send a confirmation link. Clicking it marks the BYU email confirmed, which is what "verified" means. | `hitch-supabase.js` `signUp` |
+| 2.0 | Check driver and AI limits | The Python server checks the sign-in token and BYU verification against D1, then the per-account and per-day limits in D4. | `ai_trip_draft.py` `verified_driver`, `DraftLimiter` |
+| 3.0 | Extract trip fields with AI | Sends only the description, fixed instructions, and a strict JSON schema to the AI model (`store: false`). No account details, car details, or other trips. | `generate_draft` |
+| 4.0 | Validate draft, fill blank fields | Drops any value that isn't literally in the description, is in the past, or is out of range. The browser then fills only blank fields the driver hasn't touched, and lists what's missing. | `validate_draft`, `hitch-ai.js` |
+| 5.0 | Review and publish trip | The driver checks and edits the form, picks map pins, and clicks **Publish trip**. The database refuses trips from unverified drivers. | `publishTrip` |
+| 6.0 | Find a ride and request a seat | Riders search open trips (D2) and send or cancel seat requests (D3). | `searchTrips`, `requestSeat`, `cancelRequest` |
+| 7.0 | Accept or decline requests | The driver decides on pending requests in D3. Accepted requests lower the seats left. | `decideRequest` |
+
+**What the AI cannot do:** there is no flow from 3.0 or 4.0 to any data store. The AI model never sees D1–D3, and its output only reaches the driver's form. Only the driver's own **Publish trip** (5.0) writes a trip.
+
+**Left out to keep this readable:** profile editing and photos, password reset (another email-service flow), pickup codes, and drivers cancelling trips. They don't pass through the AI workflow. Password reset and maps are shown at Level 0.
 
 Run `python3 -m unittest discover -s tests -v` and `node --test tests/*.cjs` for the automated checks. The AI tests use fake provider replies to cover validation, failures, authentication, duplicate requests, account changes, and preserving manual edits without spending API credits. Browser testing with the real provider is a separate release check.
 

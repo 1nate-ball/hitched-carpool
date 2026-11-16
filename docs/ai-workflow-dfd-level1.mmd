@@ -1,0 +1,69 @@
+---
+config:
+  layout: elk
+---
+%% Level 1 data flow diagram: Hitch AI workflow (embedded in README.md as docs/ai-workflow-dfd-level1.png).
+%% Regenerate the image after editing:
+%%   npx -y @mermaid-js/mermaid-cli@11.4.2 -i docs/ai-workflow-dfd-level1.mmd -o docs/ai-workflow-dfd-level1.png -w 1500 -s 2 -b white
+flowchart LR
+  %% External entities
+  Driver[Driver]
+  Rider[Rider]
+  Email[Email service<br/>Supabase Auth email]
+  AI[AI model<br/>OpenAI Responses API]
+  Maps[Maps<br/>Photon and OpenStreetMap]
+
+  %% Processes
+  P1(["1.0 Sign up and<br/>confirm BYU email"])
+  P2(["2.0 Check driver<br/>and AI limits"])
+  P3(["3.0 Extract trip<br/>fields with AI"])
+  P4(["4.0 Validate draft,<br/>fill blank fields"])
+  P5(["5.0 Review and<br/>publish trip"])
+  P6(["6.0 Find a ride and<br/>request a seat"])
+  P7(["7.0 Accept or decline<br/>requests"])
+
+  %% Data stores
+  D1[("D1 users<br/>auth.users, profiles")]
+  D2[("D2 trips")]
+  D3[("D3 ride_requests")]
+  D4[("D4 AI usage counts<br/>server memory")]
+
+  Driver -- "name, BYU email, password" --> P1
+  Rider -- "name, BYU email, password" --> P1
+  P1 -- "new account" --> D1
+  P1 -- "confirmation request" --> Email
+  Email -- "confirmation link" --> Driver
+  Email -- "confirmation link" --> Rider
+
+  Driver -- "trip description, sign-in token" --> P2
+  D1 -- "user id, BYU email verified" --> P2
+  P2 <-- "requests per account and per day" --> D4
+  P2 -- "description from a verified driver" --> P3
+  P3 -- "description, fixed instructions, strict schema" --> AI
+  AI -- "structured trip fields" --> P3
+  P3 -- "raw fields" --> P4
+  P4 -- "draft for blank fields, list of missing details" --> Driver
+
+  Driver -- "reviewed and edited trip, Publish" --> P5
+  P5 -- "place search" --> Maps
+  Maps -- "address suggestions, map pins" --> P5
+  D1 -- "verified driver check" --> P5
+  P5 -- "new trip" --> D2
+
+  Rider -- "search, seat request, cancel" --> P6
+  D2 -- "available trips, seats left" --> P6
+  P6 -- "pending request or cancellation" --> D3
+  D3 -- "request status" --> P6
+  P6 -- "matching trips, request status" --> Rider
+
+  D3 -- "pending requests" --> P7
+  P7 -- "requests with rider names" --> Driver
+  Driver -- "accept or decline" --> P7
+  P7 -- "accepted or declined" --> D3
+
+  classDef entity fill:#EEF3FB,stroke:#36608F,color:#16243A
+  classDef process fill:#E8F2EC,stroke:#2F6B5E,color:#13261F
+  classDef store fill:#FBF4E6,stroke:#8A6A1F,color:#2B2108
+  class Driver,Rider,Email,AI,Maps entity
+  class P1,P2,P3,P4,P5,P6,P7 process
+  class D1,D2,D3,D4 store
