@@ -604,3 +604,10 @@ textarea{border-radius:16px}
   .app:is([data-screen="post"],[data-screen="mytrips"],[data-screen="manage"],[data-screen="profile"]) .btn{transition:none}
   .app:is([data-screen="post"],[data-screen="mytrips"],[data-screen="manage"],[data-screen="profile"]) .btn:not(:disabled):active{transform:none}
 }
+
+/* Useful line icons stay small and always accompany a text label. */
+.ui-symbol{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;flex:0 0 18px;vertical-align:-3px;color:var(--brand)}
+.ui-symbol svg{display:block;width:18px;height:18px}
+#ptForm .eyebrow{display:flex;align-items:center;gap:8px}
+#ptForm .post-return .check > span{display:inline-flex;align-items:center;gap:8px}
+.btn .ui-symbol{color:inherit}
