@@ -587,3 +587,20 @@ textarea{border-radius:16px}
 #ptForm .gas-estimate{grid-column:1/-1}
 #ptForm .gas-result{font-weight:600;overflow-wrap:anywhere}
 #ptForm .gas-estimate select{font-size:1rem;min-width:0;max-width:100%}
+
+/* Quiet motion and departure context, scoped away from Explore. */
+.departure-countdown{align-self:flex-start;color:var(--brand);font-weight:700}
+.sheet.published{animation:hitch-appear .22s ease-out both}
+.sheet.published .pd-icon{animation:hitch-confirm .32s ease-out both}
+.app[data-screen="mytrips"] .mcard{animation:hitch-appear .18s ease-out both}
+.toast.success{animation:hitch-appear .18s ease-out both}
+.toast.success::before{content:"✓";margin-right:8px;font-weight:800}
+.app:is([data-screen="post"],[data-screen="mytrips"],[data-screen="manage"],[data-screen="profile"]) .btn{transition:transform .12s ease,background-color .12s ease}
+.app:is([data-screen="post"],[data-screen="mytrips"],[data-screen="manage"],[data-screen="profile"]) .btn:not(:disabled):active{transform:scale(.985)}
+@keyframes hitch-appear{from{opacity:0;translate:0 6px}to{opacity:1;translate:0 0}}
+@keyframes hitch-confirm{from{opacity:0;scale:.8}to{opacity:1;scale:1}}
+@media(prefers-reduced-motion:reduce){
+  .sheet.published,.sheet.published .pd-icon,.app[data-screen="mytrips"] .mcard,.toast.success{animation:none}
+  .app:is([data-screen="post"],[data-screen="mytrips"],[data-screen="manage"],[data-screen="profile"]) .btn{transition:none}
+  .app:is([data-screen="post"],[data-screen="mytrips"],[data-screen="manage"],[data-screen="profile"]) .btn:not(:disabled):active{transform:none}
+}
