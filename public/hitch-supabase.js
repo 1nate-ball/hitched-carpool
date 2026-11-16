@@ -159,6 +159,21 @@ export async function decideRequest(accessToken, requestId, status) {
   return rows[0];
 }
 
+// ---------- In-app notifications ----------
+// The signed-in user's 50 newest alerts, newest first: kind (seat_requested, request_accepted,
+// request_declined), trip_id, request_id, created_at, read_at, destination_id, departure_at and the
+// other person's name. The database creates them when a request or decision is saved.
+export async function loadNotifications(accessToken) {
+  const rows = await request('rpc/my_notifications', accessToken, {});
+  if (!Array.isArray(rows)) throw new Error('Could not load notifications.');
+  return rows;
+}
+
+// Marks the given ids read, or every unread one when ids is omitted. Returns how many changed.
+export async function markNotificationsRead(accessToken, ids = null) {
+  return request('rpc/mark_notifications_read', accessToken, { ids });
+}
+
 // ---------- Admin stats: Objective 2 seat fill rate ----------
 // True only for accounts listed in public.admins (managed in the SQL Editor).
 export async function isAdmin(accessToken) {
