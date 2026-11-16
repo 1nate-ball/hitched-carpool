@@ -582,3 +582,8 @@ textarea{border-radius:16px}
 .hero .dphoto[src$="dest-stgeorge.jpg"]{object-position:50% 58%}
 .hero .dphoto[src$="dest-zion.jpg"]{object-position:50% 85%}
 .hero .dphoto[src$="dest-parkcity.jpg"]{object-position:50% 55%}
+
+/* Optional gas estimate: stays inside the posting form. */
+#ptForm .gas-estimate{grid-column:1/-1}
+#ptForm .gas-result{font-weight:600;overflow-wrap:anywhere}
+#ptForm .gas-estimate select{font-size:1rem;min-width:0;max-width:100%}

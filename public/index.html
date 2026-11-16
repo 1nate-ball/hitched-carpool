@@ -462,6 +462,7 @@ const S = {
 
 let cleanupLocationPickers = () => {};
 let cleanupProfilePhoto = () => {};
+let cleanupGasEstimate = () => {};
 let cleanupTripDraft = () => {};
 
 // ---------- Supabase: Post a Trip ----------
@@ -1376,6 +1377,21 @@ SCREENS.post = () => {
     <div class="two post-pricing"><div class="field"><label for="pt-seats">Available seats</label><input id="pt-seats" type="number" min="1" max="7" step="1" inputmode="numeric" placeholder="1–7" required><div class="err" id="pe-seats"></div></div>
     <div class="field"><label for="pt-price" id="pt-price-label">Price per seat ($)</label><input id="pt-price" type="number" min="1" max="150" step="1" inputmode="numeric" placeholder="1–150" required><div class="err" id="pe-price"></div></div></div>
   </div>
+  <details class="fieldset post-disclosure gas-estimate" id="pt-gas"><summary>Estimate gas per seat <span class="small muted">Optional</span></summary>
+    <div class="post-disclosure-body">
+      <div class="two"><div class="field"><label for="gas-year">Vehicle year</label><select id="gas-year">${Array.from({length:new Date().getFullYear()-1982},(_,i)=>new Date().getFullYear()+1-i).map(y=>`<option ${y===2020?'selected':''}>${y}</option>`).join('')}</select></div><div class="field"><label for="gas-make">Make</label><select id="gas-make" disabled><option value="">Choose make</option></select></div></div>
+      <div class="two"><div class="field"><label for="gas-model">Model</label><select id="gas-model" disabled><option value="">Choose model</option></select></div><div class="field"><label for="gas-option">Engine / transmission</label><select id="gas-option" disabled><option value="">Choose option</option></select></div></div>
+      <div class="two"><div class="field"><label for="gas-miles">One-way miles</label><input id="gas-miles" type="number" min="1" max="10000" step="1" inputmode="numeric"></div><div class="field"><label for="gas-mpg">MPG</label><input id="gas-mpg" type="number" min="1" max="150" step="0.1" inputmode="decimal"></div></div>
+      <div class="field"><label for="gas-price">Gas ($/gallon)</label><input id="gas-price" type="number" min="0.1" max="20" step="0.01" inputmode="decimal"></div>
+      <p class="small muted">Gas price starts at the national average. Edit for your fuel.</p>
+      <p class="small muted" id="gas-source">Choose your vehicle for EPA combined MPG, or enter MPG yourself.</p>
+      <p class="small muted" id="gas-distance">Enter route miles. Map pins can provide a rough distance; adjust for your route.</p>
+      <p class="small" id="gas-status" role="status"></p>
+      <div class="gas-result" id="gas-result" role="status"></div>
+      <button class="btn" type="button" id="gas-use" disabled>Use estimated price</button>
+      <p class="small muted">Gas only. Split equally with the driver, assuming all offered seats fill. <a href="https://www.fueleconomy.gov/feg/ws/" target="_blank" rel="noopener">EPA data</a></p>
+    </div>
+  </details>
   <div class="fieldset post-return">
     <label class="check"><input type="checkbox" id="pt-ret" aria-describedby="pt-covers"><span><b>Include a return trip</b></span></label>
     <div id="pt-retfields" hidden><div class="post-date-time"><div class="field"><label for="pt-return">Return pickup date</label><input id="pt-return" type="date" aria-describedby="pe-return"><div class="err" id="pe-return"></div></div>
@@ -1459,6 +1475,7 @@ BIND.post = () => {
     $('pt-preview').innerHTML = postPreview(v);
     $('pt-tips').innerHTML = postTips(v);
     $('pt-mobile-review').innerHTML = postMobileReview(v);
+    f.dispatchEvent?.(new Event('hitch-route-updated'));
   };
   f.addEventListener('input', refresh); f.addEventListener('change', refresh); refresh();
   const covers = () => {
@@ -1480,6 +1497,10 @@ BIND.post = () => {
     cleanupLocationPickers = () => { stop(); destPicker?.destroy(); };
   }).catch(() => { /* Typing a destination still works without suggestions. */ });
   let selectedPins = {pickup:null,dropoff:null};
+  import('/hitch-gas.js').then(module => {
+    if (!f.isConnected) return;
+    cleanupGasEstimate = module.bindGasEstimate({form:f, getPins:() => ({from:selectedPins.pickup, to:selectedPins.dropoff}), milesBetween});
+  }).catch(() => { if (f.isConnected) $('gas-status').textContent = 'Calculator unavailable. You can still set your price.'; });
   if ($('pt-pickup-picker')) import('/hitch-locations.js').then(async module => {
     const api = await loadApi();
     if (!f.isConnected) return;
@@ -2343,6 +2364,7 @@ const PRESENT_BAR = `<aside class="present-bar" aria-label="Open Hitch on your p
   <a class="present-url" href="https://hitched-carpool.onrender.com/">hitched-carpool.onrender.com</a></div>
 </aside>`;
 function render(){
+  cleanupGasEstimate(); cleanupGasEstimate = () => {};
   cleanupTripDraft(); cleanupTripDraft = () => {};
   cleanupLocationPickers(); cleanupLocationPickers = () => {};
   cleanupProfilePhoto(); cleanupProfilePhoto = () => {};

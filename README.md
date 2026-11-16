@@ -527,3 +527,9 @@ Cancelling a request or a trip doesn't send an alert yet. Email and push notific
 - `node --test tests/test_notifications.cjs` checks the bell, the list, opening an alert, and mark read, using a fake database.
 - `python3 scripts/check_notifications_schema.py` runs 36 checks against a throwaway local PostgreSQL.
 - To check it live, paste [the notifications check](database/checks/notifications_live.sql) into the SQL Editor. It rolls back everything it creates and should end with a `PASS` row.
+
+### Gas estimate on Post a trip
+
+Expand **Estimate gas per seat** and choose the vehicle year, make, model, and engine/transmission. FuelEconomy.gov supplies EPA combined MPG and a national fuel-price starting point. Miles, MPG, and gas price are editable; manual entry still works when the service is unavailable. Selected pickup/drop-off pins can prefill rough road miles (straight-line distance × 1.2); drivers should adjust this for their route.
+
+Gas cost = one-way miles × (2 for a return, otherwise 1) ÷ MPG × gas price. We split it equally between the driver and all offered seats. **Use estimated price** rounds up to whole dollars and updates the existing price field; it never publishes the trip. This estimates fuel only, assumes every offered seat fills, and needs no AI key or paid service. Electric and plug-in vehicles do not receive a gasoline MPG estimate.
