@@ -541,3 +541,7 @@ Drivers can download a calendar file from Manage requests or Trip details. Confi
 ### Departure countdowns and motion
 
 My Trips shows a live departure countdown on upcoming saved trips for drivers and confirmed riders, alongside the original date. Labels refresh every 30 seconds and when the page becomes visible; cancelled, past, and sample trips do not get countdowns. Publishing has a short checkmark animation, successful seat requests and confirmations get a checked toast, and My Trips cards enter softly. All motion respects the device's reduced-motion preference.
+
+### Direct admin link for grading
+
+Share https://hitched-carpool.onrender.com/#admin with the grader. Signed-out visitors see Admin sign-in and go directly to Hitch stats after logging in; a signed-in visitor opens the stats page immediately. The account must exist in Supabase Auth and be listed in `public.admins`. The link does not grant admin access, and the database still rejects non-admins. Share the grading account password privately, never in this repository.

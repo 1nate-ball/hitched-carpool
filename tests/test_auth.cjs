@@ -156,3 +156,14 @@ test('profile name from the account replaces the sample name', () => {
   run("S.me = {first:'Jordan', last:'Hale'}; DB.profile = {full_name:'Robbie  McVey'}; applyAccountName();");
   assert.equal(run('fullName(S.me)'), 'Robbie McVey');
 });
+
+test('admin deep link has a fixed stats target and preserves normal login behavior',()=>{
+ const run=app();
+ assert.equal(run("adminLinkTarget('#admin').screen"),'stats');
+ assert.equal(run("adminLinkTarget('#/admin').screen"),'stats');
+ for(const hash of ['', '#access_token=test', '#admin=1', '#https://other.test']) assert.equal(run(`adminLinkTarget('${hash}')`),null);
+ run("S.after={screen:'stats',params:{}};");
+ assert.match(run('SCREENS.login()'),/Admin sign-in/);
+ assert.match(run('SCREENS.login()'),/assigned admin account/);
+ run('S.after=null');assert.doesNotMatch(run('SCREENS.login()'),/Admin sign-in/);
+});

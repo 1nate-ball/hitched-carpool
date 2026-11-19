@@ -1862,9 +1862,9 @@ function authHeader(sub){
 
 SCREENS.login = () => `<div class="screen auth-layout">${authArt('login')}<div class="auth-form">
   ${authHeader('Rides with BYU students')}
-  <h1>Log in</h1>
+  <h1>${S.after?.screen === 'stats' ? 'Admin sign-in' : 'Log in'}</h1>
   ${S.loginNotice ? `<div class="alert ok small" role="status">${esc(S.loginNotice)}</div>` : ''}
-  ${S.after ? '<p class="small muted">Log in to continue.</p>' : ''}
+  ${S.after?.screen === 'stats' ? '<p class="small muted">Sign in with your assigned admin account to view Hitch stats.</p>' : S.after ? '<p class="small muted">Log in to continue.</p>' : ''}
   <form id="liForm" class="fieldset" novalidate>
     <div class="field"><label for="li-email">BYU email</label><input id="li-email" type="email" autocomplete="username" value="${esc(S.loginUser)}" required></div>
     <div class="field"><label for="li-pass">Password</label>${passInput('li-pass', 'current-password')}</div>
@@ -2372,6 +2372,9 @@ BIND.edit = () => {
   });
 };
 
+// Grading link: use a hash so the Python server still serves the normal app.
+function adminLinkTarget(hash){ return ['#admin', '#/admin'].includes(hash) ? {screen:'stats', params:{}} : null; }
+
 // ---------- render + events ----------
 async function boot(){
   try {
@@ -2384,6 +2387,7 @@ async function boot(){
   }
   // Keep the user signed in across refreshes: the saved Supabase session is reused (and refreshed if needed).
   let emailSession = null;
+  const adminTarget = adminLinkTarget(location.hash);
   const emailLink = new URLSearchParams(location.hash.slice(1));
   if (emailLink.has('error_code')) history.replaceState(null, '', location.pathname + location.search);
   try {
@@ -2392,9 +2396,10 @@ async function boot(){
     DB.session = await api.getSession();
   } catch (error) { console.warn('Could not check sign-in:', error.message); DB.session = null; }
   if (DB.session?.recovery){ S.screen = 'reset'; render(); return; }
-  if (DB.session){ await loadAccount(); S.screen = lastScreen() || 'home'; }
+  if (DB.session){ await loadAccount(); S.screen = adminTarget?.screen || lastScreen() || 'home'; }
   else {
     S.screen = 'login';
+    if (adminTarget) S.after = adminTarget;
     if (emailLink.has('error_code')) S.loginNotice = 'This email link expired or was already used. Log in or request a new reset link.';
   }
   render();
